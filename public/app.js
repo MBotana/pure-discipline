@@ -16,6 +16,13 @@ let S = { token: '', startDate: '', days: {}, settings: {}, device: Math.random(
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch { /* sin almacenamiento */ }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* ignorar */ } };
 
+const THEMES = [['cielo', 'Cielo', '#9fd8f7'], ['noche', 'Noche', '#0b1830'], ['plata', 'Plata', '#c3ccd8'], ['bronce', 'Bronce', '#120c0b']];
+function applyTheme() {
+  const t = THEMES.find(x => x[0] === S.theme) ? S.theme : 'cielo';
+  document.documentElement.dataset.theme = t;
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = THEMES.find(x => x[0] === t)[2];
+}
+applyTheme();
 let tab = 'hoy', viewDate = todayISO(), syncMsg = '', syncing = false, errMsg = '', mode = null, timer = 0;
 
 // ---------- fechas (UTC puro, sin zona horaria) ----------
@@ -181,6 +188,7 @@ function viewAjustes() {
     h += `<div class="err">${esc(errMsg)}</div><button class="btn" data-act="login">${mode === 'setup' ? 'Crear y entrar' : 'Entrar'}</button></div>`;
     return h;
   }
+  h += `<div class="card"><h2>Apariencia</h2><div class="themes">${THEMES.map(t => `<button class="theme ${(S.theme || 'cielo') === t[0] ? 'on' : ''}" data-act="theme" data-v="${t[0]}"><i style="background:${t[2]}"></i>${t[1]}</button>`).join('')}</div></div>`;
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   h += `<div class="card"><h2>Sincronización</h2><div class="row"><span>${pending() ? pending() + ' día(s) pendientes' : 'Todo sincronizado'}</span><button class="btn sm" data-act="sync" ${syncing ? 'disabled' : ''}>${syncing ? 'Sincronizando…' : 'Sincronizar'}</button></div><div class="mute">${S.lastSync ? 'Última vez: ' + new Date(S.lastSync).toLocaleString('es-AR') : 'Nunca'}</div><div class="err">${esc(syncMsg)}</div></div>`;
   const st = S.settings || {};
@@ -289,6 +297,7 @@ document.addEventListener('click', async ev => {
   else if (a === 'equip') { if (dayIdx(todayISO()) < 0) { S.preEquip = el.dataset.c; save(); stripKey = ''; render(); } else setInput(todayISO(), i => { i.equip = el.dataset.c; }); }
   else if (a === 'map') { mapAct = +el.dataset.a; mapSel = 0; render(); }
   else if (a === 'node') { mapSel = +el.dataset.f; render(); }
+  else if (a === 'theme') { S.theme = el.dataset.v; save(); applyTheme(); render(); }
   else if (a === 'login') login();
   else if (a === 'sync') sync();
   else if (a === 'push') enablePush();
