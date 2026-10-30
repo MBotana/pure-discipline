@@ -1,0 +1,11 @@
+{
+  "name": "pure-discipline",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:engine": "bun build engine/src/engine/engine.ts --outfile public/engine.js --format esm --target browser",
+    "test": "tsx --test engine/test/*.test.ts test/*.test.ts",
+    "deploy": "wrangler deploy"
+  }
+}

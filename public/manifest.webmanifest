@@ -1,0 +1,15 @@
+{
+  "name": "Pure Discipline",
+  "short_name": "Discipline",
+  "description": "Life Reset 66: tu torre de 100 pisos",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#111420",
+  "theme_color": "#111420",
+  "lang": "es",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
