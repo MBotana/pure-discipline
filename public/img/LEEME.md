@@ -20,3 +20,4 @@ Fondo transparente en los sprites, sin suavizado (pixel art puro). La app los mu
 
 Los pies del héroe, de la mascota y del jefe se apoyan en la misma línea del suelo (unos 6 px sobre el borde inferior del fondo).
 Para ver un cambio en el iPhone, cerrá y abrí la app dos veces (usa caché).
+| `marco.png` (opcional) | 24×24 | Marco de los paneles: se estira en 9 partes, con esquinas de 6 px. Si no existe, la app usa un marco dibujado por código |

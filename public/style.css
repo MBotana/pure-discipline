@@ -6,8 +6,10 @@ body{background:radial-gradient(120% 60% at 50% 0,#2a1a16 0,#120c0b 70%) fixed}
 img.px{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
 #app{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 12px) 14px calc(196px + env(safe-area-inset-bottom))}
 h1{font-size:22px;margin:4px 0 12px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);text-shadow:2px 2px 0 #000}
-h2{display:inline-block;font-size:13px;margin:0 0 10px;padding:3px 12px;text-transform:uppercase;letter-spacing:.08em;color:#ffe7b0;background:var(--red);border:2px solid var(--gold);box-shadow:2px 2px 0 #000;text-shadow:1px 1px 0 #000}
-.card{background:var(--panel);border:12px solid transparent;border-image:var(--frame) 6 fill/12px/0 stretch;image-rendering:pixelated;padding:4px 6px 8px;margin:0 0 12px}
+h2{display:block;font-size:13px;margin:0 0 12px;padding:0 0 6px;text-transform:uppercase;letter-spacing:.1em;color:var(--gold);border-bottom:2px solid #5a3e24;text-shadow:1px 1px 0 #000}
+.card{--n:6px;position:relative;background:#1f1514;padding:16px 16px 14px;margin:0 0 14px;box-shadow:inset 0 0 0 2px #0b0706,inset 0 0 0 4px #8a5f2e,inset 0 0 0 6px #0b0706,inset 6px 6px 0 6px rgba(255,211,107,.05),3px 3px 0 #000}
+/* marco propio: si existe /img/marco.png (24×24, corte de 6 px) reemplaza al estilo por defecto */
+.cf .card{background:var(--panel);border:12px solid transparent;border-image:url(/img/marco.png) 6 fill/12px/0 stretch;image-rendering:pixelated;padding:4px 6px 8px;box-shadow:none;clip-path:none}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .mute{color:var(--mute);font-size:13px}.big{font-size:34px;font-weight:800;line-height:1.1;color:var(--gold);text-shadow:2px 2px 0 #000}
 .bar{height:14px;background:var(--track);border:2px solid var(--bronze);margin:8px 0 4px}
@@ -51,7 +53,7 @@ a{color:var(--gold)}
 .strip.blocked .pet{animation:none}
 .arena .spark{position:absolute;font-style:normal;color:var(--gold);font-size:14px;text-shadow:1px 1px 0 #000;animation:float 1s steps(6) infinite;pointer-events:none}
 .dmg{position:absolute;left:30%;top:18%;font-size:18px;font-weight:800;color:var(--gold);text-shadow:2px 2px 0 #000,-1px -1px 0 #000;animation:float .9s steps(8) forwards;pointer-events:none}
-img.ico{display:inline-block;vertical-align:-4px;margin-right:6px;image-rendering:pixelated}
+img.ico{display:inline-block;vertical-align:middle;margin-right:6px;image-rendering:pixelated}
 img.px{image-rendering:pixelated}
 @keyframes jump{50%{transform:translateY(-10px)}}@keyframes shake{50%{transform:translateX(3px)}}
 @keyframes walk{to{background-position:-32px 0}}@keyframes bob{50%{transform:translateY(-3px)}}@keyframes hop{50%{transform:translateY(-4px)}}

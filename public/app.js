@@ -198,6 +198,7 @@ function render() {
   const app = document.getElementById('app'), focus = document.activeElement?.id, y = window.scrollY;
   const offline = (!navigator.onLine || pending() > 0) && S.token ? `<div class="mute" style="text-align:right">${navigator.onLine ? 'pendiente de sincronizar' : 'sin conexión'}</div>` : '';
   if (!S.token && tab !== 'ajustes') { tab = 'ajustes'; return render(); }
+  document.documentElement.classList.toggle('cf', has('marco'));
   app.innerHTML = offline + view(); renderStrip();
   document.getElementById('tabs').innerHTML = TABS.map(t => `<button class="${t[0] === tab ? 'on' : ''}" data-act="tab" data-t="${t[0]}"><span>${t[1]}</span>${t[2]}</button>`).join('');
   if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
