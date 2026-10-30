@@ -23,7 +23,7 @@ function applyTheme() {
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = THEMES.find(x => x[0] === t)[2];
 }
 applyTheme();
-let mtab = 'dia', tab = 'hoy', viewDate = todayISO(), syncMsg = '', syncing = false, errMsg = '', mode = null, timer = 0;
+let showDone = false, lastTap = { k: '', t: 0 }, mtab = 'dia', tab = 'hoy', viewDate = todayISO(), syncMsg = '', syncing = false, errMsg = '', mode = null, timer = 0;
 
 // ---------- fechas (UTC puro, sin zona horaria) ----------
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -59,7 +59,13 @@ function current() {
   const { e } = compute(i); return { e, st: e.state, pre: false };
 }
 function dayGain(date) { const i = dayIdx(date); if (i < 0) return 0; return compute(i).results[i].events.reduce((a, x) => a + x.paid, 0); }
+function hint(text) {
+  let t = document.getElementById('hint');
+  if (!t) { t = document.createElement('div'); t.id = 'hint'; document.body.appendChild(t); }
+  t.textContent = text; t.classList.add('show'); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 1200);
+}
 const toggle = (date, key) => {
+  document.getElementById('hint')?.classList.remove('show');
   const before = dayGain(date), wasOn = !!S.days[date]?.input?.[key];
   setInput(date, i => { i[key] = !i[key]; });
   if (wasOn) return;
@@ -113,7 +119,8 @@ function viewHoy() {
   const w = c => st.wu[c], m = c => st.mu[c];
   const gained = r.events.reduce((a, x) => a + x.paid, 0), lost = r.events.filter(x => x.outcome !== 'paid').reduce((a, x) => a + x.amount - x.paid, 0);
   const tick = k => !!inp[k];
-  const row = (k, cat, label, meta) => `<button class="mrow ${tick(k) ? 'on' : ''}" ${pre ? 'disabled' : `data-act="t" data-k="${k}"`}><span class="mic">${iconTag(cat, 2)}</span><span class="mtx"><b>${label}</b><small>${meta}</small></span><span class="chk">${tick(k) ? '✓' : ''}</span></button>`;
+  const doneRows = [];
+  const row = (k, cat, label, meta) => { if (tick(k)) { doneRows.push([k, cat, label]); return ''; } return `<button class="mrow" ${pre ? 'disabled' : `data-act="t" data-k="${k}"`}><span class="mic">${iconTag(cat, 2)}</span><span class="mtx"><b>${label}</b><small>${meta}</small></span>${pre ? '' : '<span class="dbl">2×</span>'}</button>`; };
   const pips = (n, max) => `<span class="pips">${Array.from({ length: max }, (_, q) => `<i class="${q < n ? 'f' : ''}"></i>`).join('')}</span>`;
   const info = (cat, label, meta, right, done) => `<div class="mrow static ${done ? 'on' : ''}"><span class="mic">${iconTag(cat, 2)}</span><span class="mtx"><b>${label}</b><small>${meta}</small></span>${right}<span class="chk">${done ? '✓' : ''}</span></div>`;
   const bar = (n, max) => `<span class="mini"><i style="width:${Math.min(100, n / max * 100)}%"></i></span>`;
@@ -131,6 +138,7 @@ function viewHoy() {
     h += row('aero', 'V', 'Aeróbico', `${wk} · sem ${w('V')}/3 · mes ${m('V')}/${cfg.aeroM}`);
     h += row('dwork', 'D', 'Día de trabajo del objetivo', `sem ${w('D')}/3`);
     h += row('clean', 'O', 'Ambiente ordenado', `${wk} · sem ${w('O')}/${cfg.namb}`);
+    if (n === 5) h += `<p class="allok">¡Todas las misiones del día cumplidas!</p>`;
     h += `</div>`;
   } else if (mtab === 'sem') {
     const rows = [['F', 'Fuerza', '3 sesiones', 3], ['I', 'Inteligencia', '3 lecturas', 3], ['V', 'Vitalidad', '3 aeróbicos', 3], ['D', 'Disciplina', '3 días de trabajo', 3], ['O', 'Orden', `${cfg.namb} ambientes`, cfg.namb]];
@@ -153,6 +161,11 @@ function viewHoy() {
     h += `<p class="mute">Fallar 2 o más reinicia la racha; cada uno fallado resta 1 punto de estadística.</p></div>`;
     h += `<div class="card slim"><h2>Registrar hoy</h2>${row('bookTramo', 'I', 'Avancé un tramo del libro (10 %)', `mes ${m('I')}/${cfg.bookTramos}`)}${row('improve', 'O', 'Día de trabajo de la mejora', `mes ${m('O')}/${cfg.impUnits}`)}`;
     h += dd === 2 || dd === 6 ? row('dcheck', 'D', 'Chequeo de tareas: al día', 'miércoles y domingo') : `<p class="mute">El chequeo de tareas se registra miércoles y domingo.</p>`;
+    h += `</div>`;
+  }
+  if (doneRows.length) {
+    h += `<div class="card slim"><button class="donebtn" data-act="showdone"><span>Completadas (${doneRows.length})</span><span>${showDone ? '▲' : '▼'}</span></button>`;
+    if (showDone) h += doneRows.map(([k, c, l]) => `<div class="mrow static on"><span class="mic">${iconTag(c, 2)}</span><span class="mtx"><b>${l}</b></span><button class="undo" data-act="undo" data-k="${k}">Deshacer</button></div>`).join('');
     h += `</div>`;
   }
   return h;
@@ -321,7 +334,13 @@ document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act;
   if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); window.scrollTo(0, 0); }
-  else if (a === 't') toggle(viewDate, el.dataset.k);
+  else if (a === 't') {
+    const k = el.dataset.k, now = Date.now();
+    if (lastTap.k === k && now - lastTap.t < 450) { lastTap = { k: '', t: 0 }; toggle(viewDate, k); }
+    else { lastTap = { k, t: now }; el.classList.add('armed'); setTimeout(() => el.classList.remove('armed'), 450); hint('Tocá otra vez para completar'); }
+  }
+  else if (a === 'undo') setInput(viewDate, i => { i[el.dataset.k] = false; });
+  else if (a === 'showdone') { showDone = !showDone; render(); }
   else if (a === 'anti') setInput(viewDate, i => { i.anti = i.anti === false ? undefined : false; });
   else if (a === 'prev') { viewDate = addDays(viewDate, -1); render(); }
   else if (a === 'next') { if (viewDate < todayISO()) { viewDate = addDays(viewDate, 1); render(); } }
