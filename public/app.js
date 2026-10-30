@@ -101,48 +101,58 @@ const fmt = n => Math.round(n).toLocaleString('es-AR');
 function viewHoy() {
   if (!S.startDate) return '';
   const today = todayISO(), idx = dayIdx(viewDate);
-  const nav = `<div class="nav"><button data-act="prev" aria-label="Día anterior">‹</button><div style="text-align:center"><b>${pretty(viewDate)}</b>${viewDate === today ? '<div class="mute">Hoy</div>' : '<div class="mute"><a href="#" data-act="today">Ir a hoy</a></div>'}</div><button data-act="next" aria-label="Día siguiente" ${viewDate >= today ? 'disabled' : ''}>›</button></div>`;
+  const dow = (new Date(toUTC(viewDate)).getUTCDay() + 6) % 7, wkStart = addDays(viewDate, -dow), DK = ['gym', 'read', 'aero', 'clean', 'dwork'];
+  const strip = Array.from({ length: 7 }, (_, i) => { const d = addDays(wkStart, i), inp = S.days[d]?.input ?? {}, n = DK.filter(k => inp[k]).length, off = d > today;
+    return `<button class="wd ${d === viewDate ? 'sel' : ''} ${d === today ? 'tod' : ''} ${n === 5 ? 'full' : n ? 'some' : ''}" ${off ? 'disabled' : `data-act="day" data-d="${d}"`}><span>${'LMXJVSD'[i]}</span><b>${+d.slice(8)}</b><i></i></button>`; }).join('');
+  const nav = `<div class="wk">${strip}</div><div class="daytitle">${viewDate === today ? 'Hoy' : 'Editando'} · ${pretty(viewDate)}${viewDate !== today ? ' · <a href="#" data-act="today">volver a hoy</a>' : ''}</div>`;
   const pre = dayIdx(today) < 0;
   if (idx < 0 && !pre) return `${nav}<div class="card mute">Este día es anterior al inicio de tu torre.</div>`;
   const cur = pre ? current() : null, { e, results } = pre ? { e: cur.e, results: [{ floor: 1, events: [] }] } : compute(idx), st = e.state, r = results[pre ? 0 : idx], cfg = e.cfg;
   const dd = pre ? 0 : idx % 7, inp = pre ? {} : S.days[viewDate]?.input ?? {};
   const on = k => !!inp[k];
-  const t = (k, label, sub) => `<button class="task ${on(k) ? 'on' : ''}" ${pre ? 'disabled' : `data-act="t" data-k="${k}"`}><span class="box">${on(k) ? '✓' : ''}</span><span>${label}<small>${sub}</small></span></button>`;
   const w = c => st.wu[c], m = c => st.mu[c];
   const gained = r.events.reduce((a, x) => a + x.paid, 0), lost = r.events.filter(x => x.outcome !== 'paid').reduce((a, x) => a + x.amount - x.paid, 0);
-  const prog = (n, max, label, done, gold) => `<div class="mprog"><div class="row"><span>${label}</span><span class="pill ${done ? 'ok' : ''}">${done ? 'cumplida' : n + ' / ' + max}</span></div><div class="bar ${gold ? 'gold' : ''}"><i style="width:${Math.min(100, n / max * 100)}%"></i></div></div>`;
+  const tick = k => !!inp[k];
+  const row = (k, cat, label, meta) => `<button class="mrow ${tick(k) ? 'on' : ''}" ${pre ? 'disabled' : `data-act="t" data-k="${k}"`}><span class="mic">${iconTag(cat, 2)}</span><span class="mtx"><b>${label}</b><small>${meta}</small></span><span class="chk">${tick(k) ? '✓' : ''}</span></button>`;
+  const pips = (n, max) => `<span class="pips">${Array.from({ length: max }, (_, q) => `<i class="${q < n ? 'f' : ''}"></i>`).join('')}</span>`;
+  const info = (cat, label, meta, right, done) => `<div class="mrow static ${done ? 'on' : ''}"><span class="mic">${iconTag(cat, 2)}</span><span class="mtx"><b>${label}</b><small>${meta}</small></span>${right}<span class="chk">${done ? '✓' : ''}</span></div>`;
+  const bar = (n, max) => `<span class="mini"><i style="width:${Math.min(100, n / max * 100)}%"></i></span>`;
   const sections = [['dia', 'Diarias'], ['sem', 'Semanales'], ['mes', 'Mensuales']];
   let h = nav;
   if (pre) h += `<div class="banner">Tu torre empieza el <b>${pretty(S.startDate)}</b> (faltan ${-dayIdx(today)} días). Así se verán tus misiones; todavía no se pueden registrar.</div>`;
   if (st.blocked !== null && viewDate === today) h += `<div class="banner">🔒 <b>Bloqueado en el piso ${st.blocked}.</b> No sumás XP hasta cumplir la puerta (mirá la pestaña Torre).</div>`;
-  h += `<div class="card"><div class="row"><div><div class="mute">XP ganada este día</div><div class="big">+${fmt(gained)}</div></div><div style="text-align:right"><div class="mute">Piso</div><div class="big">${r.floor}</div></div></div>${lost > 0 ? `<div class="mute">No cobrada por bloqueo: ${fmt(lost)}</div>` : ''}<div class="mute">Racha mensual: ${st.s} · multiplicador ×${st.s >= 1 ? st.s + 1 : 1}</div></div>`;
+  h += `<div class="sum"><span><small>XP del día</small><b>+${fmt(gained)}</b></span><span><small>Piso</small><b>${r.floor}</b></span><span><small>Racha</small><b>${st.s} ${st.s === 1 ? 'mes' : 'meses'}</b></span><span><small>Multiplicador</small><b>×${st.s >= 1 ? st.s + 1 : 1}</b></span></div>${lost > 0 ? `<div class="mute" style="margin:-6px 0 10px">No cobrada por bloqueo: ${fmt(lost)}</div>` : ''}`;
   h += `<div class="seg">${sections.map(([k, l]) => `<button class="${mtab === k ? 'on' : ''}" data-act="mtab" data-v="${k}">${l}</button>`).join('')}</div>`;
   if (mtab === 'dia') {
-    const wk = dd < 5 ? '+50 XP (lun–vie)' : 'fin de semana: solo suma a lo semanal';
-    h += `<div class="card"><h2>${iconTag('F')} Fuerza</h2>${t('gym', 'Gimnasio', `${wk} · semana ${w('F')}/3 · mes ${m('F')}/${cfg.gymM}`)}</div>`;
-    h += `<div class="card"><h2>${iconTag('I')} Inteligencia</h2>${t('read', 'Lectura', `${wk} · semana ${w('I')}/3`)}</div>`;
-    h += `<div class="card"><h2>${iconTag('V')} Vitalidad</h2>${t('aero', 'Aeróbico', `${wk} · semana ${w('V')}/3 · mes ${m('V')}/${cfg.aeroM}`)}</div>`;
-    h += `<div class="card"><h2>${iconTag('D')} Disciplina</h2>${t('dwork', 'Día de trabajo del objetivo', `semana ${w('D')}/3`)}</div>`;
-    h += `<div class="card"><h2>${iconTag('O')} Orden</h2>${t('clean', 'Ambiente ordenado', `${wk} · semana ${w('O')}/${cfg.namb}`)}</div>`;
+    const wk = dd < 5 ? '+50 XP' : 'solo suma a la semana', n = DK.filter(tick).length;
+    h += `<div class="card slim"><div class="row"><h2>Misiones del día</h2><span class="pill ${n === 5 ? 'ok' : ''}">${n} / 5</span></div><div class="bar gold"><i style="width:${n * 20}%"></i></div>`;
+    h += row('gym', 'F', 'Gimnasio', `${wk} · sem ${w('F')}/3 · mes ${m('F')}/${cfg.gymM}`);
+    h += row('read', 'I', 'Lectura', `${wk} · sem ${w('I')}/3`);
+    h += row('aero', 'V', 'Aeróbico', `${wk} · sem ${w('V')}/3 · mes ${m('V')}/${cfg.aeroM}`);
+    h += row('dwork', 'D', 'Día de trabajo del objetivo', `sem ${w('D')}/3`);
+    h += row('clean', 'O', 'Ambiente ordenado', `${wk} · sem ${w('O')}/${cfg.namb}`);
+    h += `</div>`;
   } else if (mtab === 'sem') {
-    h += `<div class="card"><h2>Esta semana</h2>`;
-    h += prog(w('F'), 3, `${iconTag('F', 1)} Fuerza · 3 sesiones`, st.wdone.includes('F')) + prog(w('I'), 3, `${iconTag('I', 1)} Inteligencia · 3 lecturas`, st.wdone.includes('I')) + prog(w('V'), 3, `${iconTag('V', 1)} Vitalidad · 3 aeróbicos`, st.wdone.includes('V'));
-    h += prog(w('D'), 3, `${iconTag('D', 1)} Disciplina · 3 días de trabajo`, st.wdone.includes('D')) + prog(w('O'), cfg.namb, `${iconTag('O', 1)} Orden · ${cfg.namb} ambientes`, st.wdone.includes('O'));
-    h += `<p class="mute">Cada semanal cumplida da +1 punto de estadística. Racha de semanas buenas: ${st.wstreak}.</p></div>`;
-    h += `<div class="card"><h2>Cierre de semana</h2>`;
+    const rows = [['F', 'Fuerza', '3 sesiones', 3], ['I', 'Inteligencia', '3 lecturas', 3], ['V', 'Vitalidad', '3 aeróbicos', 3], ['D', 'Disciplina', '3 días de trabajo', 3], ['O', 'Orden', `${cfg.namb} ambientes`, cfg.namb]];
+    const dn = rows.filter(([c]) => st.wdone.includes(c)).length;
+    h += `<div class="card slim"><div class="row"><h2>Esta semana</h2><span class="pill ${dn === 5 ? 'ok' : ''}">${dn} / 5</span></div>`;
+    h += rows.map(([c, nm, goal, max]) => info(c, nm, goal, pips(w(c), max), st.wdone.includes(c))).join('');
+    h += `<p class="mute">Cada semanal cumplida da +1 punto de estadística. Semanas buenas seguidas: ${st.wstreak}.</p></div>`;
+    h += `<div class="card slim"><h2>Cierre de semana</h2>`;
     if (dd === 6) {
-      h += `<button class="task bad ${inp.anti === false ? 'on' : ''}" data-act="anti"><span class="box">${inp.anti === false ? '!' : ''}</span><span>Violé un antiobjetivo<small>más de 3 sesiones de videojuegos o celular promedio > 5 h</small></span></button>`;
-      h += t('feed', 'Alimenté a la mascota toda la semana', `mascota equipada: ${PETS[st.equipped].name}`);
+      h += `<button class="mrow bad ${inp.anti === false ? 'on' : ''}" data-act="anti"><span class="mic">⚠️</span><span class="mtx"><b>Violé un antiobjetivo</b><small>más de 3 sesiones de videojuegos o celular > 5 h</small></span><span class="chk">${inp.anti === false ? '!' : ''}</span></button>`;
+      h += row('feed', 'F', 'Alimenté a la mascota toda la semana', `mascota equipada: ${PETS[st.equipped].name}`).replace(iconTag('F', 2), petTag(st.equipped, e.petLevel(st.equipped), 1));
     } else h += `<p class="mute">Se completa el domingo: ahí marcás si violaste un antiobjetivo y si alimentaste a tu mascota (${PETS[st.equipped].name}).</p>`;
     h += `</div>`;
   } else {
-    h += `<div class="card"><h2>Este mes</h2>`;
-    h += prog(m('F'), cfg.gymM, `${iconTag('F', 1)} Fuerza · ${cfg.gymM} sesiones`, st.mdone.includes('F'), true) + prog(m('V'), cfg.aeroM, `${iconTag('V', 1)} Vitalidad · ${cfg.aeroM} aeróbicos`, st.mdone.includes('V'), true);
-    h += prog(m('I'), cfg.bookTramos, `${iconTag('I', 1)} Inteligencia · libro en ${cfg.bookTramos} tramos`, st.mdone.includes('I'), true) + prog(m('O'), cfg.impUnits, `${iconTag('O', 1)} Orden · ${cfg.impUnits} días de mejora`, st.mdone.includes('O'), true);
-    h += `<div class="mprog"><div class="row"><span>${iconTag('D', 1)} Disciplina · chequeos al día</span><span class="pill ${st.mdone.includes('D') ? 'ok' : ''}">${st.mdone.includes('D') ? 'cumplido' : 'pendiente'}</span></div></div>`;
-    h += `<p class="mute">Cumplidos ${st.mdone.length} de 5. Fallar 2 o más reinicia la racha; cada uno fallado resta 1 punto de estadística.</p></div>`;
-    h += `<div class="card"><h2>Registrar hoy</h2>${t('bookTramo', 'Avancé un tramo del libro (10 %)', `mes ${m('I')}/${cfg.bookTramos}`)}${t('improve', 'Día de trabajo de la mejora', `mes ${m('O')}/${cfg.impUnits}`)}`;
-    h += dd === 2 || dd === 6 ? t('dcheck', 'Chequeo de tareas: al día', 'miércoles y domingo') : `<p class="mute">El chequeo de tareas se registra miércoles y domingo.</p>`;
+    const rows = [['F', 'Fuerza', `${cfg.gymM} sesiones`, cfg.gymM], ['V', 'Vitalidad', `${cfg.aeroM} aeróbicos`, cfg.aeroM], ['I', 'Inteligencia', `${cfg.bookTramos} tramos del libro`, cfg.bookTramos], ['O', 'Orden', `${cfg.impUnits} días de mejora`, cfg.impUnits]];
+    const dn = st.mdone.length;
+    h += `<div class="card slim"><div class="row"><h2>Este mes</h2><span class="pill ${dn === 5 ? 'ok' : ''}">${dn} / 5</span></div>`;
+    h += rows.map(([c, nm, goal, max]) => info(c, nm, `${m(c)} de ${goal}`, bar(m(c), max), st.mdone.includes(c))).join('');
+    h += info('D', 'Disciplina', 'chequeos de tareas al día', '', st.mdone.includes('D'));
+    h += `<p class="mute">Fallar 2 o más reinicia la racha; cada uno fallado resta 1 punto de estadística.</p></div>`;
+    h += `<div class="card slim"><h2>Registrar hoy</h2>${row('bookTramo', 'I', 'Avancé un tramo del libro (10 %)', `mes ${m('I')}/${cfg.bookTramos}`)}${row('improve', 'O', 'Día de trabajo de la mejora', `mes ${m('O')}/${cfg.impUnits}`)}`;
+    h += dd === 2 || dd === 6 ? row('dcheck', 'D', 'Chequeo de tareas: al día', 'miércoles y domingo') : `<p class="mute">El chequeo de tareas se registra miércoles y domingo.</p>`;
     h += `</div>`;
   }
   return h;
@@ -319,6 +329,7 @@ document.addEventListener('click', async ev => {
   else if (a === 'equip') { if (dayIdx(todayISO()) < 0) { S.preEquip = el.dataset.c; save(); stripKey = ''; render(); } else setInput(todayISO(), i => { i.equip = el.dataset.c; }); }
   else if (a === 'map') { mapAct = +el.dataset.a; mapSel = 0; render(); }
   else if (a === 'node') { mapSel = +el.dataset.f; render(); }
+  else if (a === 'day') { viewDate = el.dataset.d; render(); }
   else if (a === 'mtab') { mtab = el.dataset.v; render(); }
   else if (a === 'theme') { S.theme = el.dataset.v; save(); applyTheme(); render(); }
   else if (a === 'login') login();
