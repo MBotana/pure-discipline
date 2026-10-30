@@ -35,3 +35,20 @@ label{display:block;font-size:14px;color:var(--mute);margin-top:8px}
 .nav button{background:var(--card);border:1px solid var(--line);border-radius:12px;width:44px;height:44px;font-size:18px;cursor:pointer}
 .nav button:disabled{opacity:.35}
 .err{color:var(--bad);font-size:14px;min-height:18px}
+/* ---- escena del héroe ---- */
+.scene{position:relative;height:150px;border-radius:18px;overflow:hidden;margin:0 0 12px;border:1px solid var(--line);background:linear-gradient(var(--sky1),var(--sky2))}
+.scene.tall{height:190px}
+.scene .hills{position:absolute;left:0;right:0;bottom:34px;width:100%;height:70px}
+.scene .ground{position:absolute;left:0;right:0;bottom:0;height:40px;background:var(--gr);border-top:3px solid var(--gr2);overflow:hidden}
+.scene .ground::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 34px,color-mix(in srgb,var(--gr2) 70%,transparent) 34px 40px);background-size:80px 100%;animation:walk 1.6s linear infinite;opacity:.6}
+.scene .actors{position:absolute;left:14%;bottom:20px;display:flex;align-items:flex-end;gap:2px}
+.scene .hero-wrap{animation:bob .8s ease-in-out infinite}
+.scene .pet-wrap{animation:bob .8s ease-in-out .25s infinite;margin-right:-6px}
+.scene .hero .l1{transform-origin:26px 53px;animation:step .8s ease-in-out infinite}.scene .hero .l2{transform-origin:36px 53px;animation:step .8s ease-in-out .4s infinite}
+.scene .sword{transform-origin:48px 50px;animation:swing 1.6s ease-in-out infinite}
+.scene .foe{position:absolute;right:11%;bottom:20px;animation:hop 1.4s ease-in-out infinite}
+.scene.is-blocked .foe,.scene .foe .gate-art{animation:none}
+.scene.is-blocked .ground::after{animation:none}.scene.is-blocked .hero-wrap,.scene.is-blocked .pet-wrap{animation:none}
+.scene .zone-tag{position:absolute;left:10px;top:8px;font-size:12px;font-weight:700;color:#fff;background:rgba(17,20,32,.55);padding:3px 9px;border-radius:99px;backdrop-filter:blur(4px)}
+@keyframes walk{to{background-position:-80px 0}}@keyframes bob{50%{transform:translateY(-3px)}}@keyframes step{50%{transform:rotate(14deg)}}@keyframes swing{50%{transform:rotate(-10deg)}}@keyframes hop{50%{transform:translateY(-6px)}}
+@media (prefers-reduced-motion:reduce){.scene *,.scene *::after{animation:none!important}}

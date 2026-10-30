@@ -1,4 +1,5 @@
 import { Engine, levelOf, cumXp, buildGates } from '/engine.js';
+import { sceneHTML, petSVG } from '/art.js';
 
 const NAMES = { F: 'Fuerza', I: 'Inteligencia', V: 'Vitalidad', D: 'Disciplina', O: 'Orden' };
 const ICONS = { F: '💪', I: '📚', V: '🏃', D: '🎯', O: '🧹' };
@@ -82,7 +83,8 @@ function viewHoy() {
   const t = (k, label, sub) => `<button class="task ${on(k) ? 'on' : ''}" data-act="t" data-k="${k}"><span class="box">${on(k) ? '✓' : ''}</span><span>${label}<small>${sub}</small></span></button>`;
   const w = c => st.wu[c], m = c => st.mu[c];
   const gained = r.events.reduce((a, x) => a + x.paid, 0), lost = r.events.filter(x => x.outcome !== 'paid').reduce((a, x) => a + x.amount - x.paid, 0);
-  let h = nav;
+  const sceneOf = (tall) => sceneHTML({ floor: r.floor, equipped: st.equipped, petLevel: e.petLevel(st.equipped), blocked: st.blocked !== null, done: st.tower !== null, tall });
+  let h = nav + sceneOf(false);
   if (st.blocked !== null && viewDate === today) h += `<div class="banner">🔒 <b>Bloqueado en el piso ${st.blocked}.</b> No sumás XP hasta cumplir la puerta (mirá la pestaña Torre).</div>`;
   h += `<div class="card"><div class="row"><div><div class="mute">XP ganada este día</div><div class="big">+${fmt(gained)}</div></div><div style="text-align:right"><div class="mute">Piso</div><div class="big">${r.floor}</div></div></div>${lost > 0 ? `<div class="mute">No cobrada por bloqueo: ${fmt(lost)}</div>` : ''}<div class="mute">Racha mensual: ${st.s} · multiplicador ×${st.s >= 1 ? st.s + 1 : 1}</div></div>`;
   h += `<div class="card"><h2>${ICONS.F} Fuerza</h2>${t('gym', 'Gimnasio', `semana ${w('F')}/3 · mes ${m('F')}/18`)}</div>`;
@@ -103,7 +105,7 @@ function viewTorre() {
   const { e } = compute(dayIdx(todayISO())), st = e.state, cfg = e.cfg, L = e.floor();
   const into = st.xp - cumXp(L, cfg.A, cfg.r), cost = cfg.A * Math.pow(cfg.r, L - 1);
   const gates = buildGates(cfg), nums = Object.keys(gates).map(Number).sort((a, b) => a - b);
-  let h = `<h1>Torre</h1><div class="card"><div class="row"><div><div class="mute">Piso actual</div><div class="big">${L}</div></div><div style="text-align:right"><div class="mute">XP total</div><b>${fmt(st.xp)}</b></div></div>`;
+  let h = `<h1>Torre</h1>` + sceneHTML({ floor: L, equipped: st.equipped, petLevel: e.petLevel(st.equipped), blocked: st.blocked !== null, done: st.tower !== null, tall: true }) + `<div class="card"><div class="row"><div><div class="mute">Piso actual</div><div class="big">${L}</div></div><div style="text-align:right"><div class="mute">XP total</div><b>${fmt(st.xp)}</b></div></div>`;
   h += st.tower !== null ? `<div class="banner ok">🏆 ¡Torre completada!</div>` : `<div class="bar"><i style="width:${Math.min(100, into / cost * 100)}%"></i></div><div class="mute">${fmt(into)} / ${fmt(cost)} XP para el piso ${L + 1}</div>`;
   h += `<div class="mute">Racha mensual activa: <b>${st.s}</b> ${st.s === 1 ? 'mes' : 'meses'}</div></div><div class="card"><h2>Puertas</h2>`;
   for (const g of nums) {
@@ -132,7 +134,7 @@ function viewMascotas() {
   if (st.feedStreak >= 1) h += `<div class="banner">Semanas sin alimentar seguidas: <b>${st.feedStreak}</b>. ${st.feedStreak >= 2 ? 'La mascota equipada pierde 1 nivel por cada semana fallada.' : 'Con la próxima semana fallada baja 1 nivel.'}</div>`;
   for (const c of CATS) {
     const l = lv[c], max = l >= 5, eq = st.equipped === c;
-    h += `<div class="card"><div class="row"><b>${ICONS[c]} Mascota de ${NAMES[c]}</b>${eq ? '<span class="pill gold">equipada</span>' : `<button class="btn sm ghost" data-act="equip" data-c="${c}">Equipar</button>`}</div><div class="row mute"><span>Nivel ${l} / 5</span>${max ? '<span>máximo</span>' : `<span>${st.px[c] - cum[l]} / ${e.cfg.petCosts[l]} XP</span>`}</div><div class="bar gold"><i style="width:${max ? 100 : (st.px[c] - cum[l]) / e.cfg.petCosts[l] * 100}%"></i></div></div>`;
+    h += `<div class="card"><div class="row"><span style="display:flex;align-items:center;gap:8px">${petSVG(c, l, 52)}<b>Mascota de ${NAMES[c]}</b></span>${eq ? '<span class="pill gold">equipada</span>' : `<button class="btn sm ghost" data-act="equip" data-c="${c}">Equipar</button>`}</div><div class="row mute"><span>Nivel ${l} / 5</span>${max ? '<span>máximo</span>' : `<span>${st.px[c] - cum[l]} / ${e.cfg.petCosts[l]} XP</span>`}</div><div class="bar gold"><i style="width:${max ? 100 : (st.px[c] - cum[l]) / e.cfg.petCosts[l] * 100}%"></i></div></div>`;
   }
   return h + `<p class="mute">Solo la mascota equipada aporta puntos en una puerta de estadísticas y solo a su propia estadística. Cada semana de alimentación perfecta le da 10 XP.</p>`;
 }
