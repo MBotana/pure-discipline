@@ -16,10 +16,12 @@ Fondo transparente en los sprites, sin suavizado (pixel art puro). La app los mu
 | `icono_fuerza.png`, `icono_inteligencia.png`, `icono_vitalidad.png`, `icono_disciplina.png`, `icono_orden.png` | 16×16 | Íconos de estadísticas |
 | `torre_cerrada.png`, `torre_abierta.png` | 240×64 | Escena de la torre con la puerta cerrada / abierta (antes del inicio) |
 | `torre_apertura_1.png` … `_6.png` (opcionales) | 240×64 | Cuadros intermedios de la puerta abriéndose (se usan los que existan, ~0,5 s cada uno) |
-| `fondo_01.png` … `fondo_12.png` | 240×64 | Fondos. 01: pisos 1-10 · 02: 11-24 · 03: 25 · 04: 26-35 · 05: 36-49 · 06: 50 · 07: 51-60 · 08: 61-74 · 09: 75 · 10: 76-85 · 11: 86-99 · 12: 100 |
+| `fondo_01.png` … `fondo_12.png` | 240×64 | Fondos (**se repiten sin cortes hacia los lados**, se mueven siempre; incluyen el suelo; sin la torre). 01: pisos 1-10 · 02: 11-24 · 03: 25 · 04: 26-35 · 05: 36-49 · 06: 50 · 07: 51-60 · 08: 61-74 · 09: 75 · 10: 76-85 · 11: 86-99 · 12: 100 |
 | `jefe_25.png`, `jefe_50.png`, `jefe_75.png`, `jefe_100.png` | 48×48 | Jefes (aparecen a la derecha) |
 
 Los pies del héroe, de la mascota y del jefe se apoyan en la misma línea del suelo (unos 6 px sobre el borde inferior del fondo).
 Para ver un cambio en el iPhone, cerrá y abrí la app dos veces (usa caché).
 | `marco.png` (opcional) | 24×24 | Marco de los paneles: se estira en 9 partes, con esquinas de 6 px. Si no existe, la app usa un marco dibujado por código |
 | `ambiente_cocina.png`, `ambiente_bano.png`, `ambiente_habitacion.png`, `ambiente_living.png`, `ambiente_oficina.png`, `ambiente_patio.png` | 48×48 | Cuadritos para elegir el ambiente que ordenaste (misión de Orden) |
+| `fondo_01_lejos.png` … `fondo_12_lejos.png` (opcionales) | 240×64 | Capa lejana (cielo, montañas) que se mueve más lento; también sin cortes. Con ella `fondo_NN` debe tener fondo transparente arriba |
+| `heroe_tX_eY_correr_1.png` … `_4.png` (hasta 6) | 32×40 | Cuadros de la carrera. Se usan todos los que existan, en orden |

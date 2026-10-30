@@ -1,7 +1,7 @@
 // Imágenes del juego. Cada una se busca en /img/<nombre>.png; si el archivo no existe se usa un dibujo provisorio.
 // Para reemplazar un dibujo basta con subir el archivo con el nombre exacto (ver img/LEEME.md).
 import { px } from '/px.js';
-import { heroSVG, petSVG, enemySVG, iconSVG, towerSVG, zoneOf } from '/art.js';
+import { heroSVG, petSVG, enemySVG, iconSVG, towerSVG, farSVG, nearSVG, zoneOf } from '/art.js';
 
 const state = new Map(); let notify = () => {};
 export const onAssets = f => { notify = f; };
@@ -66,3 +66,20 @@ export const towerLayer = (name, open, cls = 'door') => bgLayer(name, towerFb(op
 export const ROOMS = [['cocina', 'Cocina', '🍳', '#e0a060'], ['bano', 'Baño', '🛁', '#6fb3d8'], ['habitacion', 'Habitación', '🛏️', '#9a86d8'], ['living', 'Living', '🛋️', '#d87f6f'], ['oficina', 'Oficina', '💻', '#6fa8a0'], ['patio', 'Patio', '🌳', '#7fbf6a']];
 export const roomTile = id => { const r = ROOMS.find(x => x[0] === id), n = 'ambiente_' + id;
   return has(n) ? `<img class="px tile" alt="${r[1]}" src="${url(n)}">` : `<span class="tile fb" style="background:linear-gradient(${r[3]},color-mix(in srgb,${r[3]} 55%,#000))">${r[2]}</span>`; };
+
+// ---- carrera y fondo en movimiento ----
+/** Cuadros de la carrera del héroe: los tuyos (heroe_tX_eY_correr_1..6) o, si faltan, dos provisorios. */
+export function runFrames(floor, crown) {
+  const base = heroBase(floor), real = [];
+  for (let n = 1; n <= 6; n++) { if (has(`${base}_correr_${n}`)) real.push(url(`${base}_correr_${n}`)); else break; }
+  if (real.length >= 2) return { frames: real, bob: false };
+  if (has(base)) return { frames: [url(base)], bob: true };
+  return { frames: [px(heroSVG('a', crown, 'run1'), 32, 40), px(heroSVG('a', crown, 'run2'), 32, 40)], bob: false };
+}
+/** Capas del fondo (cada imagen se repite sin cortes): lejana (opcional) y cercana. */
+export function scrollLayers(floor, tNear) {
+  const n = bgName(floor), z = zoneOf(floor), main = has(n), far = has(n + '_lejos');
+  const lay = (cls, t, src) => `<div class="scroll ${cls}" style="--t:${t}s"><img class="px" alt="" src="${src}"><img class="px" alt="" src="${src}"></div>`;
+  if (main && !far) return lay('near', tNear, url(n));
+  return lay('far', (tNear * 2.2).toFixed(2), far ? url(n + '_lejos') : px(farSVG(z), 240, 64)) + lay('near', tNear, main ? url(n) : px(nearSVG(z), 240, 64));
+}

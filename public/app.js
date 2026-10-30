@@ -1,6 +1,6 @@
 import { Engine, levelOf, cumXp, buildGates } from '/engine.js';
 import { gateSVG, flagSVG, zoneOf, ZONES } from '/art.js';
-import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petSprite, bossSprite, bgName, bgLayer, towerLayer, iconTag, PETS, BOSSES } from '/assets.js';
+import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petSprite, bossSprite, bgName, bgLayer, towerLayer, runFrames, scrollLayers, iconTag, PETS, BOSSES } from '/assets.js';
 import { px, setReadyHandler } from '/px.js';
 const IMG = (svg, w, h, k, cls = '') => `<img class="px ${cls}" alt="" src="${px(svg, w, h)}" width="${w * k}" height="${h * k}">`;
 const gateImg = (open, k = 2) => IMG(gateSVG(open), 32, 40, k);
@@ -287,7 +287,7 @@ function render() {
 
 // ---------- franja de batalla ----------
 // Lienzo lógico de 240×64: todo se posiciona en unidades de ese lienzo (cqw) para que escale parejo en cualquier pantalla.
-let stripKey = '', readyN = 0, opening = false, phase = '';
+let runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
 const U = v => `calc(${v} * 100cqw / 240)`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function renderStrip() {
@@ -305,11 +305,22 @@ function renderStrip() {
   const vars = `--sky1:${z.sky[0]};--sky2:${z.sky[1]};--gr:${z.gr};--gr2:${z.gr2}`;
   const showDoor = pre || phase;
   const doorName = phase === 'open' || phase === 'fade' ? 'torre_abierta' : phase.startsWith('f') ? 'torre_apertura_' + phase.slice(1) : 'torre_cerrada';
-  const bg = showDoor && pre ? '' : bgLayer(bgName(floor), null, 'bg');
+  const running = !pre && !phase && st.tower === null && st.blocked === null;
+  const speed = 1 + 0.5 * st.s, tNear = +(9 / speed).toFixed(2);
+  const bg = showDoor && pre ? '' : `<div class="scrollwrap ${running ? '' : 'paused'}">${scrollLayers(floor, tNear)}</div>`;
   const door = showDoor ? towerLayer(doorName, doorName !== 'torre_cerrada' && !doorName.startsWith('torre_apertura'), 'door ' + (phase === 'shake' ? 'shake' : phase === 'fade' ? 'fadeout' : '')) : '';
   const ground = 6;
   ['diaria', 'semanal', 'mensual', 'mueca'].forEach(p => heroSrc(floor, p)); // precarga las poses
   el.innerHTML = `<div class="strip ${d.blocked ? 'blocked' : ''}"><div class="top"><span>${title}</span>${pre ? '' : `<span class="hp" title="Avance al próximo piso"><i style="width:${d.pct}%"></i></span>`}</div><div class="arena" style="${vars}">${bg}${door}${heroSprite(floor, `left:${U(46)};bottom:${U(ground)}`, d.done)}${petSprite(d.eq, d.pl, `left:${U(82)};bottom:${U(ground)}`)}${d.boss ? bossSprite(floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div></div>`;
+  clearInterval(runTimer);
+  const hero = el.querySelector('.hero');
+  if (hero && running) {
+    const rf = runFrames(floor, d.done); let k = 0;
+    hero.classList.toggle('bob', rf.bob); hero.classList.add('running');
+    hero.style.setProperty('--bobt', (0.5 / speed).toFixed(2) + 's');
+    if (rf.frames.length > 1) { hero.src = rf.frames[0]; runTimer = setInterval(() => { if (!hero.isConnected) return clearInterval(runTimer); if (hero.dataset.pose) return; k = (k + 1) % rf.frames.length; hero.src = rf.frames[k]; }, Math.round(240 / speed)); }
+    else hero.src = rf.frames[0];
+  }
   if (phase === 'fade') requestAnimationFrame(() => requestAnimationFrame(() => el.querySelector('.door')?.classList.add('gone')));
 }
 /** Apertura de la puerta, una sola vez: cerrada → sacudón → (cuadros) → abierta → aparece la zona 1. */
@@ -326,9 +337,9 @@ function fx(delta, pose = 'diaria') {
   const hero = s.querySelector('.hero');
   if (hero) {
     const { e } = current(), r = heroSrc(e.floor(), pose), base = hero.src, ms = { diaria: 1000, semanal: 1500, mensual: 2500, mueca: 1500 }[pose];
-    hero.src = r.src; hero.classList.toggle('hop', r.hop);
+    hero.dataset.pose = '1'; hero.classList.remove('running', 'bob'); hero.src = r.src; hero.classList.toggle('hop', r.hop);
     if (pose === 'mensual') for (let i = 0; i < 6; i++) { const t = document.createElement('i'); t.className = 'spark'; t.textContent = '✦'; t.style.cssText = `left:calc(${46 + (i % 3) * 14 - 6} * 100cqw / 240);bottom:calc(${14 + Math.floor(i / 3) * 20 + (i % 2) * 6} * 100cqw / 240);animation-delay:${i * 0.18}s`; s.querySelector('.arena').appendChild(t); setTimeout(() => t.remove(), ms); }
-    setTimeout(() => { if (hero.isConnected) { hero.src = base; hero.classList.remove('hop'); } }, ms);
+    setTimeout(() => { if (hero.isConnected) { stripKey = ''; renderStrip(); } }, ms);
   }
   if (delta > 0) {
     const t = document.createElement('div'); t.className = 'dmg'; t.textContent = '+' + delta;

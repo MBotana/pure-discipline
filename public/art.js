@@ -15,7 +15,7 @@ export const ZONES = [
 export const zoneOf = floor => ZONES[Math.min(9, Math.max(0, Math.floor((floor - 1) / 10)))];
 
 export function heroSVG(frame = 'a', crown = false, pose = '') {
-  const lift = [0, 0];
+  const lift = pose === 'run1' ? [4, 0] : pose === 'run2' ? [0, 4] : [0, 0];
   const atk = false;
   const cel = pose === 'diaria' || pose === 'semanal' || pose === 'mensual';
   const up = cel ? `<g><rect x="44" y="6" width="6" height="30" rx="3" fill="#5865f2" stroke="${INK}" stroke-width="2.4" transform="rotate(14 47 36)"/><circle cx="50" cy="6" r="5.4" fill="#ffd9b8" stroke="${INK}" stroke-width="2.4"/></g>` : '';
@@ -118,3 +118,16 @@ const ICON = {
 export const iconSVG = c => `<svg viewBox="0 0 16 16" width="16" height="16" xmlns="http://www.w3.org/2000/svg">${ICON[c]}</svg>`;
 /** Mete un SVG de otra proporción dentro de un lienzo w×h centrado abajo. */
 export const fitSVG = (inner, iw, ih, w, h) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><svg x="${(w - iw) / 2}" y="${h - ih}" width="${iw}" height="${ih}" viewBox="0 0 ${iw} ${ih}">${inner.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '')}</svg></svg>`;
+
+/** Provisorios del fondo en movimiento: capa lejana (cielo y colinas) y capa cercana (suelo). Ambas se repiten sin cortes cada 240 px. */
+export function farSVG(z) {
+  return `<svg viewBox="0 0 240 64" width="240" height="64" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${z.sky[0]}"/><stop offset="1" stop-color="${z.sky[1]}"/></linearGradient></defs><rect width="240" height="64" fill="url(#g)"/>
+  <path d="M0 50 Q30 30 60 50 T120 50 T180 50 T240 50 V64 H0z" fill="${z.far}"/><path d="M0 54 Q20 42 40 54 T80 54 T120 54 T160 54 T200 54 T240 54 V64 H0z" fill="${z.far}" opacity=".7"/>
+  <circle cx="60" cy="14" r="2" fill="#fff" opacity=".8"/><circle cx="170" cy="20" r="1.5" fill="#fff" opacity=".8"/></svg>`;
+}
+export function nearSVG(z) {
+  let s = `<svg viewBox="0 0 240 64" width="240" height="64" xmlns="http://www.w3.org/2000/svg"><rect y="52" width="240" height="12" fill="${z.gr}"/><rect y="52" width="240" height="3" fill="${z.gr2}"/>`;
+  for (const x of [20, 80, 140, 200]) s += `<rect x="${x}" y="57" width="10" height="2" fill="${z.gr2}"/>`;
+  for (const x of [50, 170]) s += `<path d="M${x} 52l3-6 3 6z" fill="${z.gr2}"/>`;
+  return s + '</svg>';
+}
