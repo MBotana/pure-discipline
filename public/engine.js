@@ -30,7 +30,7 @@ var DEFAULT_CONFIG = {
   W: 300,
   Mp: 1500,
   r: 1.015,
-  A: 5150,
+  A: 5000,
   weeklyBonus: [0, 0.2, 0.3, 0.4, 0.5],
   gymM: 18,
   aeroM: 12,
@@ -39,6 +39,7 @@ var DEFAULT_CONFIG = {
   dchk: 2,
   namb: 6,
   foodDays: 4,
+  dripDays: 6,
   statPw: 1,
   statPen: 1,
   statScale: 0.5,
@@ -92,6 +93,8 @@ function initialState() {
     feedStreak: 0,
     gameWk: 0,
     foodWk: 0,
+    roomsWk: [],
+    drips: [],
     wstreak: 0,
     multM: 1,
     mu: zero(),
@@ -189,6 +192,7 @@ class Engine {
       S.wdone = [];
       S.gameWk = 0;
       S.foodWk = 0;
+      S.roomsWk = [];
     }
     if (input.equip)
       S.equipped = input.equip;
@@ -241,8 +245,30 @@ class Engine {
     if (input.clean) {
       if (wkday)
         ev.push(["O", "D", cfg.d]);
-      weekly("O", cfg.namb);
+      const rm = input.room;
+      if (!rm || !S.roomsWk.includes(rm)) {
+        if (rm)
+          S.roomsWk.push(rm);
+        weekly("O", cfg.namb);
+      }
     }
+    const mark = (cat) => {
+      if (S.mu[cat] >= 1)
+        return;
+      S.mu[cat]++;
+      addDone(S.mdone, cat);
+      completed.monthly.push(cat);
+      S.drips.push({ cat, base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
+    };
+    if (input.book)
+      mark("I");
+    if (input.repair)
+      mark("O");
+    for (const d of S.drips) {
+      ev.push([d.cat, "M", d.base, d.mult]);
+      d.left--;
+    }
+    S.drips = S.drips.filter((d) => d.left > 0);
     if (input.dwork && S.wu.D < 3) {
       S.wu.D++;
       ev.push(["D", "W", cfg.W / 3]);
@@ -309,7 +335,7 @@ class Engine {
       }
     };
     tryUnblock();
-    for (const [cat, kind, base] of ev) {
+    for (const [cat, kind, base, mo] of ev) {
       if (kind === "S") {
         const cs = this.statCap();
         const nw = Math.min(S.stat[cat] + cfg.statPw, cs);
@@ -324,6 +350,8 @@ class Engine {
         mult = 1;
       if (kind === "M" && S.s === 0)
         mult = 1;
+      if (mo !== undefined)
+        mult = mo;
       const amt = base * mult;
       const rec = { day: i, cat, kind, base, mult, amount: amt, outcome: "paid", paid: 0 };
       out.push(rec);

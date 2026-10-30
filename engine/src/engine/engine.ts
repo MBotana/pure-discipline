@@ -27,7 +27,7 @@ const zero = (): Record<Cat, number> => ({ F: 0, I: 0, V: 0, D: 0, O: 0 });
 export function initialState(): State {
   return {
     day: 0, xp: 0, cleared: [], blocked: null, stat: zero(), s: 0, px: zero(), equipped: 'F',
-    feedStreak: 0, gameWk: 0, foodWk: 0, wstreak: 0,
+    feedStreak: 0, gameWk: 0, foodWk: 0, roomsWk: [], drips: [], wstreak: 0,
     multM: 1, mu: zero(), mdone: [], bd: 0,
     bonusW: 1, wu: zero(), wdone: [],
     arrive: {}, clearedDay: {}, blocks: [], tower: null,
@@ -99,11 +99,11 @@ export class Engine {
         S.mu = zero(); S.mdone = []; S.bd = 0; S.wstreak = 0;
       }
       S.bonusW = S.s >= 1 ? S.multM : 1 + cfg.weeklyBonus[Math.min(S.wstreak, 4)];
-      S.wu = zero(); S.wdone = []; S.gameWk = 0; S.foodWk = 0;
+      S.wu = zero(); S.wdone = []; S.gameWk = 0; S.foodWk = 0; S.roomsWk = [];
     }
     if (input.equip) S.equipped = input.equip;
 
-    const ev: [Cat, 'D' | 'W' | 'M' | 'S', number][] = [];
+    const ev: [Cat, 'D' | 'W' | 'M' | 'S', number, number?][] = [];
     const wkday = dd < 5;
     const addDone = (arr: Cat[], c: Cat) => { if (!arr.includes(c)) arr.push(c); };
     const weekly = (cat: Cat, units: number) => {
@@ -124,7 +124,22 @@ export class Engine {
     if (input.read) { if (wkday) ev.push(['I', 'D', cfg.d]); weekly('I', 3); }
     if (input.bookTramo) monthly('I', cfg.bookTramos, cfg.Mp / cfg.bookTramos);
     if (input.aero) { if (wkday) ev.push(['V', 'D', cfg.d]); weekly('V', 3); monthly('V', cfg.aeroM, cfg.Mp / cfg.aeroM); }
-    if (input.clean) { if (wkday) ev.push(['O', 'D', cfg.d]); weekly('O', cfg.namb); }
+    if (input.clean) {
+      if (wkday) ev.push(['O', 'D', cfg.d]);
+      const rm = input.room;
+      if (!rm || !S.roomsWk.includes(rm)) { if (rm) S.roomsWk.push(rm); weekly('O', cfg.namb); }
+    }
+    // Misiones mensuales de una sola unidad: la misión se cumple el día en que se marca; el XP se paga en dripDays cuotas diarias
+    // (así ningún día concentra el pozo entero y se mantiene el límite de un piso por día).
+    const mark = (cat: Cat) => {
+      if (S.mu[cat] >= 1) return;
+      S.mu[cat]++; addDone(S.mdone, cat); completed.monthly.push(cat);
+      S.drips.push({ cat, base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
+    };
+    if (input.book) mark('I');
+    if (input.repair) mark('O');
+    for (const d of S.drips) { ev.push([d.cat, 'M', d.base, d.mult]); d.left--; }
+    S.drips = S.drips.filter(d => d.left > 0);
     if (input.dwork && S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
     if (input.dweek) while (S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
     if (input.gaming) S.gameWk += input.gaming;
@@ -160,7 +175,7 @@ export class Engine {
     };
     tryUnblock();
 
-    for (const [cat, kind, base] of ev) {
+    for (const [cat, kind, base, mo] of ev) {
       if (kind === 'S') {
         const cs = this.statCap();
         const nw = Math.min(S.stat[cat] + cfg.statPw, cs);
@@ -171,6 +186,7 @@ export class Engine {
       let mult = (kind === 'D' || kind === 'W') ? S.bonusW : S.multM;
       if (kind === 'D') mult = 1;
       if (kind === 'M' && S.s === 0) mult = 1;
+      if (mo !== undefined) mult = mo;
       const amt = base * mult;
       const rec: AuditEvent = { day: i, cat, kind: kind as EventKind, base, mult, amount: amt, outcome: 'paid', paid: 0 };
       out.push(rec);

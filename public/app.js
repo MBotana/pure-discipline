@@ -1,6 +1,6 @@
 import { Engine, levelOf, cumXp, buildGates } from '/engine.js';
 import { gateSVG, flagSVG, zoneOf, ZONES } from '/art.js';
-import { onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petSprite, bossSprite, bgName, bgLayer, towerLayer, iconTag, PETS, BOSSES } from '/assets.js';
+import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petSprite, bossSprite, bgName, bgLayer, towerLayer, iconTag, PETS, BOSSES } from '/assets.js';
 import { px, setReadyHandler } from '/px.js';
 const IMG = (svg, w, h, k, cls = '') => `<img class="px ${cls}" alt="" src="${px(svg, w, h)}" width="${w * k}" height="${h * k}">`;
 const gateImg = (open, k = 2) => IMG(gateSVG(open), 32, 40, k);
@@ -70,6 +70,7 @@ const toggle = (date, key) => {
   const before = dayGain(date), wasOn = !!S.days[date]?.input?.[key];
   setInput(date, i => { i[key] = !i[key]; });
   if (wasOn) return;
+  if (key === 'clean') { modal = { kind: 'room', date, before }; render(); return; }
   const idx = dayIdx(date), c = idx >= 0 ? compute(idx).results[idx].completed : null;
   fx(Math.round(dayGain(date) - before), c?.monthly.length ? 'mensual' : c?.weekly.length || c?.pet ? 'semanal' : 'diaria');
 };
@@ -146,7 +147,7 @@ function viewHoy() {
     h += `</div>`;
     h += `<div class="card slim bronze"><h2>Antiobjetivo</h2><button class="mrow bronze" ${pre ? 'disabled' : 'data-act="game"'}><span class="mic">🎮</span><span class="mtx"><b>Sesión de videojuegos</b><small>hoy ${today0} · semana ${games} (más de 3 rompe el objetivo)</small></span>${pre ? '' : '<span class="dbl">2×</span>'}</button>${today0 > 0 ? `<button class="undo" data-act="gameminus">Quitar una sesión</button>` : ''}</div>`;
   } else if (mtab === 'sem') {
-    const rows = [['F', 'Fuerza', '3 sesiones', 3], ['I', 'Inteligencia', '3 lecturas', 3], ['V', 'Vitalidad', '3 aeróbicos', 3], ['O', 'Orden', `${cfg.namb} ambientes`, cfg.namb]];
+    const rows = [['F', 'Fuerza', '3 sesiones', 3], ['I', 'Inteligencia', '3 lecturas', 3], ['V', 'Vitalidad', '3 aeróbicos', 3], ['O', 'Orden', `${cfg.namb} ambientes · faltan: ${ROOMS.filter(([id]) => !st.roomsWk.includes(id)).map(r => r[1]).join(', ') || 'ninguno'}`, cfg.namb]];
     const dn = rows.filter(([c]) => st.wdone.includes(c)).length + (st.wu.D >= 3 ? 1 : 0) + (st.foodWk >= cfg.foodDays ? 1 : 0);
     h += `<div class="card slim"><div class="row"><h2>Esta semana</h2><span class="pill ${dn === 6 ? 'ok' : ''}">${dn} / 6</span></div>`;
     h += rows.map(([c, nm, goal, max]) => info(c, nm, goal, pips(w(c), max), st.wdone.includes(c))).join('');
@@ -158,13 +159,14 @@ function viewHoy() {
     else h += `<p class="mute">El domingo se abre el formulario con tu objetivo de Disciplina de la semana y la pregunta del celular. Videojuegos esta semana: ${games} (máximo 3).</p>`;
     h += `</div>`;
   } else {
-    const rows = [['F', 'Fuerza', `${cfg.gymM} sesiones`, cfg.gymM], ['V', 'Vitalidad', `${cfg.aeroM} aeróbicos`, cfg.aeroM], ['I', 'Inteligencia', `${cfg.bookTramos} tramos del libro`, cfg.bookTramos], ['O', 'Orden', `${cfg.impUnits} días de mejora`, cfg.impUnits]];
+    const rows = [['F', 'Fuerza', `${cfg.gymM} sesiones`, cfg.gymM], ['V', 'Vitalidad', `${cfg.aeroM} aeróbicos`, cfg.aeroM]];
     const dn = st.mdone.length;
     h += `<div class="card slim"><div class="row"><h2>Este mes</h2><span class="pill ${dn === 5 ? 'ok' : ''}">${dn} / 5</span></div>`;
     h += rows.map(([c, nm, goal, max]) => info(c, nm, `${m(c)} de ${goal}`, bar(m(c), max), st.mdone.includes(c))).join('');
+    h += info('I', 'Inteligencia', 'Libro terminado', '', st.mdone.includes('I')) + info('O', 'Orden', 'Arreglo en la casa', '', st.mdone.includes('O'));
     h += info('D', 'Disciplina', `${m('D')} de ${wi.of} objetivos semanales`, bar(m('D'), wi.of), st.mdone.includes('D'));
     h += `<p class="mute">Fallar 2 o más reinicia la racha; cada uno fallado resta 1 punto de estadística.</p></div>`;
-    h += `<div class="card slim"><h2>Registrar hoy</h2>${row('bookTramo', 'I', 'Avancé un tramo del libro (10 %)', `mes ${m('I')}/${cfg.bookTramos}`)}${row('improve', 'O', 'Día de trabajo de la mejora', `mes ${m('O')}/${cfg.impUnits}`)}</div>`;
+    h += `<div class="card slim"><h2>Registrar hoy</h2>${row('book', 'I', 'Libro terminado', 'se cumple el día que lo marcás · el XP se reparte en 6 días')}${row('repair', 'O', 'Arreglo en la casa', 'se cumple el día que lo marcás · el XP se reparte en 6 días')}<p class="mute">También aparecen en el cierre del último domingo del mes.</p></div>`;
   }
   if (doneRows.length) {
     h += `<div class="card slim"><button class="donebtn" data-act="showdone"><span>Completadas (${doneRows.length})</span><span>${showDone ? '▲' : '▼'}</span></button>`;
@@ -251,9 +253,21 @@ function viewAjustes() {
 const TABS = [['hoy', '✅', 'Misiones', viewHoy], ['torre', '🏰', 'Torre', viewTorre], ['stats', '📊', 'Stats', viewStats], ['mascotas', '🐾', 'Mascotas', viewMascotas], ['ajustes', '⚙️', 'Ajustes', viewAjustes]];
 function modalHTML() {
   if (!modal || !S.startDate) return '';
-  const i = dayIdx(modal.date), { e } = compute(i), wi = e.weekInfo(i), txt = DTEXT[Math.min(wi.n, 5) - 1];
-  const tg = (k, label, sub, bad) => `<button class="mrow ${bad ? 'bad' : ''} ${modal[k] ? 'on' : ''}" data-act="mdl" data-k="${k}"><span class="mic">${k === 'dw' ? iconTag('D', 2) : '📱'}</span><span class="mtx"><b>${label}</b><small>${sub}</small></span><span class="chk">${modal[k] ? '✓' : ''}</span></button>`;
-  return `<div class="modal"><div class="card slim"><h2>Cierre de semana ${wi.n} del mes</h2>${tg('dw', 'Objetivo de Disciplina', txt, false)}${tg('ph', 'El promedio semanal de celular superó las 5 h', 'antiobjetivo: si lo marcás, esta semana no suma punto de Disciplina', true)}<div class="row" style="margin-top:12px"><button class="btn ghost" data-act="mdlcancel">Cancelar</button><button class="btn" data-act="mdlsave">Guardar cierre</button></div></div></div>`;
+  const i = dayIdx(modal.date), { e, results } = compute(i), st = e.state;
+  if (modal.kind === 'room') {
+    const mine = S.days[modal.date]?.input?.room, taken = st.roomsWk.filter(r => r !== mine);
+    return `<div class="modal"><div class="card slim"><h2>¿Qué ambiente ordenaste?</h2><p class="mute">Cada ambiente cuenta una vez por semana (${taken.length} de ${ROOMS.length} ya hechos).</p><div class="rooms">${ROOMS.map(([id, nm]) => `<button class="room ${taken.includes(id) ? 'taken' : ''}" ${taken.includes(id) ? 'disabled' : `data-act="room" data-r="${id}"`}>${roomTile(id)}<b>${nm}</b>${taken.includes(id) ? '<span class="ck">✓</span>' : ''}</button>`).join('')}</div><div class="row" style="margin-top:12px"><button class="btn ghost" data-act="roomcancel">Cancelar</button></div></div></div>`;
+  }
+  const wi = e.weekInfo(i), txt = DTEXT[Math.min(wi.n, 5) - 1], lastWeek = wi.n === wi.of;
+  const inp0 = S.days[modal.date]?.input ?? {};
+  const bookEarlier = st.mdone.includes('I') && !inp0.book, repairEarlier = st.mdone.includes('O') && !inp0.repair;
+  const tg = (k, ic, label, sub, bad, off) => `<button class="mrow ${bad ? 'bad' : ''} ${modal[k] || off ? 'on' : ''}" ${off ? 'disabled' : `data-act="mdl" data-k="${k}"`}><span class="mic">${ic}</span><span class="mtx"><b>${label}</b><small>${sub}</small></span><span class="chk">${modal[k] || off ? '✓' : ''}</span></button>`;
+  let h = `<div class="modal"><div class="card slim"><h2>Cierre de semana ${wi.n} del mes</h2>${tg('dw', iconTag('D', 2), 'Objetivo de Disciplina', txt, false)}${tg('ph', '📱', 'El promedio semanal de celular superó las 5 h', 'antiobjetivo: si lo marcás, esta semana no suma punto de Disciplina', true)}`;
+  if (lastWeek) {
+    if (modal.bk === undefined) { modal.bk = !!inp0.book; modal.rp = !!inp0.repair; }
+    h += `<h2 style="margin-top:14px">Cierre de mes</h2>${tg('bk', iconTag('I', 2), 'Libro terminado', bookEarlier ? 'ya registrado este mes' : 'se cumple hoy; el XP se reparte en 6 días', false, bookEarlier)}${tg('rp', iconTag('O', 2), 'Arreglo en la casa', repairEarlier ? 'ya registrado este mes' : 'se cumple hoy; el XP se reparte en 6 días', false, repairEarlier)}`;
+  }
+  return h + `<div class="row" style="margin-top:12px"><button class="btn ghost" data-act="mdlcancel">Cancelar</button><button class="btn" data-act="mdlsave">Guardar cierre</button></div></div></div>`;
 }
 function render() {
   const view = TABS.find(t => t[0] === tab)[3];
@@ -262,7 +276,7 @@ function render() {
   if (!S.token && tab !== 'ajustes') { tab = 'ajustes'; return render(); }
   document.documentElement.classList.toggle('cf', has('marco'));
   if (tab === 'hoy' && S.startDate && !modal && viewDate === todayISO() && dayIdx(viewDate) >= 0 && dayIdx(viewDate) % 7 === 6 && askedFor !== viewDate && !(S.days[viewDate]?.input?.dform)) {
-    askedFor = viewDate; modal = { dw: false, ph: false, date: viewDate };
+    askedFor = viewDate; modal = { kind: 'week', dw: false, ph: false, date: viewDate };
   }
   app.innerHTML = offline + view(); renderStrip();
   document.getElementById('modal').innerHTML = modalHTML();
@@ -358,15 +372,22 @@ document.addEventListener('click', async ev => {
     else { lastTap = { k: 'game', t: now }; el.classList.add('armed'); setTimeout(() => el.classList.remove('armed'), 450); hint('Tocá otra vez para registrar la sesión'); }
   }
   else if (a === 'gameminus') setInput(viewDate, i => { i.gaming = Math.max(0, (i.gaming || 0) - 1); });
-  else if (a === 'closeweek') { const i = S.days[viewDate]?.input ?? {}; modal = { dw: !!i.dweek, ph: !!i.phone, date: viewDate }; render(); }
+  else if (a === 'closeweek') { const i = S.days[viewDate]?.input ?? {}; modal = { kind: 'week', dw: !!i.dweek, ph: !!i.phone, date: viewDate }; render(); }
   else if (a === 'mdl') { modal[el.dataset.k] = !modal[el.dataset.k]; render(); }
+  else if (a === 'room') {
+    const m0 = modal; modal = null;
+    setInput(m0.date, i => { i.room = el.dataset.r; });
+    const idx = dayIdx(m0.date), c = compute(idx).results[idx].completed;
+    fx(Math.round(dayGain(m0.date) - m0.before), c.monthly.length ? 'mensual' : c.weekly.length || c.pet ? 'semanal' : 'diaria');
+  }
+  else if (a === 'roomcancel') { const m0 = modal; modal = null; setInput(m0.date, i => { delete i.clean; delete i.room; }); }
   else if (a === 'mdlcancel') { modal = null; render(); }
   else if (a === 'mdlsave') {
     const m0 = modal; modal = null;
-    setInput(m0.date, i => { i.dform = true; i.dweek = m0.dw; i.phone = m0.ph; });
+    setInput(m0.date, i => { i.dform = true; i.dweek = m0.dw; i.phone = m0.ph; if (m0.bk !== undefined) i.book = m0.bk; if (m0.rp !== undefined) i.repair = m0.rp; });
     fx(0, m0.ph ? 'mueca' : m0.dw ? 'semanal' : 'diaria');
   }
-  else if (a === 'undo') setInput(viewDate, i => { i[el.dataset.k] = false; });
+  else if (a === 'undo') setInput(viewDate, i => { i[el.dataset.k] = false; if (el.dataset.k === 'clean') delete i.room; });
   else if (a === 'showdone') { showDone = !showDone; render(); }
   else if (a === 'anti') setInput(viewDate, i => { i.anti = i.anti === false ? undefined : false; });
   else if (a === 'prev') { viewDate = addDays(viewDate, -1); render(); }

@@ -61,3 +61,8 @@ export const iconTag = (c, k = 2) => tag(`icono_${STAT[c]}`, () => px(iconSVG(c)
 export const bgLayer = (name, fb, cls = 'bg') => { const ok = has(name), src = ok ? url(name) : fb ? fb() : ''; return src ? `<img class="px ${cls}" alt="" src="${src}">` : ''; };
 export const towerFb = open => () => px(towerSVG(open), 240, 64);
 export const towerLayer = (name, open, cls = 'door') => bgLayer(name, towerFb(open), cls);
+
+// ---- ambientes (misión de Orden): 48×48 ----
+export const ROOMS = [['cocina', 'Cocina', '🍳', '#e0a060'], ['bano', 'Baño', '🛁', '#6fb3d8'], ['habitacion', 'Habitación', '🛏️', '#9a86d8'], ['living', 'Living', '🛋️', '#d87f6f'], ['oficina', 'Oficina', '💻', '#6fa8a0'], ['patio', 'Patio', '🌳', '#7fbf6a']];
+export const roomTile = id => { const r = ROOMS.find(x => x[0] === id), n = 'ambiente_' + id;
+  return has(n) ? `<img class="px tile" alt="${r[1]}" src="${url(n)}">` : `<span class="tile fb" style="background:linear-gradient(${r[3]},color-mix(in srgb,${r[3]} 55%,#000))">${r[2]}</span>`; };

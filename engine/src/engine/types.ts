@@ -1,4 +1,5 @@
 export type Cat = 'F' | 'I' | 'V' | 'D' | 'O'; // Fuerza, Inteligencia, Vitalidad, Disciplina, Orden
+export const ROOMS = ['cocina', 'bano', 'habitacion', 'living', 'oficina', 'patio'] as const;
 export const CATS: readonly Cat[] = ['F', 'I', 'V', 'D', 'O'];
 
 /** Lo que el usuario registró en un día. Todo opcional; ausente = no hecho. */
@@ -19,6 +20,9 @@ export interface DayInput {
   phone?: boolean;      // domingo: el promedio semanal de celular superó las 5 h (antiobjetivo violado)
   gaming?: number;      // sesiones de videojuegos de ese día (la semana permite hasta 3)
   food?: boolean;       // misión diaria de alimentación cumplida (4 días en la semana alimentan a la mascota)
+  book?: boolean;       // libro terminado (misión mensual de Inteligencia, una sola unidad)
+  repair?: boolean;     // arreglo en la casa (misión mensual de Orden, una sola unidad)
+  room?: string;        // ambiente limpiado ese día (cada uno cuenta una vez por semana)
   equip?: Cat;          // cambiar mascota equipada equipada (se aplica al inicio del día)
 }
 
@@ -38,7 +42,7 @@ export interface Config {
   d: number; W: number; Mp: number;
   r: number; A: number;
   weeklyBonus: number[];
-  gymM: number; aeroM: number; bookTramos: number; impUnits: number; dchk: number; namb: number; foodDays: number;
+  gymM: number; aeroM: number; bookTramos: number; impUnits: number; dchk: number; namb: number; foodDays: number; dripDays: number;
   statPw: number; statPen: number; statScale: number; reqScale: number; freezeDays: number;
   hingeEvery: number;
   combos: [Cat, Cat][];
@@ -61,7 +65,8 @@ export interface State {
   px: Record<Cat, number>;       // XP de mascota
   equipped: Cat;
   feedStreak: number;
-  gameWk: number; foodWk: number;
+  gameWk: number; foodWk: number; roomsWk: string[];
+  drips: { cat: Cat; base: number; mult: number; left: number }[]; // pagos fraccionados de misiones mensuales de una sola unidad
   wstreak: number;
   // acumuladores del mes
   multM: number; mu: Record<Cat, number>; mdone: Cat[]; bd: number;

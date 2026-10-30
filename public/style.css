@@ -124,3 +124,9 @@ img.px{image-rendering:pixelated}
 .card.bronze{box-shadow:inset 0 0 0 2px var(--deep),inset 0 0 0 4px #8a5a2b,inset 0 0 0 6px #4a2e17,inset 0 0 0 8px var(--deep),3px 3px 0 var(--shadow)}
 .mrow.bronze{background:color-mix(in srgb,#8a5a2b 22%,transparent)}.mrow.bronze .mic{border-color:#8a5a2b;background:color-mix(in srgb,#4a2e17 35%,var(--field))}.mrow.bronze .dbl{border-color:#8a5a2b;color:#8a5a2b}
 .mrow.bad.on .chk{background:var(--bad);border-color:var(--bad)}
+
+.rooms{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
+.room{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;background:var(--field);border:2px solid var(--line3);color:var(--ink);cursor:pointer;min-height:96px}
+.room .tile{width:56px;height:56px;image-rendering:pixelated;display:grid;place-items:center;font-size:28px;border:2px solid var(--deep)}
+.room b{font-size:12px}.room.taken{opacity:.45}.room .ck{position:absolute;top:4px;right:6px;color:var(--ok);font-weight:800}
+.room:active{box-shadow:inset 0 0 0 2px var(--gold)}

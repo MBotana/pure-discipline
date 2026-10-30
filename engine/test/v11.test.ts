@@ -55,3 +55,20 @@ test('v1.1: 4 días de comida alimentan a la mascota equipada', () => {
   const f = new Engine({ ...G.config }); for (let i = 0; i < 7; i++) f.processDay(i < 3 ? { food: true } : {});
   assert.equal(f.state.px.F, 0);
 });
+
+test('v1.2: libro terminado y arreglo en la casa (un solo pago mensual) + ambientes distintos: año perfecto', () => {
+  const sc = G.scenarios.find((s: any) => s.name === 'perfecto');
+  const probe = new Engine({ ...G.config });
+  const base = toV11(sc.inputs).map((i: any, d: number) => {
+    const { bookTramo, improve, ...rest } = i as any; const o: any = rest;
+    const wi = probe.weekInfo(d);
+    if (d % 7 === 6 && wi.n === wi.of) { o.book = true; o.repair = true; }
+    return o as DayInput;
+  });
+  const ROOMS = ['cocina', 'bano', 'habitacion', 'living', 'oficina', 'patio'];
+  for (let w = 0; w * 7 < base.length; w++) { let k = 0; for (let d = 0; d < 7; d++) { const x: any = base[w * 7 + d]; if (x && x.clean && k < 6) x.room = ROOMS[k++]; } }
+  const r = peak(base);
+  console.log('v1.2 torre', r.e.state.tower, 'pico', r.worst.toFixed(3), 'multi', r.multi);
+  assert.equal(r.multi, 0);
+  assert.ok(r.worst < 1);
+});
