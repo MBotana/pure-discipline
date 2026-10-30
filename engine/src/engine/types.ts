@@ -13,7 +13,13 @@ export interface DayInput {
   dcheck?: boolean;     // chequeo "al día" de Disciplina (solo miércoles y domingo)
   anti?: boolean;       // domingo: true = NO violó ningún antiobjetivo
   feed?: boolean;       // domingo: semana de alimentación perfecta
-  equip?: Cat;          // cambiar mascota equipada (se aplica al inicio del día)
+  // --- modo v1.1 (aditivo): formulario del domingo, videojuegos y comida diarios ---
+  dweek?: boolean;      // domingo: misión semanal de Disciplina cumplida (pago de las 3 unidades de una vez)
+  dform?: boolean;      // domingo: el formulario de cierre fue respondido
+  phone?: boolean;      // domingo: el promedio semanal de celular superó las 5 h (antiobjetivo violado)
+  gaming?: number;      // sesiones de videojuegos de ese día (la semana permite hasta 3)
+  food?: boolean;       // misión diaria de alimentación cumplida (4 días en la semana alimentan a la mascota)
+  equip?: Cat;          // cambiar mascota equipada equipada (se aplica al inicio del día)
 }
 
 export type EventKind = 'D' | 'W' | 'M'; // diaria, semanal, mensual
@@ -32,7 +38,7 @@ export interface Config {
   d: number; W: number; Mp: number;
   r: number; A: number;
   weeklyBonus: number[];
-  gymM: number; aeroM: number; bookTramos: number; impUnits: number; dchk: number; namb: number;
+  gymM: number; aeroM: number; bookTramos: number; impUnits: number; dchk: number; namb: number; foodDays: number;
   statPw: number; statPen: number; statScale: number; reqScale: number; freezeDays: number;
   hingeEvery: number;
   combos: [Cat, Cat][];
@@ -55,6 +61,7 @@ export interface State {
   px: Record<Cat, number>;       // XP de mascota
   equipped: Cat;
   feedStreak: number;
+  gameWk: number; foodWk: number;
   wstreak: number;
   // acumuladores del mes
   multM: number; mu: Record<Cat, number>; mdone: Cat[]; bd: number;

@@ -17,8 +17,9 @@ export const zoneOf = floor => ZONES[Math.min(9, Math.max(0, Math.floor((floor -
 export function heroSVG(frame = 'a', crown = false, pose = '') {
   const lift = [0, 0];
   const atk = false;
-  const up = pose ? `<g><rect x="44" y="6" width="6" height="30" rx="3" fill="#5865f2" stroke="${INK}" stroke-width="2.4" transform="rotate(14 47 36)"/><circle cx="50" cy="6" r="5.4" fill="#ffd9b8" stroke="${INK}" stroke-width="2.4"/></g>` : '';
-  const up2 = (pose === 'semanal' || pose === 'mensual') ? `<g><rect x="12" y="6" width="6" height="30" rx="3" fill="#5865f2" stroke="${INK}" stroke-width="2.4" transform="rotate(-14 15 36)"/><circle cx="12" cy="6" r="5.4" fill="#ffd9b8" stroke="${INK}" stroke-width="2.4"/></g>` : '';
+  const cel = pose === 'diaria' || pose === 'semanal' || pose === 'mensual';
+  const up = cel ? `<g><rect x="44" y="6" width="6" height="30" rx="3" fill="#5865f2" stroke="${INK}" stroke-width="2.4" transform="rotate(14 47 36)"/><circle cx="50" cy="6" r="5.4" fill="#ffd9b8" stroke="${INK}" stroke-width="2.4"/></g>` : '';
+  const up2 = cel && (pose === 'semanal' || pose === 'mensual') ? `<g><rect x="12" y="6" width="6" height="30" rx="3" fill="#5865f2" stroke="${INK}" stroke-width="2.4" transform="rotate(-14 15 36)"/><circle cx="12" cy="6" r="5.4" fill="#ffd9b8" stroke="${INK}" stroke-width="2.4"/></g>` : '';
   return `<svg viewBox="0 -8 64 80" width="64" height="80" xmlns="http://www.w3.org/2000/svg">
   <ellipse cx="30" cy="68" rx="15" ry="3.2" fill="#000" opacity=".3"/>
   <rect x="22" y="53" width="8" height="${14 - lift[0]}" rx="3.5" fill="#3b3f73" stroke="${INK}" stroke-width="2.6"/><rect x="32" y="53" width="8" height="${14 - lift[1]}" rx="3.5" fill="#4a4f8c" stroke="${INK}" stroke-width="2.6"/>
@@ -28,10 +29,10 @@ export function heroSVG(frame = 'a', crown = false, pose = '') {
   <circle cx="31" cy="20" r="11" fill="#ffd9b8" stroke="${INK}" stroke-width="2.8"/>
   <path d="M19 21c-1-12 7-17 13-17s13 5 12 16c-4-5-9-7-13-7s-9 2-12 8z" fill="#3f4bd0" stroke="${INK}" stroke-width="2.8" stroke-linejoin="round"/>
   <circle cx="35" cy="22" r="2" fill="${INK}"/><circle cx="28" cy="22" r="2" fill="${INK}"/>
-  <path d="M30 27c1.2 1 2.4 1 3.6 0" stroke="${INK}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  ${pose === 'mueca' ? `<path d="M29 29.5c1.2-1.6 3.4-1.6 4.6 0" stroke="${INK}" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M24.5 17.5l5 2.4M37 17.5l-5 2.4" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>` : `<path d="M30 27c1.2 1 2.4 1 3.6 0" stroke="${INK}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`}
   ${crown ? `<path d="M24 8l3-6 4 4 4-4 3 6z" fill="#ffc442" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>` : ''}
   ${up}${up2}
-  ${pose ? '' : ''}<g transform="${atk ? 'rotate(42 48 50)' : ''}" ${pose ? 'opacity="0"' : ''}><rect x="46" y="20" width="5" height="28" rx="2" fill="#e8ecff" stroke="${INK}" stroke-width="2.4"/><rect x="42" y="46" width="13" height="5" rx="2" fill="#ffc442" stroke="${INK}" stroke-width="2.2"/><rect x="46" y="51" width="5" height="8" rx="2" fill="#7a4a2a" stroke="${INK}" stroke-width="2.2"/></g></g></svg>`;
+  <g transform="${atk ? 'rotate(42 48 50)' : ''}" ${cel ? 'opacity="0"' : ''}><rect x="46" y="20" width="5" height="28" rx="2" fill="#e8ecff" stroke="${INK}" stroke-width="2.4"/><rect x="42" y="46" width="13" height="5" rx="2" fill="#ffc442" stroke="${INK}" stroke-width="2.2"/><rect x="46" y="51" width="5" height="8" rx="2" fill="#7a4a2a" stroke="${INK}" stroke-width="2.2"/></g></g></svg>`;
 }
 
 const PET = {

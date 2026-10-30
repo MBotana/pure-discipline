@@ -33,7 +33,7 @@ export const zone12 = floor => { let z = 1; ZSTART.forEach((s, k) => { if (floor
 export const bgName = floor => 'fondo_' + String(zone12(floor)).padStart(2, '0');
 export const BOSSES = [25, 50, 75, 100];
 export const heroBase = floor => { const { t, e } = heroLook(floor); return `heroe_t${t}_e${e}`; };
-export const POSES = ['diaria', 'semanal', 'mensual'];
+export const POSES = ['diaria', 'semanal', 'mensual', 'mueca'];
 
 const tag = (name, fb, w, h, k, cls) => `<img class="px ${cls}" alt="" src="${has(name) ? url(name) : fb()}" width="${w * k}" height="${h * k}">`;
 const sp = (name, fb, w, style, cls) => `<img class="px sp ${cls}" alt="" src="${has(name) ? url(name) : fb()}" style="--w:${w};${style}">`;

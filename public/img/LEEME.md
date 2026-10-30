@@ -7,6 +7,7 @@ Fondo transparente en los sprites, sin suavizado (pixel art puro). La app los mu
 |---|---|---|
 | `heroe_t1_e1.png` … `heroe_t4_e3.png` (12) | 32×40 | Héroe quieto. `t` = armadura 1-4, `e` = etapa 1-3. Cambia en los pisos 1/10/20, 25/35/45, 50/60/70, 75/85/95 |
 | `heroe_tX_eY_diaria.png`, `_semanal.png`, `_mensual.png` | 32×40 | Festejo al cumplir una misión diaria / semanal / mensual (36 en total). Si falta, el héroe salta |
+| `heroe_tX_eY_mueca.png` (12) | 32×40 | Mueca de decepción al registrar una sesión de videojuegos o violar un antiobjetivo |
 | `mascota_behemot_n0.png` … `n5.png` | 32×32 | Fuerza. `n0` = huevo, `n5` = adulto |
 | `mascota_esfinge_n0..n5.png` | 32×32 | Inteligencia |
 | `mascota_fenix_n0..n5.png` | 32×32 | Vitalidad |

@@ -27,7 +27,7 @@ const zero = (): Record<Cat, number> => ({ F: 0, I: 0, V: 0, D: 0, O: 0 });
 export function initialState(): State {
   return {
     day: 0, xp: 0, cleared: [], blocked: null, stat: zero(), s: 0, px: zero(), equipped: 'F',
-    feedStreak: 0, wstreak: 0,
+    feedStreak: 0, gameWk: 0, foodWk: 0, wstreak: 0,
     multM: 1, mu: zero(), mdone: [], bd: 0,
     bonusW: 1, wu: zero(), wdone: [],
     arrive: {}, clearedDay: {}, blocks: [], tower: null,
@@ -37,7 +37,7 @@ export function initialState(): State {
 
 export interface DayResult {
   day: number; floor: number; xp: number; events: AuditEvent[]; blocked: number | null; unlocked: number[];
-  completed: { weekly: Cat[]; monthly: Cat[] };
+  completed: { weekly: Cat[]; monthly: Cat[]; pet: boolean };
 }
 
 export class Engine {
@@ -91,7 +91,7 @@ export class Engine {
     const month = this.cal.months[this.cal.monthOfWeek[w]];
     const unlocked: number[] = [];
     const out: AuditEvent[] = [];
-    const completed: { weekly: Cat[]; monthly: Cat[] } = { weekly: [], monthly: [] };
+    const completed: { weekly: Cat[]; monthly: Cat[]; pet: boolean } = { weekly: [], monthly: [], pet: false };
 
     if (dd === 0) {
       if (w === month.weeks[0]) { // inicio de mes
@@ -99,7 +99,7 @@ export class Engine {
         S.mu = zero(); S.mdone = []; S.bd = 0; S.wstreak = 0;
       }
       S.bonusW = S.s >= 1 ? S.multM : 1 + cfg.weeklyBonus[Math.min(S.wstreak, 4)];
-      S.wu = zero(); S.wdone = [];
+      S.wu = zero(); S.wdone = []; S.gameWk = 0; S.foodWk = 0;
     }
     if (input.equip) S.equipped = input.equip;
 
@@ -126,13 +126,18 @@ export class Engine {
     if (input.aero) { if (wkday) ev.push(['V', 'D', cfg.d]); weekly('V', 3); monthly('V', cfg.aeroM, cfg.Mp / cfg.aeroM); }
     if (input.clean) { if (wkday) ev.push(['O', 'D', cfg.d]); weekly('O', cfg.namb); }
     if (input.dwork && S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
+    if (input.dweek) while (S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
+    if (input.gaming) S.gameWk += input.gaming;
+    if (input.food) { S.foodWk++; if (S.foodWk === cfg.foodDays) completed.pet = true; }
     if (input.improve) monthly('O', cfg.impUnits, cfg.Mp / cfg.impUnits);
+    if (dd === 6 && input.dweek) { S.mu.D++; ev.push(['D', 'M', cfg.Mp / month.weeks.length]); }
     if ((dd === 2 || dd === 6) && input.dcheck) ev.push(['D', 'M', cfg.Mp / (cfg.dchk * month.weeks.length)]);
 
     const lastWeekOfMonth = w === month.weeks[month.weeks.length - 1];
     if (dd === 6) {
       if (input.dcheck && lastWeekOfMonth) { addDone(S.mdone, 'D'); completed.monthly.push('D'); }
-      const anti = input.anti ?? true;
+      if (lastWeekOfMonth && S.mu.D >= month.weeks.length) { addDone(S.mdone, 'D'); completed.monthly.push('D'); }
+      const anti = (input.anti ?? true) && S.gameWk <= 3 && !input.phone;
       if (S.wu.D >= 3 && anti) { addDone(S.wdone, 'D'); completed.weekly.push('D'); ev.unshift(['D', 'S', 0]); }
       else {
         S.wdone = S.wdone.filter(c => c !== 'D');
@@ -140,7 +145,7 @@ export class Engine {
       }
       // mascota equipada
       const eq = S.equipped, maxXp = this.cum[this.cum.length - 1];
-      if (input.feed) { S.px[eq] = Math.min(maxXp, S.px[eq] + cfg.petWeek); S.feedStreak = 0; }
+      if (input.feed || S.foodWk >= cfg.foodDays) { S.px[eq] = Math.min(maxXp, S.px[eq] + cfg.petWeek); S.feedStreak = 0; }
       else {
         S.feedStreak++;
         if (S.feedStreak >= 2 && this.petLevel(eq) > 0) S.px[eq] = this.cum[this.petLevel(eq) - 1];
@@ -210,6 +215,11 @@ export class Engine {
     if (!frozen) S.s = failm.length >= 2 ? 0 : S.s + 1;
   }
 
+  /** Posición de la semana de un día dentro de su mes: { n: 1..k, of: k }. */
+  weekInfo(day: number): { n: number; of: number } {
+    const w = Math.floor(day / 7), m = this.cal.months[this.cal.monthOfWeek[w]];
+    return { n: m.weeks.indexOf(w) + 1, of: m.weeks.length };
+  }
   petLevels(): Record<Cat, number> {
     return { F: this.petLevel('F'), I: this.petLevel('I'), V: this.petLevel('V'), D: this.petLevel('D'), O: this.petLevel('O') };
   }

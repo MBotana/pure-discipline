@@ -38,6 +38,7 @@ var DEFAULT_CONFIG = {
   impUnits: 6,
   dchk: 2,
   namb: 6,
+  foodDays: 4,
   statPw: 1,
   statPen: 1,
   statScale: 0.5,
@@ -89,6 +90,8 @@ function initialState() {
     px: zero(),
     equipped: "F",
     feedStreak: 0,
+    gameWk: 0,
+    foodWk: 0,
     wstreak: 0,
     multM: 1,
     mu: zero(),
@@ -172,7 +175,7 @@ class Engine {
     const month = this.cal.months[this.cal.monthOfWeek[w]];
     const unlocked = [];
     const out = [];
-    const completed = { weekly: [], monthly: [] };
+    const completed = { weekly: [], monthly: [], pet: false };
     if (dd === 0) {
       if (w === month.weeks[0]) {
         S.multM = S.s >= 1 ? 1 + S.s : 1;
@@ -184,6 +187,8 @@ class Engine {
       S.bonusW = S.s >= 1 ? S.multM : 1 + cfg.weeklyBonus[Math.min(S.wstreak, 4)];
       S.wu = zero();
       S.wdone = [];
+      S.gameWk = 0;
+      S.foodWk = 0;
     }
     if (input.equip)
       S.equipped = input.equip;
@@ -242,8 +247,24 @@ class Engine {
       S.wu.D++;
       ev.push(["D", "W", cfg.W / 3]);
     }
+    if (input.dweek)
+      while (S.wu.D < 3) {
+        S.wu.D++;
+        ev.push(["D", "W", cfg.W / 3]);
+      }
+    if (input.gaming)
+      S.gameWk += input.gaming;
+    if (input.food) {
+      S.foodWk++;
+      if (S.foodWk === cfg.foodDays)
+        completed.pet = true;
+    }
     if (input.improve)
       monthly("O", cfg.impUnits, cfg.Mp / cfg.impUnits);
+    if (dd === 6 && input.dweek) {
+      S.mu.D++;
+      ev.push(["D", "M", cfg.Mp / month.weeks.length]);
+    }
     if ((dd === 2 || dd === 6) && input.dcheck)
       ev.push(["D", "M", cfg.Mp / (cfg.dchk * month.weeks.length)]);
     const lastWeekOfMonth = w === month.weeks[month.weeks.length - 1];
@@ -252,7 +273,11 @@ class Engine {
         addDone(S.mdone, "D");
         completed.monthly.push("D");
       }
-      const anti = input.anti ?? true;
+      if (lastWeekOfMonth && S.mu.D >= month.weeks.length) {
+        addDone(S.mdone, "D");
+        completed.monthly.push("D");
+      }
+      const anti = (input.anti ?? true) && S.gameWk <= 3 && !input.phone;
       if (S.wu.D >= 3 && anti) {
         addDone(S.wdone, "D");
         completed.weekly.push("D");
@@ -265,7 +290,7 @@ class Engine {
         }
       }
       const eq = S.equipped, maxXp = this.cum[this.cum.length - 1];
-      if (input.feed) {
+      if (input.feed || S.foodWk >= cfg.foodDays) {
         S.px[eq] = Math.min(maxXp, S.px[eq] + cfg.petWeek);
         S.feedStreak = 0;
       } else {
@@ -366,6 +391,10 @@ class Engine {
     const frozen = S.blocked !== null && !this.statOk(S.blocked) || S.bd > cfg.freezeDays;
     if (!frozen)
       S.s = failm.length >= 2 ? 0 : S.s + 1;
+  }
+  weekInfo(day) {
+    const w = Math.floor(day / 7), m = this.cal.months[this.cal.monthOfWeek[w]];
+    return { n: m.weeks.indexOf(w) + 1, of: m.weeks.length };
   }
   petLevels() {
     return { F: this.petLevel("F"), I: this.petLevel("I"), V: this.petLevel("V"), D: this.petLevel("D"), O: this.petLevel("O") };

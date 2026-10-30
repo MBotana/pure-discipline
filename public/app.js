@@ -23,7 +23,8 @@ function applyTheme() {
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = THEMES.find(x => x[0] === t)[2];
 }
 applyTheme();
-let showDone = false, lastTap = { k: '', t: 0 }, mtab = 'dia', tab = 'hoy', viewDate = todayISO(), syncMsg = '', syncing = false, errMsg = '', mode = null, timer = 0;
+const DTEXT = ['Objetivos y prioridades definidos y estrategia planteada', 'Todos los proyectos iniciados y registrados', 'Todos los proyectos cerrados o pendientes a cerrar', 'Reportes realizados y mes entrante planificado', 'Revisión general hecha y ajustes aplicados'];
+let modal = null, askedFor = '', showDone = false, lastTap = { k: '', t: 0 }, mtab = 'dia', tab = 'hoy', viewDate = todayISO(), syncMsg = '', syncing = false, errMsg = '', mode = null, timer = 0;
 
 // ---------- fechas (UTC puro, sin zona horaria) ----------
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -70,7 +71,7 @@ const toggle = (date, key) => {
   setInput(date, i => { i[key] = !i[key]; });
   if (wasOn) return;
   const idx = dayIdx(date), c = idx >= 0 ? compute(idx).results[idx].completed : null;
-  fx(Math.round(dayGain(date) - before), c?.monthly.length ? 'mensual' : c?.weekly.length ? 'semanal' : 'diaria');
+  fx(Math.round(dayGain(date) - before), c?.monthly.length ? 'mensual' : c?.weekly.length || c?.pet ? 'semanal' : 'diaria');
 };
 
 // ---------- sincronización ----------
@@ -107,7 +108,7 @@ const fmt = n => Math.round(n).toLocaleString('es-AR');
 function viewHoy() {
   if (!S.startDate) return '';
   const today = todayISO(), idx = dayIdx(viewDate);
-  const dow = (new Date(toUTC(viewDate)).getUTCDay() + 6) % 7, wkStart = addDays(viewDate, -dow), DK = ['gym', 'read', 'aero', 'clean', 'dwork'];
+  const dow = (new Date(toUTC(viewDate)).getUTCDay() + 6) % 7, wkStart = addDays(viewDate, -dow), DK = ['gym', 'read', 'aero', 'clean', 'food'];
   const strip = Array.from({ length: 7 }, (_, i) => { const d = addDays(wkStart, i), inp = S.days[d]?.input ?? {}, n = DK.filter(k => inp[k]).length, off = d > today;
     return `<button class="wd ${d === viewDate ? 'sel' : ''} ${d === today ? 'tod' : ''} ${n === 5 ? 'full' : n ? 'some' : ''}" ${off ? 'disabled' : `data-act="day" data-d="${d}"`}><span>${'LMXJVSD'[i]}</span><b>${+d.slice(8)}</b><i></i></button>`; }).join('');
   const nav = `<div class="wk">${strip}</div><div class="daytitle">${viewDate === today ? 'Hoy' : 'Editando'} · ${pretty(viewDate)}${viewDate !== today ? ' · <a href="#" data-act="today">volver a hoy</a>' : ''}</div>`;
@@ -119,10 +120,11 @@ function viewHoy() {
   const w = c => st.wu[c], m = c => st.mu[c];
   const gained = r.events.reduce((a, x) => a + x.paid, 0), lost = r.events.filter(x => x.outcome !== 'paid').reduce((a, x) => a + x.amount - x.paid, 0);
   const tick = k => !!inp[k];
+  const ic = c => c === 'P' ? petTag(st.equipped, e.petLevel(st.equipped), 1) : iconTag(c, 2);
   const doneRows = [];
-  const row = (k, cat, label, meta) => { if (tick(k)) { doneRows.push([k, cat, label]); return ''; } return `<button class="mrow" ${pre ? 'disabled' : `data-act="t" data-k="${k}"`}><span class="mic">${iconTag(cat, 2)}</span><span class="mtx"><b>${label}</b><small>${meta}</small></span>${pre ? '' : '<span class="dbl">2×</span>'}</button>`; };
+  const row = (k, cat, label, meta) => { if (tick(k)) { doneRows.push([k, cat, label]); return ''; } return `<button class="mrow" ${pre ? 'disabled' : `data-act="t" data-k="${k}"`}><span class="mic">${ic(cat)}</span><span class="mtx"><b>${label}</b><small>${meta}</small></span>${pre ? '' : '<span class="dbl">2×</span>'}</button>`; };
   const pips = (n, max) => `<span class="pips">${Array.from({ length: max }, (_, q) => `<i class="${q < n ? 'f' : ''}"></i>`).join('')}</span>`;
-  const info = (cat, label, meta, right, done) => `<div class="mrow static ${done ? 'on' : ''}"><span class="mic">${iconTag(cat, 2)}</span><span class="mtx"><b>${label}</b><small>${meta}</small></span>${right}<span class="chk">${done ? '✓' : ''}</span></div>`;
+  const info = (cat, label, meta, right, done) => `<div class="mrow static ${done ? 'on' : ''}"><span class="mic">${ic(cat)}</span><span class="mtx"><b>${label}</b><small>${meta}</small></span>${right}<span class="chk">${done ? '✓' : ''}</span></div>`;
   const bar = (n, max) => `<span class="mini"><i style="width:${Math.min(100, n / max * 100)}%"></i></span>`;
   const sections = [['dia', 'Diarias'], ['sem', 'Semanales'], ['mes', 'Mensuales']];
   let h = nav;
@@ -130,42 +132,43 @@ function viewHoy() {
   if (st.blocked !== null && viewDate === today) h += `<div class="banner">🔒 <b>Bloqueado en el piso ${st.blocked}.</b> No sumás XP hasta cumplir la puerta (mirá la pestaña Torre).</div>`;
   h += `<div class="sum"><span><small>XP del día</small><b>+${fmt(gained)}</b></span><span><small>Piso</small><b>${r.floor}</b></span><span><small>Racha</small><b>${st.s} ${st.s === 1 ? 'mes' : 'meses'}</b></span><span><small>Multiplicador</small><b>×${st.s >= 1 ? st.s + 1 : 1}</b></span></div>${lost > 0 ? `<div class="mute" style="margin:-6px 0 10px">No cobrada por bloqueo: ${fmt(lost)}</div>` : ''}`;
   h += `<div class="seg">${sections.map(([k, l]) => `<button class="${mtab === k ? 'on' : ''}" data-act="mtab" data-v="${k}">${l}</button>`).join('')}</div>`;
+  const wi = pre ? { n: 1, of: 4 } : e.weekInfo(idx), games = st.gameWk, today0 = inp.gaming || 0;
+  const petIc = c => petTag(c, e.petLevel(c), 1);
   if (mtab === 'dia') {
     const wk = dd < 5 ? '+50 XP' : 'solo suma a la semana', n = DK.filter(tick).length;
     h += `<div class="card slim"><div class="row"><h2>Misiones del día</h2><span class="pill ${n === 5 ? 'ok' : ''}">${n} / 5</span></div><div class="bar gold"><i style="width:${n * 20}%"></i></div>`;
     h += row('gym', 'F', 'Gimnasio', `${wk} · sem ${w('F')}/3 · mes ${m('F')}/${cfg.gymM}`);
     h += row('read', 'I', 'Lectura', `${wk} · sem ${w('I')}/3`);
     h += row('aero', 'V', 'Aeróbico', `${wk} · sem ${w('V')}/3 · mes ${m('V')}/${cfg.aeroM}`);
-    h += row('dwork', 'D', 'Día de trabajo del objetivo', `sem ${w('D')}/3`);
     h += row('clean', 'O', 'Ambiente ordenado', `${wk} · sem ${w('O')}/${cfg.namb}`);
+    h += row('food', 'P', 'Alimentación cumplida', `sem ${st.foodWk}/${cfg.foodDays} días · alimenta a ${PETS[st.equipped].name}`);
     if (n === 5) h += `<p class="allok">¡Todas las misiones del día cumplidas!</p>`;
     h += `</div>`;
+    h += `<div class="card slim bronze"><h2>Antiobjetivo</h2><button class="mrow bronze" ${pre ? 'disabled' : 'data-act="game"'}><span class="mic">🎮</span><span class="mtx"><b>Sesión de videojuegos</b><small>hoy ${today0} · semana ${games} (más de 3 rompe el objetivo)</small></span>${pre ? '' : '<span class="dbl">2×</span>'}</button>${today0 > 0 ? `<button class="undo" data-act="gameminus">Quitar una sesión</button>` : ''}</div>`;
   } else if (mtab === 'sem') {
-    const rows = [['F', 'Fuerza', '3 sesiones', 3], ['I', 'Inteligencia', '3 lecturas', 3], ['V', 'Vitalidad', '3 aeróbicos', 3], ['D', 'Disciplina', '3 días de trabajo', 3], ['O', 'Orden', `${cfg.namb} ambientes`, cfg.namb]];
-    const dn = rows.filter(([c]) => st.wdone.includes(c)).length;
-    h += `<div class="card slim"><div class="row"><h2>Esta semana</h2><span class="pill ${dn === 5 ? 'ok' : ''}">${dn} / 5</span></div>`;
+    const rows = [['F', 'Fuerza', '3 sesiones', 3], ['I', 'Inteligencia', '3 lecturas', 3], ['V', 'Vitalidad', '3 aeróbicos', 3], ['O', 'Orden', `${cfg.namb} ambientes`, cfg.namb]];
+    const dn = rows.filter(([c]) => st.wdone.includes(c)).length + (st.wu.D >= 3 ? 1 : 0) + (st.foodWk >= cfg.foodDays ? 1 : 0);
+    h += `<div class="card slim"><div class="row"><h2>Esta semana</h2><span class="pill ${dn === 6 ? 'ok' : ''}">${dn} / 6</span></div>`;
     h += rows.map(([c, nm, goal, max]) => info(c, nm, goal, pips(w(c), max), st.wdone.includes(c))).join('');
-    h += `<p class="mute">Cada semanal cumplida da +1 punto de estadística. Semanas buenas seguidas: ${st.wstreak}.</p></div>`;
+    h += info('D', 'Disciplina', DTEXT[Math.min(wi.n, 5) - 1], '', st.wu.D >= 3);
+    h += info('P', 'Alimentación', `${cfg.foodDays} días de alimentación`, pips(st.foodWk, cfg.foodDays), st.foodWk >= cfg.foodDays);
+    h += `<p class="mute">Cada semanal cumplida da +1 punto de estadística (Disciplina se confirma en el cierre del domingo; la alimentación le da XP a tu mascota). Semanas buenas seguidas: ${st.wstreak}.</p></div>`;
     h += `<div class="card slim"><h2>Cierre de semana</h2>`;
-    if (dd === 6) {
-      h += `<button class="mrow bad ${inp.anti === false ? 'on' : ''}" data-act="anti"><span class="mic">⚠️</span><span class="mtx"><b>Violé un antiobjetivo</b><small>más de 3 sesiones de videojuegos o celular > 5 h</small></span><span class="chk">${inp.anti === false ? '!' : ''}</span></button>`;
-      h += row('feed', 'F', 'Alimenté a la mascota toda la semana', `mascota equipada: ${PETS[st.equipped].name}`).replace(iconTag('F', 2), petTag(st.equipped, e.petLevel(st.equipped), 1));
-    } else h += `<p class="mute">Se completa el domingo: ahí marcás si violaste un antiobjetivo y si alimentaste a tu mascota (${PETS[st.equipped].name}).</p>`;
+    if (dd === 6 && !pre) h += `<button class="btn" data-act="closeweek">${inp.dform ? 'Revisar el cierre' : 'Completar el cierre'}</button><p class="mute">${inp.dform ? `Disciplina: ${inp.dweek ? 'cumplida' : 'no cumplida'} · celular > 5 h: ${inp.phone ? 'sí' : 'no'}` : 'Respondé tu objetivo de Disciplina y el promedio de celular.'}</p>`;
+    else h += `<p class="mute">El domingo se abre el formulario con tu objetivo de Disciplina de la semana y la pregunta del celular. Videojuegos esta semana: ${games} (máximo 3).</p>`;
     h += `</div>`;
   } else {
     const rows = [['F', 'Fuerza', `${cfg.gymM} sesiones`, cfg.gymM], ['V', 'Vitalidad', `${cfg.aeroM} aeróbicos`, cfg.aeroM], ['I', 'Inteligencia', `${cfg.bookTramos} tramos del libro`, cfg.bookTramos], ['O', 'Orden', `${cfg.impUnits} días de mejora`, cfg.impUnits]];
     const dn = st.mdone.length;
     h += `<div class="card slim"><div class="row"><h2>Este mes</h2><span class="pill ${dn === 5 ? 'ok' : ''}">${dn} / 5</span></div>`;
     h += rows.map(([c, nm, goal, max]) => info(c, nm, `${m(c)} de ${goal}`, bar(m(c), max), st.mdone.includes(c))).join('');
-    h += info('D', 'Disciplina', 'chequeos de tareas al día', '', st.mdone.includes('D'));
+    h += info('D', 'Disciplina', `${m('D')} de ${wi.of} objetivos semanales`, bar(m('D'), wi.of), st.mdone.includes('D'));
     h += `<p class="mute">Fallar 2 o más reinicia la racha; cada uno fallado resta 1 punto de estadística.</p></div>`;
-    h += `<div class="card slim"><h2>Registrar hoy</h2>${row('bookTramo', 'I', 'Avancé un tramo del libro (10 %)', `mes ${m('I')}/${cfg.bookTramos}`)}${row('improve', 'O', 'Día de trabajo de la mejora', `mes ${m('O')}/${cfg.impUnits}`)}`;
-    h += dd === 2 || dd === 6 ? row('dcheck', 'D', 'Chequeo de tareas: al día', 'miércoles y domingo') : `<p class="mute">El chequeo de tareas se registra miércoles y domingo.</p>`;
-    h += `</div>`;
+    h += `<div class="card slim"><h2>Registrar hoy</h2>${row('bookTramo', 'I', 'Avancé un tramo del libro (10 %)', `mes ${m('I')}/${cfg.bookTramos}`)}${row('improve', 'O', 'Día de trabajo de la mejora', `mes ${m('O')}/${cfg.impUnits}`)}</div>`;
   }
   if (doneRows.length) {
     h += `<div class="card slim"><button class="donebtn" data-act="showdone"><span>Completadas (${doneRows.length})</span><span>${showDone ? '▲' : '▼'}</span></button>`;
-    if (showDone) h += doneRows.map(([k, c, l]) => `<div class="mrow static on"><span class="mic">${iconTag(c, 2)}</span><span class="mtx"><b>${l}</b></span><button class="undo" data-act="undo" data-k="${k}">Deshacer</button></div>`).join('');
+    if (showDone) h += doneRows.map(([k, c, l]) => `<div class="mrow static on"><span class="mic">${ic(c)}</span><span class="mtx"><b>${l}</b></span><button class="undo" data-act="undo" data-k="${k}">Deshacer</button></div>`).join('');
     h += `</div>`;
   }
   return h;
@@ -246,13 +249,23 @@ function viewAjustes() {
 }
 
 const TABS = [['hoy', '✅', 'Misiones', viewHoy], ['torre', '🏰', 'Torre', viewTorre], ['stats', '📊', 'Stats', viewStats], ['mascotas', '🐾', 'Mascotas', viewMascotas], ['ajustes', '⚙️', 'Ajustes', viewAjustes]];
+function modalHTML() {
+  if (!modal || !S.startDate) return '';
+  const i = dayIdx(modal.date), { e } = compute(i), wi = e.weekInfo(i), txt = DTEXT[Math.min(wi.n, 5) - 1];
+  const tg = (k, label, sub, bad) => `<button class="mrow ${bad ? 'bad' : ''} ${modal[k] ? 'on' : ''}" data-act="mdl" data-k="${k}"><span class="mic">${k === 'dw' ? iconTag('D', 2) : '📱'}</span><span class="mtx"><b>${label}</b><small>${sub}</small></span><span class="chk">${modal[k] ? '✓' : ''}</span></button>`;
+  return `<div class="modal"><div class="card slim"><h2>Cierre de semana ${wi.n} del mes</h2>${tg('dw', 'Objetivo de Disciplina', txt, false)}${tg('ph', 'El promedio semanal de celular superó las 5 h', 'antiobjetivo: si lo marcás, esta semana no suma punto de Disciplina', true)}<div class="row" style="margin-top:12px"><button class="btn ghost" data-act="mdlcancel">Cancelar</button><button class="btn" data-act="mdlsave">Guardar cierre</button></div></div></div>`;
+}
 function render() {
   const view = TABS.find(t => t[0] === tab)[3];
   const app = document.getElementById('app'), focus = document.activeElement?.id, y = window.scrollY;
   const offline = (!navigator.onLine || pending() > 0) && S.token ? `<div class="mute" style="text-align:right">${navigator.onLine ? 'pendiente de sincronizar' : 'sin conexión'}</div>` : '';
   if (!S.token && tab !== 'ajustes') { tab = 'ajustes'; return render(); }
   document.documentElement.classList.toggle('cf', has('marco'));
+  if (tab === 'hoy' && S.startDate && !modal && viewDate === todayISO() && dayIdx(viewDate) >= 0 && dayIdx(viewDate) % 7 === 6 && askedFor !== viewDate && !(S.days[viewDate]?.input?.dform)) {
+    askedFor = viewDate; modal = { dw: false, ph: false, date: viewDate };
+  }
   app.innerHTML = offline + view(); renderStrip();
+  document.getElementById('modal').innerHTML = modalHTML();
   document.getElementById('tabs').innerHTML = TABS.map(t => `<button class="${t[0] === tab ? 'on' : ''}" data-act="tab" data-t="${t[0]}"><span>${t[1]}</span>${t[2]}</button>`).join('');
   if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
   window.scrollTo(0, y);
@@ -281,7 +294,7 @@ function renderStrip() {
   const bg = showDoor && pre ? '' : bgLayer(bgName(floor), null, 'bg');
   const door = showDoor ? towerLayer(doorName, doorName !== 'torre_cerrada' && !doorName.startsWith('torre_apertura'), 'door ' + (phase === 'shake' ? 'shake' : phase === 'fade' ? 'fadeout' : '')) : '';
   const ground = 6;
-  ['diaria', 'semanal', 'mensual'].forEach(p => heroSrc(floor, p)); // precarga las poses
+  ['diaria', 'semanal', 'mensual', 'mueca'].forEach(p => heroSrc(floor, p)); // precarga las poses
   el.innerHTML = `<div class="strip ${d.blocked ? 'blocked' : ''}"><div class="top"><span>${title}</span>${pre ? '' : `<span class="hp" title="Avance al próximo piso"><i style="width:${d.pct}%"></i></span>`}</div><div class="arena" style="${vars}">${bg}${door}${heroSprite(floor, `left:${U(46)};bottom:${U(ground)}`, d.done)}${petSprite(d.eq, d.pl, `left:${U(82)};bottom:${U(ground)}`)}${d.boss ? bossSprite(floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div></div>`;
   if (phase === 'fade') requestAnimationFrame(() => requestAnimationFrame(() => el.querySelector('.door')?.classList.add('gone')));
 }
@@ -298,7 +311,7 @@ function fx(delta, pose = 'diaria') {
   const s = document.querySelector('.strip'); if (!s) return;
   const hero = s.querySelector('.hero');
   if (hero) {
-    const { e } = current(), r = heroSrc(e.floor(), pose), base = hero.src, ms = { diaria: 1000, semanal: 1500, mensual: 2500 }[pose];
+    const { e } = current(), r = heroSrc(e.floor(), pose), base = hero.src, ms = { diaria: 1000, semanal: 1500, mensual: 2500, mueca: 1500 }[pose];
     hero.src = r.src; hero.classList.toggle('hop', r.hop);
     if (pose === 'mensual') for (let i = 0; i < 6; i++) { const t = document.createElement('i'); t.className = 'spark'; t.textContent = '✦'; t.style.cssText = `left:calc(${46 + (i % 3) * 14 - 6} * 100cqw / 240);bottom:calc(${14 + Math.floor(i / 3) * 20 + (i % 2) * 6} * 100cqw / 240);animation-delay:${i * 0.18}s`; s.querySelector('.arena').appendChild(t); setTimeout(() => t.remove(), ms); }
     setTimeout(() => { if (hero.isConnected) { hero.src = base; hero.classList.remove('hop'); } }, ms);
@@ -338,6 +351,20 @@ document.addEventListener('click', async ev => {
     const k = el.dataset.k, now = Date.now();
     if (lastTap.k === k && now - lastTap.t < 450) { lastTap = { k: '', t: 0 }; toggle(viewDate, k); }
     else { lastTap = { k, t: now }; el.classList.add('armed'); setTimeout(() => el.classList.remove('armed'), 450); hint('Tocá otra vez para completar'); }
+  }
+  else if (a === 'game') {
+    const now = Date.now();
+    if (lastTap.k === 'game' && now - lastTap.t < 450) { lastTap = { k: '', t: 0 }; setInput(viewDate, i => { i.gaming = (i.gaming || 0) + 1; }); fx(0, 'mueca'); }
+    else { lastTap = { k: 'game', t: now }; el.classList.add('armed'); setTimeout(() => el.classList.remove('armed'), 450); hint('Tocá otra vez para registrar la sesión'); }
+  }
+  else if (a === 'gameminus') setInput(viewDate, i => { i.gaming = Math.max(0, (i.gaming || 0) - 1); });
+  else if (a === 'closeweek') { const i = S.days[viewDate]?.input ?? {}; modal = { dw: !!i.dweek, ph: !!i.phone, date: viewDate }; render(); }
+  else if (a === 'mdl') { modal[el.dataset.k] = !modal[el.dataset.k]; render(); }
+  else if (a === 'mdlcancel') { modal = null; render(); }
+  else if (a === 'mdlsave') {
+    const m0 = modal; modal = null;
+    setInput(m0.date, i => { i.dform = true; i.dweek = m0.dw; i.phone = m0.ph; });
+    fx(0, m0.ph ? 'mueca' : m0.dw ? 'semanal' : 'diaria');
   }
   else if (a === 'undo') setInput(viewDate, i => { i[el.dataset.k] = false; });
   else if (a === 'showdone') { showDone = !showDone; render(); }
