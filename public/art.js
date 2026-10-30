@@ -1,18 +1,22 @@
 // Ilustraciones vectoriales originales (SVG). Estilo: formas suaves, contorno oscuro, color plano con un toque de brillo.
 const INK = '#1b1f3a';
 export const ZONES = [
-  { n: 'Raíces', sky: ['#9ad6ff', '#e6f6ff'], far: '#7fc4a0', gr: '#5aa86f', gr2: '#3f8a56', ac: '#7bd389' },
-  { n: 'Bosque', sky: ['#a7e0c4', '#f0fbea'], far: '#6fb58a', gr: '#4f9e63', gr2: '#357a49', ac: '#9be07a' },
-  { n: 'Pantano', sky: ['#c3d9a8', '#f4f7df'], far: '#8fae74', gr: '#6d9a58', gr2: '#4d7b3f', ac: '#c7e06a' },
-  { n: 'Colinas', sky: ['#ffd7a8', '#fff4e0'], far: '#d9a56b', gr: '#c68b4e', gr2: '#a06d36', ac: '#ffb347' },
-  { n: 'Desierto', sky: ['#ffc7a0', '#ffe9d2'], far: '#e0a070', gr: '#d68f55', gr2: '#b46f3a', ac: '#ff8a4c' },
-  { n: 'Cañón', sky: ['#f0a8a0', '#ffe1da'], far: '#c47866', gr: '#a85d4c', gr2: '#82443a', ac: '#ff6b5c' },
-  { n: 'Cumbres', sky: ['#b7c4ff', '#eef0ff'], far: '#8f9ad6', gr: '#7683c4', gr2: '#5a66a8', ac: '#8aa0ff' },
-  { n: 'Nieve', sky: ['#cfe8ff', '#f7fbff'], far: '#aac6e6', gr: '#d9e8f6', gr2: '#b6cde4', ac: '#7cc8ff' },
-  { n: 'Tormenta', sky: ['#7c7fb8', '#c9cbe6'], far: '#5d6094', gr: '#4a4d80', gr2: '#363963', ac: '#b48cff' },
-  { n: 'Cielo', sky: ['#3a2f7a', '#c18cff'], far: '#6a4fb0', gr: '#52399a', gr2: '#3b2878', ac: '#ffd36b' },
+  { n: 'Ruinas en llamas', sky: ['#2a0d0d', '#8a2a10'], far: '#4a1a12', gr: '#3a2a2a', gr2: '#6a2a1a', ac: '#ff6a2a' },
+  { n: 'Ruinas', sky: ['#bfe3ff', '#fff4dc'], far: '#b8a88a', gr: '#a89878', gr2: '#7a6a50', ac: '#d8b878' },
+  { n: 'Coliseo', sky: ['#e0a070', '#ffe3b8'], far: '#c08a5a', gr: '#d2a766', gr2: '#a8803f', ac: '#c0452a' },
+  { n: 'Batalla', sky: ['#8aa0b8', '#d8d8d0'], far: '#7a8a70', gr: '#6a8a4a', gr2: '#4a6a30', ac: '#c0c8d0' },
+  { n: 'Campo de guerra', sky: ['#6a6a78', '#b0a8a0'], far: '#6a6258', gr: '#5a5a3e', gr2: '#3e3e2a', ac: '#8a8a7a' },
+  { n: 'Llanura del león', sky: ['#ffd27a', '#fff0c8'], far: '#d9b46a', gr: '#c9a24a', gr2: '#a07a28', ac: '#d89a2a' },
+  { n: 'Montaña baja', sky: ['#4a4a60', '#8a8aa0'], far: '#5a5a70', gr: '#5a6a58', gr2: '#3e4e3e', ac: '#7a7a92' },
+  { n: 'Montaña alta', sky: ['#7ac8ff', '#eaf8ff'], far: '#a8c8e8', gr: '#e6eef6', gr2: '#b8cde0', ac: '#7cc8ff' },
+  { n: 'Cima', sky: ['#8a96b0', '#d8dce8'], far: '#7a8298', gr: '#b0b8c8', gr2: '#8892a8', ac: '#8a909c' },
+  { n: 'Camino del cielo', sky: ['#6ab8ff', '#fff2d8'], far: '#cfe6ff', gr: '#f4eedc', gr2: '#d8cfae', ac: '#ffd36b' },
+  { n: 'Camino de ángeles', sky: ['#9ad0ff', '#fff6d0'], far: '#e8f2ff', gr: '#fff6dc', gr2: '#e8d89a', ac: '#ffffff' },
+  { n: 'Trono de Zeus', sky: ['#3a2f7a', '#ffd36b'], far: '#6a4fb0', gr: '#f0dca0', gr2: '#c8a840', ac: '#ffd36b' },
 ];
-export const zoneOf = floor => ZONES[Math.min(9, Math.max(0, Math.floor((floor - 1) / 10)))];
+const ZSTART = [1, 11, 25, 26, 36, 50, 51, 61, 75, 76, 86, 100];
+export const zone12 = floor => { let z = 1; ZSTART.forEach((s, k) => { if (floor >= s) z = k + 1; }); return z; };
+export const zoneOf = floor => ZONES[zone12(floor) - 1];
 
 export function heroSVG(frame = 'a', crown = false, pose = '') {
   const lift = pose === 'run1' ? [4, 0] : pose === 'run2' ? [0, 4] : [0, 0];
@@ -131,3 +135,4 @@ export function nearSVG(z) {
   for (const x of [50, 170]) s += `<path d="M${x} 52l3-6 3 6z" fill="${z.gr2}"/>`;
   return s + '</svg>';
 }
+

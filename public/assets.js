@@ -1,7 +1,8 @@
 // Imágenes del juego. Cada una se busca en /img/<nombre>.png; si el archivo no existe se usa un dibujo provisorio.
 // Para reemplazar un dibujo basta con subir el archivo con el nombre exacto (ver img/LEEME.md).
 import { px } from '/px.js';
-import { heroSVG, petSVG, enemySVG, iconSVG, towerSVG, farSVG, nearSVG, zoneOf } from '/art.js';
+import { heroSVG, petSVG, enemySVG, iconSVG, towerSVG, farSVG, nearSVG, zoneOf, zone12, ZONES } from '/art.js';
+export { zone12 };
 
 const state = new Map(); let notify = () => {};
 export const onAssets = f => { notify = f; };
@@ -28,8 +29,7 @@ export const PETS = { F: { key: 'behemot', name: 'Behemot' }, I: { key: 'esfinge
 const STARTS = [1, 10, 20, 25, 35, 45, 50, 60, 70, 75, 85, 95];
 /** Armadura (1-4) y etapa (1-3) según el piso. */
 export function heroLook(floor) { let i = 0; STARTS.forEach((s, k) => { if (floor >= s) i = k; }); return { t: Math.floor(i / 3) + 1, e: (i % 3) + 1 }; }
-const ZSTART = [1, 11, 25, 26, 36, 50, 51, 61, 75, 76, 86, 100];
-export const zone12 = floor => { let z = 1; ZSTART.forEach((s, k) => { if (floor >= s) z = k + 1; }); return z; };
+export const Z12 = ZONES;
 export const bgName = floor => 'fondo_' + String(zone12(floor)).padStart(2, '0');
 export const BOSSES = [25, 50, 75, 100];
 export const heroBase = floor => { const { t, e } = heroLook(floor); return `heroe_t${t}_e${e}`; };
@@ -46,15 +46,28 @@ export function heroSrc(floor, pose = '', crown = false) {
   if (has(base)) return { src: url(base), hop: !!pose };
   return { src: px(heroSVG('a', crown, pose), 32, 40), hop: false };
 }
-export const heroSprite = (floor, style, crown) => { const r = heroSrc(floor, '', crown); return `<img class="px sp hero" alt="" src="${r.src}" style="--w:32;${style}">`; };
+export const heroSprite = (floor, style, crown, k = 1) => { const r = heroSrc(floor, '', crown); return `<img class="px sp hero idle" alt="" src="${r.src}" style="--w:${32 * k};${style}">`; };
+/** Héroe quieto (sin lienzo): para la franja chica, Estadísticas, etc. Sube y baja suavemente. */
+export const heroImgTag = (floor, k = 2, crown = false, cls = '') => heroTag(floor, k, cls, crown);
+export const heroTag = (floor, k = 2, cls = '', crown = false) => `<img class="px hero idle ${cls}" alt="" src="${heroSrc(floor, '', crown).src}" width="${32 * k}" height="${40 * k}">`;
 // ---- mascotas: 32×32 ----
 const petFb = (c, lv) => () => px(petSVG(c, lv, 32), 32, 32);
 export const petName = (c, lv) => `mascota_${PETS[c].key}_n${lv}`;
-export const petTag = (c, lv, k = 2) => tag(petName(c, lv), petFb(c, lv), 32, 32, k, '');
-export const petSprite = (c, lv, style) => sp(petName(c, lv), petFb(c, lv), 32, style, 'pet');
+export const petTag = (c, lv, k = 2, cls = '') => tag(petName(c, lv), petFb(c, lv), 32, 32, k, cls);
+export const petSprite = (c, lv, style, k = 1) => sp(petName(c, lv), petFb(c, lv), 32 * k, style, 'pet');
+/** Cuadros de carrera de la mascota (mascota_X_nN_correr_1..4); sin ellos queda el sprite quieto con rebote. */
+export function petRunFrames(c, lv) {
+  const n = petName(c, lv), real = [];
+  for (let i = 1; i <= 4; i++) { if (has(`${n}_correr_${i}`)) real.push(url(`${n}_correr_${i}`)); else break; }
+  return real.length >= 2 ? real : null;
+}
+export const petRunner = (c, lv, style, k = 1) => { const fr = petRunFrames(c, lv); if (!fr) return petSprite(c, lv, style, k).replace('class="px sp pet"', 'class="px sp pet running"');
+  return `<img class="px sp pet running framed" alt="" src="${fr[0]}" data-frames='${JSON.stringify(fr)}' style="--w:${32 * k};${style}">`; };
+export const heroRunner = (floor, style, crown, k = 1) => { const rf = runFrames(floor, crown);
+  return `<img class="px sp hero running ${rf.bob ? 'bob' : ''}" alt="" src="${rf.frames[0]}" data-frames='${JSON.stringify(rf.frames)}' style="--w:${32 * k};${style}">`; };
 // ---- jefes: 48×48 ----
 export const bossName = floor => `jefe_${floor}`;
-export const bossSprite = (floor, style) => sp(bossName(floor), () => px(enemySVG(zoneOf(floor)).replace('viewBox="0 0 56 48"', 'viewBox="0 -4 56 56"'), 48, 48), 48, style, 'boss');
+export const bossSprite = (floor, style, k = 1) => sp(bossName(floor), () => px(enemySVG(Z12[zone12(floor) - 1]).replace('viewBox="0 0 56 48"', 'viewBox="0 -4 56 56"'), 48, 48), 48 * k, style, 'boss');
 // ---- íconos de estadística: 16×16 ----
 export const iconTag = (c, k = 2) => tag(`icono_${STAT[c]}`, () => px(iconSVG(c), 16, 16), 16, 16, k, 'ico');
 // ---- fondos y torre: 240×64 ----
@@ -78,7 +91,7 @@ export function runFrames(floor, crown) {
 }
 /** Capas del fondo (cada imagen se repite sin cortes): lejana (opcional) y cercana. */
 export function scrollLayers(floor, tNear) {
-  const n = bgName(floor), z = zoneOf(floor), main = has(n), far = has(n + '_lejos');
+  const n = bgName(floor), z = Z12[zone12(floor) - 1], main = has(n), far = has(n + '_lejos');
   const lay = (cls, t, src) => `<div class="scroll ${cls}" style="--t:${t}s"><img class="px" alt="" src="${src}"><img class="px" alt="" src="${src}"></div>`;
   if (main && !far) return lay('near', tNear, url(n));
   return lay('far', (tNear * 2.2).toFixed(2), far ? url(n + '_lejos') : px(farSVG(z), 240, 64)) + lay('near', tNear, main ? url(n) : px(nearSVG(z), 240, 64));

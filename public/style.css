@@ -141,3 +141,14 @@ img.px{image-rendering:pixelated}
 .hero.bob{animation:runbob var(--bobt,.5s) steps(2) infinite}
 @keyframes runbob{50%{transform:translateY(-3%)}}
 .arena .pet{animation:bob .5s steps(2) infinite}
+
+@keyframes idlebob{50%{transform:translateY(-3%)}}
+img.idle{animation:idlebob 1s steps(2) infinite}
+.arena .hero.idle,.arena .pet.idle{animation:idlebob 1s steps(2) infinite}
+.arena .pet.noBob{animation:none}
+.strip.dock{cursor:pointer}.dockrow{display:flex;align-items:flex-end;gap:10px;padding:6px 10px;background:linear-gradient(var(--sky1,#bfe3ff),var(--card,#fff))}
+.dockrow img{flex:none}.dockinfo{flex:1;display:flex;flex-direction:column;gap:2px;font-size:13px}.dockinfo small{color:var(--mute);font-size:11px}
+.dockinfo .hp{display:block;height:8px;background:var(--deep);border:2px solid var(--bronze)}.dockinfo .hp i{display:block;height:100%;background:var(--red2)}
+.strip.scene{margin-bottom:12px;box-shadow:none}.arena.big{max-width:none}
+.statshero{display:flex;justify-content:center;align-items:flex-end;gap:16px;padding:18px 8px 12px;position:relative}
+.statshero .spark,.statshero .dmg{position:absolute}

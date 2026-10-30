@@ -1,6 +1,6 @@
 import { Engine, levelOf, cumXp, buildGates } from '/engine.js';
 import { gateSVG, flagSVG, zoneOf, ZONES } from '/art.js';
-import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petSprite, bossSprite, bgName, bgLayer, towerLayer, runFrames, scrollLayers, iconTag, PETS, BOSSES } from '/assets.js';
+import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petSprite, bossSprite, bgName, bgLayer, towerLayer, runFrames, petRunFrames, heroImgTag, scrollLayers, iconTag, PETS, BOSSES } from '/assets.js';
 import { px, setReadyHandler } from '/px.js';
 const IMG = (svg, w, h, k, cls = '') => `<img class="px ${cls}" alt="" src="${px(svg, w, h)}" width="${w * k}" height="${h * k}">`;
 const gateImg = (open, k = 2) => IMG(gateSVG(open), 32, 40, k);
@@ -177,19 +177,23 @@ function viewHoy() {
 }
 
 let mapAct = 0, mapSel = 0;
+const z0 = f => { const z = zoneOf(f), act = Math.min(10, Math.ceil(f / 10)); return `${z.n} · ${act}-${((f - 1) % 10) + 1}`; };
 function viewTorre() {
   if (!S.startDate || dayIdx(todayISO()) < 0) return `<h1>Torre</h1><div class="card mute">Empieza el ${S.startDate ? pretty(S.startDate) : '—'}.</div>`;
   const { e } = compute(dayIdx(todayISO())), st = e.state, cfg = e.cfg, L = e.floor();
   const into = st.xp - cumXp(L, cfg.A, cfg.r), cost = cfg.A * Math.pow(cfg.r, L - 1);
   const gates = buildGates(cfg), nums = Object.keys(gates).map(Number).sort((a, b) => a - b);
-  const curAct = Math.min(10, Math.ceil(L / 10)), act = mapAct || curAct, z = ZONES[act - 1], sel = mapSel || L;
+  const curAct = Math.min(10, Math.ceil(L / 10)), act = mapAct || curAct, z = zoneOf(act * 10 - 5), sel = mapSel || L;
   const reqLines = (g) => { const d = gates[g], parts = [];
     if (d.stats) parts.push(d.stats.map(c => `${NAMES[c]} ${st.stat[c]}/${d.req}`).join(' + '));
     if (d.streak !== undefined) parts.push(`racha de ${d.streak} meses (tenés ${st.s})`);
     return parts.join('<br>'); };
-  let h = `<h1>Torre</h1><div class="card"><div class="row"><div><div class="mute">Piso actual</div><div class="big">${L}</div></div><div style="text-align:right"><div class="mute">XP total</div><b>${fmt(st.xp)}</b></div></div>`;
+  const o = arenaState(), nextG = nums.find(g => g >= L && !st.cleared.includes(g));
+  let h = `<h1>Torre</h1><div class="strip scene"><div class="top"><span>${z0(L)}</span><span>Piso ${L}</span></div>${arenaHTML(o, true)}</div>`;
+  h += `<div class="card"><div class="row"><div><div class="mute">Piso actual</div><div class="big">${L}</div></div><div style="text-align:right"><div class="mute">XP total</div><b>${fmt(st.xp)}</b></div></div>`;
   h += st.tower !== null ? `<div class="banner ok">🏆 ¡Torre completada!</div>` : `<div class="bar"><i style="width:${Math.min(100, into / cost * 100)}%"></i></div><div class="mute">${fmt(into)} / ${fmt(cost)} XP para el piso ${L + 1}</div>`;
   h += `<div class="mute">Racha mensual activa: <b>${st.s}</b> ${st.s === 1 ? 'mes' : 'meses'}</div></div>`;
+  if (nextG && st.tower === null) h += `<div class="card slim"><h2>Próxima puerta · piso ${nextG}${BOSSES.includes(nextG) ? ' · jefe' : ''}</h2><div class="row"><div>${reqLines(nextG)}</div><span class="pill ${st.blocked === nextG ? 'bad' : ''}">${st.blocked === nextG ? 'bloqueada' : 'pendiente'}</span></div></div>`;
   h += `<div class="acts">${Array.from({ length: 10 }, (_, i) => i + 1).map(a => `<button class="${a === act ? 'on' : ''} ${a > curAct ? 'lock' : ''}" data-act="map" data-a="${a}">${a}</button>`).join('')}</div>`;
   const pts = Array.from({ length: 10 }, (_, i) => [50 + 27 * Math.sin(i * 1.05 + (act % 2) * 1.6), 88 - i * 8, (act - 1) * 10 + i + 1]);
   h += `<div class="map ${act > curAct ? 'dim' : ''}" style="--sky1:${z.sky[0]};--sky2:${z.sky[1]};--gr:${z.gr}"><div class="ribbon">Acto ${act} · ${z.n}</div>`;
@@ -210,8 +214,11 @@ function viewTorre() {
 function viewStats() {
   if (!S.startDate) return `<h1>Estadísticas</h1><div class="card mute">Disponibles al ingresar.</div>`;
   const { e, st } = current(), cap = e.statCap();
-  let h = `<h1>Estadísticas</h1><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} (hasta superar la próxima puerta de estadísticas)</div>` : '');
-  for (const c of CATS) h += `<div style="margin-top:12px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}</b><b>${st.stat[c]}${Number.isFinite(cap) ? ' / ' + cap : ''}</b></div><div class="bar"><i style="width:${Number.isFinite(cap) ? Math.min(100, st.stat[c] / cap * 100) : 100}%"></i></div></div>`;
+  const o = arenaState(), seen = S.seenStat || {}, up = CATS.filter(c => st.stat[c] > (seen[c] ?? st.stat[c]));
+  if (up.length || !S.seenStat) { S.seenStat = { ...st.stat }; save(); }
+  if (up.length) setTimeout(() => { if (tab === 'stats') fx(0, 'semanal'); }, 500);
+  let h = `<h1>Estadísticas</h1><div class="card statshero">${heroImgTag(o.floor, 4, o.done, 'idle')}${petTag(o.eq, o.pl, 3, 'pet idle')}</div><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} (hasta superar la próxima puerta de estadísticas)</div>` : '');
+  for (const c of CATS) h += `<div style="margin-top:12px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}</b><b>${st.stat[c]}${Number.isFinite(cap) ? ' / ' + cap : ''}</b></div><div class="bar"><i style="width:${Number.isFinite(cap) ? Math.min(100, st.stat[c] / cap * 100) : 100}%"></i></div></div>`;
   return h + `<p class="mute">+1 por cada semanal cumplida, −1 por cada objetivo mensual fallado.</p></div>`;
 }
 
@@ -287,40 +294,62 @@ function render() {
 
 // ---------- franja de batalla ----------
 // Lienzo lógico de 240×64: todo se posiciona en unidades de ese lienzo (cqw) para que escale parejo en cualquier pantalla.
-let runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
+let dockOpen = false, runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
 const U = v => `calc(${v} * 100cqw / 240)`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+function arenaState() {
+  const { e, st, pre } = current();
+  const floor = pre ? 1 : e.floor();
+  const boss = BOSSES.includes(floor) && !st.cleared.includes(floor) && st.tower === null;
+  const running = !pre && !phase && st.tower === null && st.blocked === null && !boss;
+  return { e, st, pre, floor, boss, running, eq: st.equipped, pl: e.petLevel(st.equipped), done: st.tower !== null, speed: 1 + 0.5 * st.s };
+}
+/** Escena de 240×64: fondo en movimiento, héroe y mascota (corriendo o quietos), jefe y puerta. */
+function arenaHTML(o, big) {
+  const z = zoneOf(o.floor), vars = `--sky1:${z.sky[0]};--sky2:${z.sky[1]};--gr:${z.gr};--gr2:${z.gr2}`;
+  const showDoor = o.pre || phase, ground = 6;
+  const doorName = phase === 'open' || phase === 'fade' ? 'torre_abierta' : phase.startsWith('f') ? 'torre_apertura_' + phase.slice(1) : 'torre_cerrada';
+  const tNear = +(9 / o.speed).toFixed(2);
+  const bg = showDoor && o.pre ? '' : `<div class="scrollwrap ${o.running ? '' : 'paused'}">${scrollLayers(o.floor, tNear)}</div>`;
+  const door = showDoor ? towerLayer(doorName, doorName !== 'torre_cerrada' && !doorName.startsWith('torre_apertura'), 'door ' + (phase === 'shake' ? 'shake' : phase === 'fade' ? 'fadeout' : '')) : '';
+  const idle = o.running ? '' : 'idle', hx = o.boss ? 52 : 46, pxx = o.boss ? 94 : 82;
+  ['diaria', 'semanal', 'mensual', 'mueca'].forEach(p => heroSrc(o.floor, p));
+  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.floor}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" style="${vars}">${bg}${door}${heroSprite(o.floor, `left:${U(hx)};bottom:${U(ground)}`, o.done)}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
+}
+/** Pone a correr a los personajes de las escenas en carrera (cuadros propios o provisorios). */
+function startAnim() {
+  clearInterval(runTimer);
+  const list = [];
+  document.querySelectorAll('.arena[data-run="1"]').forEach(ar => {
+    const floor = +ar.dataset.floor, speed = +ar.dataset.speed, hero = ar.querySelector('.hero'), pet = ar.querySelector('.pet');
+    const rf = runFrames(floor, ar.dataset.crown === '1'), pf = petRunFrames(ar.dataset.eq, +ar.dataset.pl);
+    hero.classList.remove('idle'); hero.classList.add('running'); hero.classList.toggle('bob', rf.bob); hero.style.setProperty('--bobt', (0.5 / speed).toFixed(2) + 's');
+    if (rf.frames.length > 1) { hero.src = rf.frames[0]; list.push([hero, rf.frames]); }
+    else hero.src = rf.frames[0];
+    if (pf) { pet.src = pf[0]; pet.classList.add('noBob'); list.push([pet, pf]); }
+    ar._ms = Math.round(240 / speed);
+  });
+  if (!list.length) return;
+  let k = 0; const ms = +(document.querySelector('.arena[data-run="1"]')._ms || 240);
+  runTimer = setInterval(() => { k++; for (const [el, fr] of list) { if (!el.isConnected) { clearInterval(runTimer); return; } if (el.dataset.pose) continue; el.src = fr[k % fr.length]; } }, ms);
+}
 function renderStrip() {
   const el = document.getElementById('strip');
   const idx = S.startDate ? dayIdx(todayISO()) : -1;
   if (!S.token || !S.startDate) { el.innerHTML = ''; stripKey = ''; return; }
   if (idx >= 0 && !S.opened && !opening) { startOpening(); return; }
-  const { e, st, pre } = current();
-  const floor = pre ? 1 : e.floor();
+  if (tab === 'torre' || tab === 'stats') { el.innerHTML = ''; stripKey = ''; startAnim(); return; }
+  const o = arenaState(), { e, st } = o, floor = o.floor;
   const into = st.xp - cumXp(floor, e.cfg.A, e.cfg.r), cost = e.cfg.A * Math.pow(e.cfg.r, floor - 1);
-  const d = { pre, floor, eq: st.equipped, pl: e.petLevel(st.equipped), blocked: st.blocked !== null, done: st.tower !== null, boss: BOSSES.includes(floor) && !st.cleared.includes(floor) && st.tower === null, pct: pre ? 0 : Math.round(Math.min(100, into / cost * 100)), phase, readyN };
-  const key = JSON.stringify(d); if (key === stripKey) return; stripKey = key;
+  const pct = o.pre ? 0 : Math.round(Math.min(100, into / cost * 100));
+  const open = dockOpen || o.pre || !!phase;
+  const key = JSON.stringify({ o: [o.pre, floor, o.eq, o.pl, o.running, o.boss, o.done, o.speed], pct, phase, open, readyN, tab: tab === 'hoy' });
+  if (key === stripKey) return; stripKey = key;
   const z = zoneOf(floor), act = Math.min(10, Math.ceil(floor / 10)), stage = ((floor - 1) % 10) + 1;
-  const title = pre ? `La torre se abre el ${pretty(S.startDate)}` : `${z.n} · ${act}-${stage}`;
-  const vars = `--sky1:${z.sky[0]};--sky2:${z.sky[1]};--gr:${z.gr};--gr2:${z.gr2}`;
-  const showDoor = pre || phase;
-  const doorName = phase === 'open' || phase === 'fade' ? 'torre_abierta' : phase.startsWith('f') ? 'torre_apertura_' + phase.slice(1) : 'torre_cerrada';
-  const running = !pre && !phase && st.tower === null && st.blocked === null;
-  const speed = 1 + 0.5 * st.s, tNear = +(9 / speed).toFixed(2);
-  const bg = showDoor && pre ? '' : `<div class="scrollwrap ${running ? '' : 'paused'}">${scrollLayers(floor, tNear)}</div>`;
-  const door = showDoor ? towerLayer(doorName, doorName !== 'torre_cerrada' && !doorName.startsWith('torre_apertura'), 'door ' + (phase === 'shake' ? 'shake' : phase === 'fade' ? 'fadeout' : '')) : '';
-  const ground = 6;
-  ['diaria', 'semanal', 'mensual', 'mueca'].forEach(p => heroSrc(floor, p)); // precarga las poses
-  el.innerHTML = `<div class="strip ${d.blocked ? 'blocked' : ''}"><div class="top"><span>${title}</span>${pre ? '' : `<span class="hp" title="Avance al próximo piso"><i style="width:${d.pct}%"></i></span>`}</div><div class="arena" style="${vars}">${bg}${door}${heroSprite(floor, `left:${U(46)};bottom:${U(ground)}`, d.done)}${petSprite(d.eq, d.pl, `left:${U(82)};bottom:${U(ground)}`)}${d.boss ? bossSprite(floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div></div>`;
-  clearInterval(runTimer);
-  const hero = el.querySelector('.hero');
-  if (hero && running) {
-    const rf = runFrames(floor, d.done); let k = 0;
-    hero.classList.toggle('bob', rf.bob); hero.classList.add('running');
-    hero.style.setProperty('--bobt', (0.5 / speed).toFixed(2) + 's');
-    if (rf.frames.length > 1) { hero.src = rf.frames[0]; runTimer = setInterval(() => { if (!hero.isConnected) return clearInterval(runTimer); if (hero.dataset.pose) return; k = (k + 1) % rf.frames.length; hero.src = rf.frames[k]; }, Math.round(240 / speed)); }
-    else hero.src = rf.frames[0];
-  }
+  const title = o.pre ? `La torre se abre el ${pretty(S.startDate)}` : `${z.n} · ${act}-${stage}`;
+  if (open) el.innerHTML = `<div class="strip ${!o.running && !o.pre ? 'blocked' : ''}" ${o.pre || phase ? '' : 'data-act="dock"'}><div class="top"><span>${title}</span>${o.pre ? '' : `<span class="hp" title="Avance al próximo piso"><i style="width:${pct}%"></i></span>`}</div>${arenaHTML(o)}</div>`;
+  else el.innerHTML = `<div class="strip dock" data-act="dock"><div class="dockrow">${heroImgTag(floor, 2, o.done, 'idle')}${petTag(o.eq, o.pl, 2, 'pet idle')}<div class="dockinfo"><b>Piso ${floor}</b><small>${z.n}</small><span class="hp"><i style="width:${pct}%"></i></span><small>Tocá para ver la carrera</small></div></div></div>`;
+  startAnim();
   if (phase === 'fade') requestAnimationFrame(() => requestAnimationFrame(() => el.querySelector('.door')?.classList.add('gone')));
 }
 /** Apertura de la puerta, una sola vez: cerrada → sacudón → (cuadros) → abierta → aparece la zona 1. */
@@ -328,22 +357,22 @@ async function startOpening() {
   opening = true;
   const frames = []; for (let n = 1; n <= 6; n++) if (await exists('torre_apertura_' + n)) frames.push(n);
   const seq = [['closed', 900], ['shake', 1100], ...frames.map(n => ['f' + n, 500]), ['open', 900], ['fade', 1000]];
-  for (const [p, ms] of seq) { phase = p; renderStrip(); await sleep(ms); }
-  phase = ''; S.opened = true; save(); opening = false; stripKey = ''; renderStrip();
+  for (const [p, ms] of seq) { phase = p; stripKey = ''; render(); await sleep(ms); }
+  phase = ''; S.opened = true; save(); opening = false; stripKey = ''; render();
 }
 /** Festejo del héroe (1 s diaria, 1,5 s semanal, 2,5 s mensual) y texto de XP ganada. */
 function fx(delta, pose = 'diaria') {
-  const s = document.querySelector('.strip'); if (!s) return;
-  const hero = s.querySelector('.hero');
+  const s = document.querySelector('.arena') || document.querySelector('.dock') || document.querySelector('.statshero') || document.body;
+  const hero = document.querySelector('.hero');
   if (hero) {
     const { e } = current(), r = heroSrc(e.floor(), pose), base = hero.src, ms = { diaria: 1000, semanal: 1500, mensual: 2500, mueca: 1500 }[pose];
-    hero.dataset.pose = '1'; hero.classList.remove('running', 'bob'); hero.src = r.src; hero.classList.toggle('hop', r.hop);
-    if (pose === 'mensual') for (let i = 0; i < 6; i++) { const t = document.createElement('i'); t.className = 'spark'; t.textContent = '✦'; t.style.cssText = `left:calc(${46 + (i % 3) * 14 - 6} * 100cqw / 240);bottom:calc(${14 + Math.floor(i / 3) * 20 + (i % 2) * 6} * 100cqw / 240);animation-delay:${i * 0.18}s`; s.querySelector('.arena').appendChild(t); setTimeout(() => t.remove(), ms); }
-    setTimeout(() => { if (hero.isConnected) { stripKey = ''; renderStrip(); } }, ms);
+    hero.dataset.pose = '1'; hero.classList.remove('running', 'bob', 'idle'); hero.src = r.src; hero.classList.toggle('hop', r.hop);
+    if (pose === 'mensual') for (let i = 0; i < 6; i++) { const t = document.createElement('i'); t.className = 'spark'; t.textContent = '✦'; t.style.cssText = `left:calc(${46 + (i % 3) * 14 - 6} * 100cqw / 240);bottom:calc(${14 + Math.floor(i / 3) * 20 + (i % 2) * 6} * 100cqw / 240);animation-delay:${i * 0.18}s`; (s.querySelector('.arena') || s).appendChild(t); setTimeout(() => t.remove(), ms); }
+    setTimeout(() => { if (hero.isConnected) { stripKey = ''; render(); } }, ms);
   }
   if (delta > 0) {
     const t = document.createElement('div'); t.className = 'dmg'; t.textContent = '+' + delta;
-    s.querySelector('.arena').appendChild(t); setTimeout(() => t.remove(), 950);
+    (s.querySelector('.arena') || s).appendChild(t); setTimeout(() => t.remove(), 950);
   }
 }
 
@@ -372,6 +401,7 @@ document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act;
   if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); window.scrollTo(0, 0); }
+  else if (a === 'dock') { dockOpen = !dockOpen; stripKey = ''; renderStrip(); }
   else if (a === 't') {
     const k = el.dataset.k, now = Date.now();
     if (lastTap.k === k && now - lastTap.t < 450) { lastTap = { k: '', t: 0 }; toggle(viewDate, k); }
