@@ -14,19 +14,21 @@ export const ZONES = [
 ];
 export const zoneOf = floor => ZONES[Math.min(9, Math.max(0, Math.floor((floor - 1) / 10)))];
 
-export function heroSVG(crown = false) {
-  return `<svg class="hero" viewBox="0 0 64 72" width="64" height="72" aria-hidden="true">
-  <ellipse cx="30" cy="68" rx="15" ry="3.2" fill="#000" opacity=".18"/>
-  <g class="legs"><rect class="l1" x="22" y="53" width="8" height="14" rx="3.5" fill="#3b3f73" stroke="${INK}" stroke-width="2"/><rect class="l2" x="32" y="53" width="8" height="14" rx="3.5" fill="#4a4f8c" stroke="${INK}" stroke-width="2"/></g>
-  <g class="body"><path d="M18 56c-2-14 2-28 13-28s15 14 12 28c-8 3-17 3-25 0z" fill="#5865f2" stroke="${INK}" stroke-width="2.4" stroke-linejoin="round"/>
-  <path d="M24 46c4 3 11 3 15 0" stroke="#fff" stroke-opacity=".35" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-  <rect x="26" y="49" width="12" height="4" rx="2" fill="#ffc442" stroke="${INK}" stroke-width="1.6"/>
-  <circle cx="31" cy="20" r="11" fill="#ffd9b8" stroke="${INK}" stroke-width="2.4"/>
-  <path d="M19 21c-1-12 7-17 13-17s13 5 12 16c-4-5-9-7-13-7s-9 2-12 8z" fill="#3f4bd0" stroke="${INK}" stroke-width="2.4" stroke-linejoin="round"/>
-  <circle cx="35" cy="22" r="1.8" fill="${INK}"/><circle cx="28" cy="22" r="1.8" fill="${INK}"/>
-  <path d="M30 27c1.2 1 2.4 1 3.6 0" stroke="${INK}" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-  ${crown ? `<path d="M24 8l3-6 4 4 4-4 3 6z" fill="#ffc442" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/>` : ''}
-  <g class="sword"><rect x="46" y="22" width="4" height="26" rx="2" fill="#e8ecff" stroke="${INK}" stroke-width="2"/><rect x="42" y="46" width="12" height="4" rx="2" fill="#ffc442" stroke="${INK}" stroke-width="2"/><rect x="46" y="50" width="4" height="7" rx="2" fill="#7a4a2a" stroke="${INK}" stroke-width="2"/></g></g></svg>`;
+export function heroSVG(frame = 'a', crown = false) {
+  const lift = frame === 'a' ? [3, 0] : frame === 'b' ? [0, 3] : [0, 0];
+  const atk = frame === 'atk';
+  return `<svg viewBox="0 0 64 72" width="64" height="72" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="30" cy="68" rx="15" ry="3.2" fill="#000" opacity=".3"/>
+  <rect x="22" y="53" width="8" height="${14 - lift[0]}" rx="3.5" fill="#3b3f73" stroke="${INK}" stroke-width="2.6"/><rect x="32" y="53" width="8" height="${14 - lift[1]}" rx="3.5" fill="#4a4f8c" stroke="${INK}" stroke-width="2.6"/>
+  <g transform="translate(${atk ? 4 : 0} 0)"><path d="M18 56c-2-14 2-28 13-28s15 14 12 28c-8 3-17 3-25 0z" fill="#5865f2" stroke="${INK}" stroke-width="2.8" stroke-linejoin="round"/>
+  <path d="M24 46c4 3 11 3 15 0" stroke="#fff" stroke-opacity=".4" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <rect x="26" y="49" width="12" height="4" rx="2" fill="#ffc442" stroke="${INK}" stroke-width="1.8"/>
+  <circle cx="31" cy="20" r="11" fill="#ffd9b8" stroke="${INK}" stroke-width="2.8"/>
+  <path d="M19 21c-1-12 7-17 13-17s13 5 12 16c-4-5-9-7-13-7s-9 2-12 8z" fill="#3f4bd0" stroke="${INK}" stroke-width="2.8" stroke-linejoin="round"/>
+  <circle cx="35" cy="22" r="2" fill="${INK}"/><circle cx="28" cy="22" r="2" fill="${INK}"/>
+  <path d="M30 27c1.2 1 2.4 1 3.6 0" stroke="${INK}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  ${crown ? `<path d="M24 8l3-6 4 4 4-4 3 6z" fill="#ffc442" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>` : ''}
+  <g transform="${atk ? 'rotate(42 48 50)' : ''}"><rect x="46" y="20" width="5" height="28" rx="2" fill="#e8ecff" stroke="${INK}" stroke-width="2.4"/><rect x="42" y="46" width="13" height="5" rx="2" fill="#ffc442" stroke="${INK}" stroke-width="2.2"/><rect x="46" y="51" width="5" height="8" rx="2" fill="#7a4a2a" stroke="${INK}" stroke-width="2.2"/></g></g></svg>`;
 }
 
 const PET = {
@@ -42,7 +44,7 @@ const FACE = {
 };
 export function petSVG(cat, level, size = 56) {
   const p = PET[cat], s = size;
-  if (level <= 0) return `<svg viewBox="0 0 48 48" width="${s}" height="${s}" aria-label="Huevo"><ellipse cx="24" cy="43" rx="12" ry="3" fill="#000" opacity=".15"/><path d="M24 5c9 0 15 14 15 24 0 8-7 13-15 13S9 37 9 29C9 19 15 5 24 5z" fill="#f5f0e6" stroke="${INK}" stroke-width="2.4"/><path d="M12 28c4 3 7-3 12 0s9-3 13 0" stroke="${p.c}" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="19" cy="18" r="2.4" fill="${p.c2}"/><circle cx="29" cy="22" r="2" fill="${p.c}"/></svg>`;
+  if (level <= 0) return `<svg viewBox="0 -8 48 56" width="${s}" height="${s * 56 / 48}" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0 2)"><ellipse cx="24" cy="43" rx="12" ry="3" fill="#000" opacity=".25"/><path d="M24 5c9 0 15 14 15 24 0 8-7 13-15 13S9 37 9 29C9 19 15 5 24 5z" fill="#f5f0e6" stroke="${INK}" stroke-width="2.4"/><path d="M12 28c4 3 7-3 12 0s9-3 13 0" stroke="${p.c}" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="19" cy="18" r="2.4" fill="${p.c2}"/><circle cx="29" cy="22" r="2" fill="${p.c}"/></g></svg>`;
   const ears = { F: `<circle cx="13" cy="14" r="6" fill="${p.c}" stroke="${INK}" stroke-width="2.2"/><circle cx="35" cy="14" r="6" fill="${p.c}" stroke="${INK}" stroke-width="2.2"/>`,
     I: `<path d="M12 8l5 8-9 2z M36 8l-5 8 9 2z" fill="${p.c}" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/>`,
     V: `<path d="M11 5l8 11-11 1z M37 5l-8 11 11 1z" fill="${p.c}" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/>`,
@@ -56,7 +58,7 @@ export function petSVG(cat, level, size = 56) {
     `<path d="M14 36c3 4 17 4 20 0" stroke="#ffc442" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M16 5l3-5 5 4 5-4 3 5z" fill="#ffc442" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/>`,
   ][Math.min(5, level)];
   const scale = 0.82 + level * 0.045;
-  return `<svg class="pet" viewBox="0 -8 48 56" width="${s}" height="${s * 56 / 48}" aria-label="${p.name} nivel ${level}"><g transform="translate(24 46) scale(${scale}) translate(-24 -46)">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -8 48 56" width="${s}" height="${s * 56 / 48}" aria-label="${p.name} nivel ${level}"><g transform="translate(24 46) scale(${scale}) translate(-24 -46)">
   ${level >= 5 ? `<circle cx="24" cy="26" r="22" fill="${p.c2}" opacity=".35"/>` : ''}<ellipse cx="24" cy="44" rx="13" ry="3" fill="#000" opacity=".16"/>
   ${ears}<ellipse cx="24" cy="30" rx="15" ry="13.5" fill="${p.c}" stroke="${INK}" stroke-width="2.4"/>
   <ellipse cx="24" cy="34" rx="9" ry="7" fill="${p.c2}" opacity=".7"/>${FACE[cat]}
@@ -66,15 +68,15 @@ export function petSVG(cat, level, size = 56) {
   ${extra}</g></svg>`;
 }
 
-function enemySVG(z) {
-  return `<svg class="enemy" viewBox="0 0 56 48" width="56" height="48" aria-hidden="true"><ellipse cx="28" cy="45" rx="17" ry="3" fill="#000" opacity=".18"/>
+export function enemySVG(z) {
+  return `<svg viewBox="0 0 56 48" width="56" height="48" xmlns="http://www.w3.org/2000/svg"><ellipse cx="28" cy="45" rx="17" ry="3" fill="#000" opacity=".18"/>
   <path d="M7 40c-3-14 6-30 21-30s24 16 21 30c-14 4-28 4-42 0z" fill="${z.ac}" stroke="${INK}" stroke-width="2.4" stroke-linejoin="round"/>
   <path d="M15 22c3-5 8-7 12-7" stroke="#fff" stroke-opacity=".6" stroke-width="3" fill="none" stroke-linecap="round"/>
   <circle cx="20" cy="29" r="3" fill="#fff" stroke="${INK}" stroke-width="1.8"/><circle cx="36" cy="29" r="3" fill="#fff" stroke="${INK}" stroke-width="1.8"/><circle cx="21" cy="30" r="1.3" fill="${INK}"/><circle cx="37" cy="30" r="1.3" fill="${INK}"/>
   <path d="M22 37c4-2 8-2 12 0" stroke="${INK}" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
 }
-function gateSVG(open) {
-  return `<svg class="gate-art" viewBox="0 0 64 80" width="64" height="80" aria-hidden="true"><path d="M6 78V32C6 14 18 4 32 4s26 10 26 28v46z" fill="#6b7280" stroke="${INK}" stroke-width="2.6"/>
+export function gateSVG(open) {
+  return `<svg viewBox="0 0 64 80" width="64" height="80" xmlns="http://www.w3.org/2000/svg"><path d="M6 78V32C6 14 18 4 32 4s26 10 26 28v46z" fill="#6b7280" stroke="${INK}" stroke-width="2.6"/>
   <path d="M14 78V34c0-12 8-20 18-20s18 8 18 20v44z" fill="${open ? '#ffd36b' : '#2b2f55'}" stroke="${INK}" stroke-width="2.2"/>
   ${open ? '' : `<rect x="23" y="44" width="18" height="16" rx="3" fill="#ffc442" stroke="${INK}" stroke-width="2"/><path d="M27 44v-5a5 5 0 0110 0v5" stroke="${INK}" stroke-width="2.4" fill="none"/>`}</svg>`;
 }
@@ -90,3 +92,5 @@ export function sceneHTML({ floor, equipped, petLevel, blocked, done, tall = fal
   <div class="actors"><div class="pet-wrap">${petSVG(equipped, petLevel, 46)}</div><div class="hero-wrap">${heroSVG(done)}</div></div>
   <div class="foe">${blocked ? gateSVG(false) : done ? gateSVG(true) : enemySVG(z)}</div></div>`;
 }
+
+export const flagSVG = () => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 40" width="32" height="40"><rect x="4" y="4" width="4" height="34" fill="#8a5a2b" stroke="${INK}" stroke-width="2"/><path d="M8 5h20l-6 7 6 7H8z" fill="#d63a2f" stroke="${INK}" stroke-width="2.4" stroke-linejoin="round"/></svg>`;
