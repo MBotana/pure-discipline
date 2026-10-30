@@ -37,6 +37,7 @@ export function initialState(): State {
 
 export interface DayResult {
   day: number; floor: number; xp: number; events: AuditEvent[]; blocked: number | null; unlocked: number[];
+  completed: { weekly: Cat[]; monthly: Cat[] };
 }
 
 export class Engine {
@@ -90,6 +91,7 @@ export class Engine {
     const month = this.cal.months[this.cal.monthOfWeek[w]];
     const unlocked: number[] = [];
     const out: AuditEvent[] = [];
+    const completed: { weekly: Cat[]; monthly: Cat[] } = { weekly: [], monthly: [] };
 
     if (dd === 0) {
       if (w === month.weeks[0]) { // inicio de mes
@@ -107,14 +109,14 @@ export class Engine {
     const weekly = (cat: Cat, units: number) => {
       if (S.wu[cat] < units) {
         S.wu[cat]++;
-        if (S.wu[cat] === units) { addDone(S.wdone, cat); ev.push([cat, 'S', 0]); }
+        if (S.wu[cat] === units) { addDone(S.wdone, cat); completed.weekly.push(cat); ev.push([cat, 'S', 0]); }
         ev.push([cat, 'W', cfg.W / units]);
       }
     };
     const monthly = (cat: Cat, limit: number, base: number) => {
       if (S.mu[cat] < limit) {
         S.mu[cat]++; ev.push([cat, 'M', base]);
-        if (S.mu[cat] === limit) addDone(S.mdone, cat);
+        if (S.mu[cat] === limit) { addDone(S.mdone, cat); completed.monthly.push(cat); }
       }
     };
 
@@ -129,9 +131,9 @@ export class Engine {
 
     const lastWeekOfMonth = w === month.weeks[month.weeks.length - 1];
     if (dd === 6) {
-      if (input.dcheck && lastWeekOfMonth) addDone(S.mdone, 'D');
+      if (input.dcheck && lastWeekOfMonth) { addDone(S.mdone, 'D'); completed.monthly.push('D'); }
       const anti = input.anti ?? true;
-      if (S.wu.D >= 3 && anti) { addDone(S.wdone, 'D'); ev.unshift(['D', 'S', 0]); }
+      if (S.wu.D >= 3 && anti) { addDone(S.wdone, 'D'); completed.weekly.push('D'); ev.unshift(['D', 'S', 0]); }
       else {
         S.wdone = S.wdone.filter(c => c !== 'D');
         if (S.wu.D < 3 && !anti && cfg.discPen) { S.discPenN++; S.stat.D = Math.max(0, S.stat.D - 1); }
@@ -197,7 +199,7 @@ export class Engine {
       if (lastWeekOfMonth) this.closeMonth();
     }
     S.day = i + 1;
-    return { day: i, floor: this.floor(), xp: S.xp, events: out, blocked: S.blocked, unlocked };
+    return { day: i, floor: this.floor(), xp: S.xp, events: out, blocked: S.blocked, unlocked, completed };
   }
 
   private closeMonth() {

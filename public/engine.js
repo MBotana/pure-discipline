@@ -172,6 +172,7 @@ class Engine {
     const month = this.cal.months[this.cal.monthOfWeek[w]];
     const unlocked = [];
     const out = [];
+    const completed = { weekly: [], monthly: [] };
     if (dd === 0) {
       if (w === month.weeks[0]) {
         S.multM = S.s >= 1 ? 1 + S.s : 1;
@@ -197,6 +198,7 @@ class Engine {
         S.wu[cat]++;
         if (S.wu[cat] === units) {
           addDone(S.wdone, cat);
+          completed.weekly.push(cat);
           ev.push([cat, "S", 0]);
         }
         ev.push([cat, "W", cfg.W / units]);
@@ -206,8 +208,10 @@ class Engine {
       if (S.mu[cat] < limit) {
         S.mu[cat]++;
         ev.push([cat, "M", base]);
-        if (S.mu[cat] === limit)
+        if (S.mu[cat] === limit) {
           addDone(S.mdone, cat);
+          completed.monthly.push(cat);
+        }
       }
     };
     if (input.gym) {
@@ -244,11 +248,14 @@ class Engine {
       ev.push(["D", "M", cfg.Mp / (cfg.dchk * month.weeks.length)]);
     const lastWeekOfMonth = w === month.weeks[month.weeks.length - 1];
     if (dd === 6) {
-      if (input.dcheck && lastWeekOfMonth)
+      if (input.dcheck && lastWeekOfMonth) {
         addDone(S.mdone, "D");
+        completed.monthly.push("D");
+      }
       const anti = input.anti ?? true;
       if (S.wu.D >= 3 && anti) {
         addDone(S.wdone, "D");
+        completed.weekly.push("D");
         ev.unshift(["D", "S", 0]);
       } else {
         S.wdone = S.wdone.filter((c) => c !== "D");
@@ -349,7 +356,7 @@ class Engine {
         this.closeMonth();
     }
     S.day = i + 1;
-    return { day: i, floor: this.floor(), xp: S.xp, events: out, blocked: S.blocked, unlocked };
+    return { day: i, floor: this.floor(), xp: S.xp, events: out, blocked: S.blocked, unlocked, completed };
   }
   closeMonth() {
     const S = this.state, cfg = this.cfg;

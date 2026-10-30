@@ -14,10 +14,12 @@ export const ZONES = [
 ];
 export const zoneOf = floor => ZONES[Math.min(9, Math.max(0, Math.floor((floor - 1) / 10)))];
 
-export function heroSVG(frame = 'a', crown = false) {
-  const lift = frame === 'a' ? [3, 0] : frame === 'b' ? [0, 3] : [0, 0];
-  const atk = frame === 'atk';
-  return `<svg viewBox="0 0 64 72" width="64" height="72" xmlns="http://www.w3.org/2000/svg">
+export function heroSVG(frame = 'a', crown = false, pose = '') {
+  const lift = [0, 0];
+  const atk = false;
+  const up = pose ? `<g><rect x="44" y="6" width="6" height="30" rx="3" fill="#5865f2" stroke="${INK}" stroke-width="2.4" transform="rotate(14 47 36)"/><circle cx="50" cy="6" r="5.4" fill="#ffd9b8" stroke="${INK}" stroke-width="2.4"/></g>` : '';
+  const up2 = (pose === 'semanal' || pose === 'mensual') ? `<g><rect x="12" y="6" width="6" height="30" rx="3" fill="#5865f2" stroke="${INK}" stroke-width="2.4" transform="rotate(-14 15 36)"/><circle cx="12" cy="6" r="5.4" fill="#ffd9b8" stroke="${INK}" stroke-width="2.4"/></g>` : '';
+  return `<svg viewBox="0 -8 64 80" width="64" height="80" xmlns="http://www.w3.org/2000/svg">
   <ellipse cx="30" cy="68" rx="15" ry="3.2" fill="#000" opacity=".3"/>
   <rect x="22" y="53" width="8" height="${14 - lift[0]}" rx="3.5" fill="#3b3f73" stroke="${INK}" stroke-width="2.6"/><rect x="32" y="53" width="8" height="${14 - lift[1]}" rx="3.5" fill="#4a4f8c" stroke="${INK}" stroke-width="2.6"/>
   <g transform="translate(${atk ? 4 : 0} 0)"><path d="M18 56c-2-14 2-28 13-28s15 14 12 28c-8 3-17 3-25 0z" fill="#5865f2" stroke="${INK}" stroke-width="2.8" stroke-linejoin="round"/>
@@ -28,7 +30,8 @@ export function heroSVG(frame = 'a', crown = false) {
   <circle cx="35" cy="22" r="2" fill="${INK}"/><circle cx="28" cy="22" r="2" fill="${INK}"/>
   <path d="M30 27c1.2 1 2.4 1 3.6 0" stroke="${INK}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
   ${crown ? `<path d="M24 8l3-6 4 4 4-4 3 6z" fill="#ffc442" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>` : ''}
-  <g transform="${atk ? 'rotate(42 48 50)' : ''}"><rect x="46" y="20" width="5" height="28" rx="2" fill="#e8ecff" stroke="${INK}" stroke-width="2.4"/><rect x="42" y="46" width="13" height="5" rx="2" fill="#ffc442" stroke="${INK}" stroke-width="2.2"/><rect x="46" y="51" width="5" height="8" rx="2" fill="#7a4a2a" stroke="${INK}" stroke-width="2.2"/></g></g></svg>`;
+  ${up}${up2}
+  ${pose ? '' : ''}<g transform="${atk ? 'rotate(42 48 50)' : ''}" ${pose ? 'opacity="0"' : ''}><rect x="46" y="20" width="5" height="28" rx="2" fill="#e8ecff" stroke="${INK}" stroke-width="2.4"/><rect x="42" y="46" width="13" height="5" rx="2" fill="#ffc442" stroke="${INK}" stroke-width="2.2"/><rect x="46" y="51" width="5" height="8" rx="2" fill="#7a4a2a" stroke="${INK}" stroke-width="2.2"/></g></g></svg>`;
 }
 
 const PET = {
@@ -44,7 +47,7 @@ const FACE = {
 };
 export function petSVG(cat, level, size = 56) {
   const p = PET[cat], s = size;
-  if (level <= 0) return `<svg viewBox="0 -8 48 56" width="${s}" height="${s * 56 / 48}" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0 2)"><ellipse cx="24" cy="43" rx="12" ry="3" fill="#000" opacity=".25"/><path d="M24 5c9 0 15 14 15 24 0 8-7 13-15 13S9 37 9 29C9 19 15 5 24 5z" fill="#f5f0e6" stroke="${INK}" stroke-width="2.4"/><path d="M12 28c4 3 7-3 12 0s9-3 13 0" stroke="${p.c}" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="19" cy="18" r="2.4" fill="${p.c2}"/><circle cx="29" cy="22" r="2" fill="${p.c}"/></g></svg>`;
+  if (level <= 0) return `<svg viewBox="-4 -6 56 56" width="${s}" height="${s}" xmlns="http://www.w3.org/2000/svg"><g transform="translate(0 2)"><ellipse cx="24" cy="43" rx="12" ry="3" fill="#000" opacity=".25"/><path d="M24 5c9 0 15 14 15 24 0 8-7 13-15 13S9 37 9 29C9 19 15 5 24 5z" fill="#f5f0e6" stroke="${INK}" stroke-width="2.4"/><path d="M12 28c4 3 7-3 12 0s9-3 13 0" stroke="${p.c}" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="19" cy="18" r="2.4" fill="${p.c2}"/><circle cx="29" cy="22" r="2" fill="${p.c}"/></g></svg>`;
   const ears = { F: `<circle cx="13" cy="14" r="6" fill="${p.c}" stroke="${INK}" stroke-width="2.2"/><circle cx="35" cy="14" r="6" fill="${p.c}" stroke="${INK}" stroke-width="2.2"/>`,
     I: `<path d="M12 8l5 8-9 2z M36 8l-5 8 9 2z" fill="${p.c}" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/>`,
     V: `<path d="M11 5l8 11-11 1z M37 5l-8 11 11 1z" fill="${p.c}" stroke="${INK}" stroke-width="2.2" stroke-linejoin="round"/>`,
@@ -58,7 +61,7 @@ export function petSVG(cat, level, size = 56) {
     `<path d="M14 36c3 4 17 4 20 0" stroke="#ffc442" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M16 5l3-5 5 4 5-4 3 5z" fill="#ffc442" stroke="${INK}" stroke-width="1.8" stroke-linejoin="round"/>`,
   ][Math.min(5, level)];
   const scale = 0.82 + level * 0.045;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -8 48 56" width="${s}" height="${s * 56 / 48}" aria-label="${p.name} nivel ${level}"><g transform="translate(24 46) scale(${scale}) translate(-24 -46)">
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -6 56 56" width="${s}" height="${s}" aria-label="${p.name} nivel ${level}"><g transform="translate(24 46) scale(${scale}) translate(-24 -46)">
   ${level >= 5 ? `<circle cx="24" cy="26" r="22" fill="${p.c2}" opacity=".35"/>` : ''}<ellipse cx="24" cy="44" rx="13" ry="3" fill="#000" opacity=".16"/>
   ${ears}<ellipse cx="24" cy="30" rx="15" ry="13.5" fill="${p.c}" stroke="${INK}" stroke-width="2.4"/>
   <ellipse cx="24" cy="34" rx="9" ry="7" fill="${p.c2}" opacity=".7"/>${FACE[cat]}
@@ -94,3 +97,23 @@ export function sceneHTML({ floor, equipped, petLevel, blocked, done, tall = fal
 }
 
 export const flagSVG = () => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 40" width="32" height="40"><rect x="4" y="4" width="4" height="34" fill="#8a5a2b" stroke="${INK}" stroke-width="2"/><path d="M8 5h20l-6 7 6 7H8z" fill="#d63a2f" stroke="${INK}" stroke-width="2.4" stroke-linejoin="round"/></svg>`;
+
+// ---- provisorios para el período previo al inicio ----
+/** Escena 240×64: torre abajo a la izquierda, cerrada o abierta. */
+export function towerSVG(open) {
+  return `<svg viewBox="0 0 240 64" width="240" height="64" xmlns="http://www.w3.org/2000/svg"><rect width="240" height="64" fill="#1c1630"/><rect y="50" width="240" height="14" fill="#2c2a3e"/><rect y="50" width="240" height="3" fill="#403d58"/>
+  <path d="M6 54V14h6V8h5v6h5V8h5v6h5V8h5v6h6v40z" fill="#5a5470" stroke="${INK}" stroke-width="1.4"/>
+  <path d="M14 54V32c0-7 4-11 9-11s9 4 9 11v22z" fill="${open ? '#ffd36b' : '#3a2616'}" stroke="${INK}" stroke-width="1.4"/>
+  ${open ? '<path d="M18 54l5-22 5 22z" fill="#fff3b0"/>' : '<path d="M23 21v33M14 36h18M14 44h18" stroke="#8a6a3b" stroke-width="1.2"/><circle cx="26" cy="40" r="1.4" fill="#ffc442"/>'}
+  <circle cx="34" cy="12" r="1" fill="#fff"/><circle cx="120" cy="8" r="1" fill="#fff"/><circle cx="190" cy="14" r="1" fill="#fff"/></svg>`;
+}
+const ICON = {
+  F: `<rect x="1" y="6" width="3" height="4" fill="#e2574c"/><rect x="4" y="4" width="2" height="8" fill="#ff8f84"/><rect x="6" y="7" width="4" height="2" fill="#c3c9dc"/><rect x="10" y="4" width="2" height="8" fill="#ff8f84"/><rect x="12" y="6" width="3" height="4" fill="#e2574c"/>`,
+  I: `<path d="M2 3h5v10H2zM9 3h5v10H9z" fill="#6a5cf0"/><path d="M3 5h3M3 7h3M10 5h3M10 7h3" stroke="#fff" stroke-width="1"/>`,
+  V: `<path d="M8 14C2 9 1 6 1 4.5A3.5 3.5 0 018 3a3.5 3.5 0 017 1.5C15 6 14 9 8 14z" fill="#f0502c"/><path d="M3 5a2 2 0 012-2" stroke="#ffc27a" stroke-width="1" fill="none"/>`,
+  D: `<circle cx="8" cy="8" r="6.5" fill="#c3c9dc"/><circle cx="8" cy="8" r="4.5" fill="#7d869e"/><circle cx="8" cy="8" r="2.5" fill="#e8ebf6"/><circle cx="8" cy="8" r="1" fill="#e2574c"/>`,
+  O: `<path d="M12 1l1.4 1.4-6 6" stroke="#8a5a2b" stroke-width="1.6" fill="none"/><path d="M4 8l5 1 1 5H3z" fill="#2fb5a0"/><path d="M5 11h4" stroke="#8fe6d6" stroke-width="1"/>`,
+};
+export const iconSVG = c => `<svg viewBox="0 0 16 16" width="16" height="16" xmlns="http://www.w3.org/2000/svg">${ICON[c]}</svg>`;
+/** Mete un SVG de otra proporción dentro de un lienzo w×h centrado abajo. */
+export const fitSVG = (inner, iw, ih, w, h) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><svg x="${(w - iw) / 2}" y="${h - ih}" width="${iw}" height="${ih}" viewBox="0 0 ${iw} ${ih}">${inner.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '')}</svg></svg>`;

@@ -42,19 +42,18 @@ a{color:var(--gold)}
 .strip{border:3px solid var(--bronze);background:#0b0706;box-shadow:0 -4px 0 #0b0706}
 .strip .top{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 8px;font-size:11px;background:linear-gradient(#3a1612,#241817);text-transform:uppercase;color:#ffe7b0}
 .strip .hp{flex:1;max-width:46%;height:8px;background:#0b0706;border:2px solid var(--bronze)}.strip .hp i{display:block;height:100%;background:var(--red2);transition:width .25s steps(5)}
-.arena{position:relative;height:104px;overflow:hidden;background:linear-gradient(var(--sky1),var(--sky2));filter:saturate(.8) brightness(.78)}
-.arena .ground{position:absolute;left:0;right:0;bottom:0;height:26px;background:var(--gr);border-top:4px solid var(--gr2)}
-.arena .ground::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 28px,rgba(0,0,0,.22) 28px 32px);animation:walk .9s steps(4) infinite}
-.arena .party{position:absolute;left:12%;bottom:12px;display:flex;align-items:flex-end;gap:0}
-.arena .petw{margin-right:-8px;animation:bob .6s steps(2) infinite}
-.arena .herow{position:relative;width:96px;height:108px;margin-bottom:-8px;transform:scale(.62);transform-origin:left bottom}
-.arena .herow .fr{position:absolute;left:0;top:0}.fr.a{animation:fa .5s steps(1) infinite}.fr.b{animation:fb .5s steps(1) infinite}.fr.atk{visibility:hidden}
-.arena .foew{position:absolute;right:9%;bottom:12px;animation:hop .9s steps(2) infinite}
-.strip.attack .fr.a,.strip.attack .fr.b{visibility:hidden;animation:none}.strip.attack .fr.atk{visibility:visible}
-.strip.attack .party{animation:lunge .45s steps(5)}.strip.attack .foew{animation:hit .45s steps(5)}
-.strip.blocked .ground::after,.strip.blocked .petw,.strip.blocked .foew,.strip.blocked .fr.a,.strip.blocked .fr.b{animation:none}
-.dmg{position:absolute;right:16%;bottom:62px;font-size:18px;font-weight:800;color:var(--gold);text-shadow:2px 2px 0 #000,-1px -1px 0 #000;animation:float .9s steps(8) forwards;pointer-events:none}
-@keyframes fa{0%{visibility:visible}50%{visibility:hidden}}@keyframes fb{0%{visibility:hidden}50%{visibility:visible}}
+.arena{position:relative;width:100%;max-width:480px;margin:0 auto;aspect-ratio:240/64;overflow:hidden;container-type:inline-size;background:linear-gradient(var(--sky1),var(--sky2) 70%,var(--gr) 70%)}
+.arena .bg,.arena .door{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+.arena .sp{position:absolute;width:calc(var(--w) * 100cqw / 240);height:auto;image-rendering:pixelated}
+.arena .pet{animation:bob .8s steps(2) infinite}
+.arena .hero.hop{animation:jump .35s steps(4) 3}
+.arena .door.shake{animation:shake .12s steps(2) 9}.arena .door{transition:opacity .9s steps(6)}.arena .door.gone{opacity:0}
+.strip.blocked .pet{animation:none}
+.arena .spark{position:absolute;font-style:normal;color:var(--gold);font-size:14px;text-shadow:1px 1px 0 #000;animation:float 1s steps(6) infinite;pointer-events:none}
+.dmg{position:absolute;left:30%;top:18%;font-size:18px;font-weight:800;color:var(--gold);text-shadow:2px 2px 0 #000,-1px -1px 0 #000;animation:float .9s steps(8) forwards;pointer-events:none}
+img.ico{display:inline-block;vertical-align:-4px;margin-right:6px;image-rendering:pixelated}
+img.px{image-rendering:pixelated}
+@keyframes jump{50%{transform:translateY(-10px)}}@keyframes shake{50%{transform:translateX(3px)}}
 @keyframes walk{to{background-position:-32px 0}}@keyframes bob{50%{transform:translateY(-3px)}}@keyframes hop{50%{transform:translateY(-4px)}}
 @keyframes lunge{40%{transform:translateX(34px)}}@keyframes hit{20%{transform:translateX(6px);filter:brightness(2.4)}60%{transform:translateX(-4px)}}
 @keyframes float{from{transform:translateY(0);opacity:1}to{transform:translateY(-34px);opacity:0}}

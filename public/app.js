@@ -1,15 +1,12 @@
 import { Engine, levelOf, cumXp, buildGates } from '/engine.js';
-import { heroSVG, petSVG, enemySVG, gateSVG, flagSVG, zoneOf, ZONES } from '/art.js';
+import { gateSVG, flagSVG, zoneOf, ZONES } from '/art.js';
+import { onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petSprite, bossSprite, bgName, bgLayer, towerLayer, iconTag, PETS, BOSSES } from '/assets.js';
 import { px, setReadyHandler } from '/px.js';
 const IMG = (svg, w, h, k, cls = '') => `<img class="px ${cls}" alt="" src="${px(svg, w, h)}" width="${w * k}" height="${h * k}">`;
-const heroImg = (frame, crown, k = 3) => IMG(heroSVG(frame, crown), 32, 36, k);
-const petImg = (cat, lv, k = 3) => IMG(petSVG(cat, lv, 48), 30, 35, k);
-const enemyImg = (z, k = 3) => IMG(enemySVG(z), 28, 24, k);
 const gateImg = (open, k = 2) => IMG(gateSVG(open), 32, 40, k);
 const flagImg = (k = 1) => IMG(flagSVG(), 16, 20, k, 'flag');
 
 const NAMES = { F: 'Fuerza', I: 'Inteligencia', V: 'Vitalidad', D: 'Disciplina', O: 'Orden' };
-const ICONS = { F: '💪', I: '📚', V: '🏃', D: '🎯', O: '🧹' };
 const CATS = ['F', 'I', 'V', 'D', 'O'];
 const DOW = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const KEY = 'pd1';
@@ -33,7 +30,10 @@ function pretty(iso) { const d = new Date(toUTC(iso)); const w = DOW[(d.getUTCDa
 // ---------- motor ----------
 function compute(upToIdx) {
   const e = new Engine({ startDate: S.startDate }); const results = [];
-  for (let i = 0; i <= upToIdx; i++) results.push(e.processDay(S.days[addDays(S.startDate, i)]?.input ?? {}));
+  for (let i = 0; i <= upToIdx; i++) {
+    const inp = S.days[addDays(S.startDate, i)]?.input ?? {};
+    results.push(e.processDay(i === 0 && S.preEquip && !inp.equip ? { ...inp, equip: S.preEquip } : inp));
+  }
   return { e, results };
 }
 
@@ -45,8 +45,20 @@ function setInput(date, fn) {
   S.days[date] = { input, updated_at: Date.now(), dirty: true };
   save(); render(); clearTimeout(timer); timer = setTimeout(sync, 1500);
 }
+/** Estado actual; antes del inicio es el estado de partida (todo en el mínimo). */
+function current() {
+  const i = dayIdx(todayISO());
+  if (!S.startDate || i < 0) { const e = new Engine({ startDate: S.startDate || undefined }); if (S.preEquip) e.state.equipped = S.preEquip; return { e, st: e.state, pre: true }; }
+  const { e } = compute(i); return { e, st: e.state, pre: false };
+}
 function dayGain(date) { const i = dayIdx(date); if (i < 0) return 0; return compute(i).results[i].events.reduce((a, x) => a + x.paid, 0); }
-const toggle = (date, key) => { const before = dayGain(date); setInput(date, i => { i[key] = !i[key]; }); fx(Math.round(dayGain(date) - before)); };
+const toggle = (date, key) => {
+  const before = dayGain(date), wasOn = !!S.days[date]?.input?.[key];
+  setInput(date, i => { i[key] = !i[key]; });
+  if (wasOn) return;
+  const idx = dayIdx(date), c = idx >= 0 ? compute(idx).results[idx].completed : null;
+  fx(Math.round(dayGain(date) - before), c?.monthly.length ? 'mensual' : c?.weekly.length ? 'semanal' : 'diaria');
+};
 
 // ---------- sincronización ----------
 async function api(path, method = 'GET', body) {
@@ -94,11 +106,11 @@ function viewHoy() {
   let h = nav;
   if (st.blocked !== null && viewDate === today) h += `<div class="banner">🔒 <b>Bloqueado en el piso ${st.blocked}.</b> No sumás XP hasta cumplir la puerta (mirá la pestaña Torre).</div>`;
   h += `<div class="card"><div class="row"><div><div class="mute">XP ganada este día</div><div class="big">+${fmt(gained)}</div></div><div style="text-align:right"><div class="mute">Piso</div><div class="big">${r.floor}</div></div></div>${lost > 0 ? `<div class="mute">No cobrada por bloqueo: ${fmt(lost)}</div>` : ''}<div class="mute">Racha mensual: ${st.s} · multiplicador ×${st.s >= 1 ? st.s + 1 : 1}</div></div>`;
-  h += `<div class="card"><h2>${ICONS.F} Fuerza</h2>${t('gym', 'Gimnasio', `semana ${w('F')}/3 · mes ${m('F')}/18`)}</div>`;
-  h += `<div class="card"><h2>${ICONS.I} Inteligencia</h2>${t('read', 'Lectura', `semana ${w('I')}/3`)}${t('bookTramo', 'Avancé un tramo del libro (10 %)', `mes ${m('I')}/10`)}</div>`;
-  h += `<div class="card"><h2>${ICONS.V} Vitalidad</h2>${t('aero', 'Aeróbico', `semana ${w('V')}/3 · mes ${m('V')}/12`)}</div>`;
-  h += `<div class="card"><h2>${ICONS.D} Disciplina</h2>${t('dwork', 'Día de trabajo del objetivo', `semana ${w('D')}/3`)}${dd === 2 || dd === 6 ? t('dcheck', 'Chequeo de tareas: al día', 'miércoles y domingo') : ''}</div>`;
-  h += `<div class="card"><h2>${ICONS.O} Orden</h2>${t('clean', 'Ambiente ordenado', `semana ${w('O')}/6`)}${t('improve', 'Día de trabajo de la mejora', `mes ${m('O')}/6`)}</div>`;
+  h += `<div class="card"><h2>${iconTag('F')} Fuerza</h2>${t('gym', 'Gimnasio', `semana ${w('F')}/3 · mes ${m('F')}/18`)}</div>`;
+  h += `<div class="card"><h2>${iconTag('I')} Inteligencia</h2>${t('read', 'Lectura', `semana ${w('I')}/3`)}${t('bookTramo', 'Avancé un tramo del libro (10 %)', `mes ${m('I')}/10`)}</div>`;
+  h += `<div class="card"><h2>${iconTag('V')} Vitalidad</h2>${t('aero', 'Aeróbico', `semana ${w('V')}/3 · mes ${m('V')}/12`)}</div>`;
+  h += `<div class="card"><h2>${iconTag('D')} Disciplina</h2>${t('dwork', 'Día de trabajo del objetivo', `semana ${w('D')}/3`)}${dd === 2 || dd === 6 ? t('dcheck', 'Chequeo de tareas: al día', 'miércoles y domingo') : ''}</div>`;
+  h += `<div class="card"><h2>${iconTag('O')} Orden</h2>${t('clean', 'Ambiente ordenado', `semana ${w('O')}/6`)}${t('improve', 'Día de trabajo de la mejora', `mes ${m('O')}/6`)}</div>`;
   if (dd === 6) {
     h += `<div class="card"><h2>Cierre de semana</h2>`;
     h += `<button class="task bad ${inp.anti === false ? 'on' : ''}" data-act="anti"><span class="box">${inp.anti === false ? '!' : ''}</span><span>Violé un antiobjetivo<small>más de 3 sesiones de videojuegos o celular promedio > 5 h</small></span></button>`;
@@ -139,22 +151,22 @@ function viewTorre() {
 }
 
 function viewStats() {
-  if (!S.startDate || dayIdx(todayISO()) < 0) return `<h1>Estadísticas</h1><div class="card mute">Disponibles desde el inicio.</div>`;
-  const { e } = compute(dayIdx(todayISO())), st = e.state, cap = e.statCap();
+  if (!S.startDate) return `<h1>Estadísticas</h1><div class="card mute">Disponibles al ingresar.</div>`;
+  const { e, st } = current(), cap = e.statCap();
   let h = `<h1>Estadísticas</h1><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} (hasta superar la próxima puerta de estadísticas)</div>` : '');
-  for (const c of CATS) h += `<div style="margin-top:12px"><div class="row"><b>${ICONS[c]} ${NAMES[c]}</b><b>${st.stat[c]}${Number.isFinite(cap) ? ' / ' + cap : ''}</b></div><div class="bar"><i style="width:${Number.isFinite(cap) ? Math.min(100, st.stat[c] / cap * 100) : 100}%"></i></div></div>`;
+  for (const c of CATS) h += `<div style="margin-top:12px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}</b><b>${st.stat[c]}${Number.isFinite(cap) ? ' / ' + cap : ''}</b></div><div class="bar"><i style="width:${Number.isFinite(cap) ? Math.min(100, st.stat[c] / cap * 100) : 100}%"></i></div></div>`;
   return h + `<p class="mute">+1 por cada semanal cumplida, −1 por cada objetivo mensual fallado.</p></div>`;
 }
 
 function viewMascotas() {
-  if (!S.startDate || dayIdx(todayISO()) < 0) return `<h1>Mascotas</h1><div class="card mute">Disponibles desde el inicio.</div>`;
-  const { e } = compute(dayIdx(todayISO())), st = e.state, lv = e.petLevels();
+  if (!S.startDate) return `<h1>Mascotas</h1><div class="card mute">Disponibles al ingresar.</div>`;
+  const { e, st } = current(), lv = e.petLevels();
   const cum = [0]; for (const x of e.cfg.petCosts) cum.push(cum[cum.length - 1] + x);
   let h = `<h1>Mascotas</h1>`;
   if (st.feedStreak >= 1) h += `<div class="banner">Semanas sin alimentar seguidas: <b>${st.feedStreak}</b>. ${st.feedStreak >= 2 ? 'La mascota equipada pierde 1 nivel por cada semana fallada.' : 'Con la próxima semana fallada baja 1 nivel.'}</div>`;
   for (const c of CATS) {
     const l = lv[c], max = l >= 5, eq = st.equipped === c;
-    h += `<div class="card"><div class="row"><span style="display:flex;align-items:center;gap:8px">${petImg(c, l, 2)}<b>Mascota de ${NAMES[c]}</b></span>${eq ? '<span class="pill gold">equipada</span>' : `<button class="btn sm ghost" data-act="equip" data-c="${c}">Equipar</button>`}</div><div class="row mute"><span>Nivel ${l} / 5</span>${max ? '<span>máximo</span>' : `<span>${st.px[c] - cum[l]} / ${e.cfg.petCosts[l]} XP</span>`}</div><div class="bar gold"><i style="width:${max ? 100 : (st.px[c] - cum[l]) / e.cfg.petCosts[l] * 100}%"></i></div></div>`;
+    h += `<div class="card"><div class="row"><span style="display:flex;align-items:center;gap:8px">${petTag(c, l, 2)}<b>${PETS[c].name} <small class="mute">(${NAMES[c]})</small></b></span>${eq ? '<span class="pill gold">equipada</span>' : `<button class="btn sm ghost" data-act="equip" data-c="${c}">Equipar</button>`}</div><div class="row mute"><span>Nivel ${l} / 5</span>${max ? '<span>máximo</span>' : `<span>${st.px[c] - cum[l]} / ${e.cfg.petCosts[l]} XP</span>`}</div><div class="bar gold"><i style="width:${max ? 100 : (st.px[c] - cum[l]) / e.cfg.petCosts[l] * 100}%"></i></div></div>`;
   }
   return h + `<p class="mute">Solo la mascota equipada aporta puntos en una puerta de estadísticas y solo a su propia estadística. Cada semana de alimentación perfecta le da 10 XP.</p>`;
 }
@@ -193,24 +205,54 @@ function render() {
 }
 
 // ---------- franja de batalla ----------
-let stripKey = '', readyN = 0, foe = { hp: 100 };
+// Lienzo lógico de 240×64: todo se posiciona en unidades de ese lienzo (cqw) para que escale parejo en cualquier pantalla.
+let stripKey = '', readyN = 0, opening = false, phase = '';
+const U = v => `calc(${v} * 100cqw / 240)`;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 function renderStrip() {
   const el = document.getElementById('strip');
-  if (!S.token || !S.startDate || dayIdx(todayISO()) < 0) { el.innerHTML = ''; stripKey = ''; return; }
-  const { e } = compute(dayIdx(todayISO())), st = e.state;
-  const d = { floor: e.floor(), eq: st.equipped, pl: e.petLevel(st.equipped), blocked: st.blocked !== null, done: st.tower !== null, readyN };
+  const idx = S.startDate ? dayIdx(todayISO()) : -1;
+  if (!S.token || !S.startDate) { el.innerHTML = ''; stripKey = ''; return; }
+  if (idx >= 0 && !S.opened && !opening) { startOpening(); return; }
+  const { e, st, pre } = current();
+  const floor = pre ? 1 : e.floor();
+  const into = st.xp - cumXp(floor, e.cfg.A, e.cfg.r), cost = e.cfg.A * Math.pow(e.cfg.r, floor - 1);
+  const d = { pre, floor, eq: st.equipped, pl: e.petLevel(st.equipped), blocked: st.blocked !== null, done: st.tower !== null, boss: BOSSES.includes(floor) && !st.cleared.includes(floor) && st.tower === null, pct: pre ? 0 : Math.round(Math.min(100, into / cost * 100)), phase, readyN };
   const key = JSON.stringify(d); if (key === stripKey) return; stripKey = key;
-  const z = zoneOf(d.floor), act = Math.min(10, Math.ceil(d.floor / 10)), stage = ((d.floor - 1) % 10) + 1;
+  const z = zoneOf(floor), act = Math.min(10, Math.ceil(floor / 10)), stage = ((floor - 1) % 10) + 1;
+  const title = pre ? `La torre se abre el ${pretty(S.startDate)}` : `${z.n} · ${act}-${stage}`;
   const vars = `--sky1:${z.sky[0]};--sky2:${z.sky[1]};--gr:${z.gr};--gr2:${z.gr2}`;
-  el.innerHTML = `<div class="strip ${d.blocked ? 'blocked' : ''}"><div class="top"><span>${z.n} · ${act}-${stage}</span><span class="hp"><i style="width:${foe.hp}%"></i></span></div><div class="arena" style="${vars}"><div class="ground"></div><div class="party"><div class="petw">${petImg(d.eq, d.pl, 2)}</div><div class="herow"><span class="fr a">${heroImg('a', d.done)}</span><span class="fr b">${heroImg('b', d.done)}</span><span class="fr atk">${heroImg('atk', d.done)}</span></div></div><div class="foew">${d.blocked ? gateImg(false, 2) : d.done ? gateImg(true, 2) : enemyImg(z, 2)}</div></div></div>`;
+  const showDoor = pre || phase;
+  const doorName = phase === 'open' || phase === 'fade' ? 'torre_abierta' : phase.startsWith('f') ? 'torre_apertura_' + phase.slice(1) : 'torre_cerrada';
+  const bg = showDoor && pre ? '' : bgLayer(bgName(floor), null, 'bg');
+  const door = showDoor ? towerLayer(doorName, doorName !== 'torre_cerrada' && !doorName.startsWith('torre_apertura'), 'door ' + (phase === 'shake' ? 'shake' : phase === 'fade' ? 'fadeout' : '')) : '';
+  const ground = 6;
+  ['diaria', 'semanal', 'mensual'].forEach(p => heroSrc(floor, p)); // precarga las poses
+  el.innerHTML = `<div class="strip ${d.blocked ? 'blocked' : ''}"><div class="top"><span>${title}</span>${pre ? '' : `<span class="hp" title="Avance al próximo piso"><i style="width:${d.pct}%"></i></span>`}</div><div class="arena" style="${vars}">${bg}${door}${heroSprite(floor, `left:${U(46)};bottom:${U(ground)}`, d.done)}${petSprite(d.eq, d.pl, `left:${U(82)};bottom:${U(ground)}`)}${d.boss ? bossSprite(floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div></div>`;
+  if (phase === 'fade') requestAnimationFrame(() => requestAnimationFrame(() => el.querySelector('.door')?.classList.add('gone')));
 }
-function fx(delta) {
-  const s = document.querySelector('.strip'); if (!s || delta <= 0) return;
-  s.classList.add('attack'); setTimeout(() => s.classList.remove('attack'), 480);
-  foe.hp = foe.hp - 22 <= 0 ? 100 : foe.hp - 22;
-  const i = s.querySelector('.hp i'); if (i) i.style.width = foe.hp + '%';
-  const t = document.createElement('div'); t.className = 'dmg'; t.textContent = '+' + delta;
-  s.querySelector('.arena').appendChild(t); setTimeout(() => t.remove(), 950);
+/** Apertura de la puerta, una sola vez: cerrada → sacudón → (cuadros) → abierta → aparece la zona 1. */
+async function startOpening() {
+  opening = true;
+  const frames = []; for (let n = 1; n <= 6; n++) if (await exists('torre_apertura_' + n)) frames.push(n);
+  const seq = [['closed', 900], ['shake', 1100], ...frames.map(n => ['f' + n, 500]), ['open', 900], ['fade', 1000]];
+  for (const [p, ms] of seq) { phase = p; renderStrip(); await sleep(ms); }
+  phase = ''; S.opened = true; save(); opening = false; stripKey = ''; renderStrip();
+}
+/** Festejo del héroe (1 s diaria, 1,5 s semanal, 2,5 s mensual) y texto de XP ganada. */
+function fx(delta, pose = 'diaria') {
+  const s = document.querySelector('.strip'); if (!s) return;
+  const hero = s.querySelector('.hero');
+  if (hero) {
+    const { e } = current(), r = heroSrc(e.floor(), pose), base = hero.src, ms = { diaria: 1000, semanal: 1500, mensual: 2500 }[pose];
+    hero.src = r.src; hero.classList.toggle('hop', r.hop);
+    if (pose === 'mensual') for (let i = 0; i < 6; i++) { const t = document.createElement('i'); t.className = 'spark'; t.textContent = '✦'; t.style.cssText = `left:calc(${46 + (i % 3) * 14 - 6} * 100cqw / 240);bottom:calc(${14 + Math.floor(i / 3) * 20 + (i % 2) * 6} * 100cqw / 240);animation-delay:${i * 0.18}s`; s.querySelector('.arena').appendChild(t); setTimeout(() => t.remove(), ms); }
+    setTimeout(() => { if (hero.isConnected) { hero.src = base; hero.classList.remove('hop'); } }, ms);
+  }
+  if (delta > 0) {
+    const t = document.createElement('div'); t.className = 'dmg'; t.textContent = '+' + delta;
+    s.querySelector('.arena').appendChild(t); setTimeout(() => t.remove(), 950);
+  }
 }
 
 // ---------- acciones ----------
@@ -243,7 +285,7 @@ document.addEventListener('click', async ev => {
   else if (a === 'prev') { viewDate = addDays(viewDate, -1); render(); }
   else if (a === 'next') { if (viewDate < todayISO()) { viewDate = addDays(viewDate, 1); render(); } }
   else if (a === 'today') { ev.preventDefault(); viewDate = todayISO(); render(); }
-  else if (a === 'equip') setInput(todayISO(), i => { i.equip = el.dataset.c; });
+  else if (a === 'equip') { if (dayIdx(todayISO()) < 0) { S.preEquip = el.dataset.c; save(); stripKey = ''; render(); } else setInput(todayISO(), i => { i.equip = el.dataset.c; }); }
   else if (a === 'map') { mapAct = +el.dataset.a; mapSel = 0; render(); }
   else if (a === 'node') { mapSel = +el.dataset.f; render(); }
   else if (a === 'login') login();
@@ -271,4 +313,5 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 window.addEventListener('online', sync);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (viewDate > todayISO()) viewDate = todayISO(); sync(); render(); } });
 setReadyHandler(() => { readyN++; render(); });
+onAssets(() => { readyN++; render(); });
 render(); detectMode(); sync();
