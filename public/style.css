@@ -155,3 +155,5 @@ img.breathe{animation:none}
 .strip.scene{margin-bottom:12px;box-shadow:none}.arena.big{max-width:none}
 .statshero{display:flex;justify-content:center;align-items:flex-end;gap:16px;padding:18px 8px 12px;position:relative}
 .statshero .spark,.statshero .dmg{position:absolute}
+
+.arena .hero[data-act=gait]{cursor:pointer}.gaitlbl{position:absolute;left:3%;top:4%;font-size:10px;background:rgba(0,0,0,.55);color:#fff;padding:2px 6px}

@@ -294,7 +294,7 @@ function render() {
 
 // ---------- franja de batalla ----------
 // Lienzo lógico de 240×64: todo se posiciona en unidades de ese lienzo (cqw) para que escale parejo en cualquier pantalla.
-let dockOpen = false, runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
+let previewGait = '', dockOpen = false, runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
 const U = v => `calc(${v} * 100cqw / 240)`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function arenaState() {
@@ -302,7 +302,7 @@ function arenaState() {
   const floor = pre ? 1 : e.floor();
   const boss = BOSSES.includes(floor) && !st.cleared.includes(floor) && st.tower === null;
   const running = !pre && !phase && st.tower === null && st.blocked === null && !boss;
-  return { e, st, pre, floor, boss, running, eq: st.equipped, pl: e.petLevel(st.equipped), done: st.tower !== null, speed: 1 + 0.5 * st.s, gait: gaitFor(st.s) };
+  return { e, st, pre, floor, boss, running, eq: st.equipped, pl: e.petLevel(st.equipped), done: st.tower !== null, speed: previewGait ? { caminar: 1, correr: 1.5, sprint: 2.5 }[previewGait] : 1 + 0.5 * st.s, gait: previewGait || gaitFor(st.s) };
 }
 /** Escena de 240×64: fondo en movimiento, héroe y mascota (corriendo o quietos), jefe y puerta. */
 function arenaHTML(o, big) {
@@ -314,7 +314,7 @@ function arenaHTML(o, big) {
   const door = showDoor ? towerLayer(doorName, doorName !== 'torre_cerrada' && !doorName.startsWith('torre_apertura'), 'door ' + (phase === 'shake' ? 'shake' : phase === 'fade' ? 'fadeout' : '')) : '';
   const idle = o.running ? '' : 'idle', hx = o.boss ? 52 : 46, pxx = o.boss ? 94 : 82;
   ['diaria', 'semanal', 'mensual', 'mueca'].forEach(p => heroSrc(o.floor, p));
-  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.floor}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" data-gait="${o.gait}" style="${vars}">${bg}${door}${heroSprite(o.floor, `left:${U(hx)};bottom:${U(ground)}`, o.done)}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
+  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.floor}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" data-gait="${o.gait}" style="${vars}">${bg}${door}${heroSprite(o.floor, `left:${U(hx)};bottom:${U(ground)}`, o.done).replace('class="px sp hero', 'data-act="gait" class="px sp hero')}${previewGait && o.running ? `<span class="gaitlbl">Vista previa: ${previewGait} · tocá al héroe para cambiar</span>` : ''}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
 }
 /** Pone a correr a los personajes de las escenas en carrera (cuadros propios o provisorios). */
 function startAnim() {
@@ -403,6 +403,7 @@ document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act;
   if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); window.scrollTo(0, 0); }
+  else if (a === 'gait') { previewGait = { '': 'caminar', caminar: 'correr', correr: 'sprint', sprint: '' }[previewGait]; stripKey = ''; render(); }
   else if (a === 'dock') { dockOpen = !dockOpen; stripKey = ''; renderStrip(); }
   else if (a === 't') {
     const k = el.dataset.k, now = Date.now();
