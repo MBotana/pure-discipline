@@ -1,6 +1,6 @@
 import { Engine, levelOf, cumXp, buildGates } from '/engine.js';
 import { gateSVG, flagSVG, zoneOf, ZONES } from '/art.js';
-import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petSprite, bossSprite, bgName, bgLayer, towerLayer, runFrames, petRunFrames, heroImgTag, scrollLayers, iconTag, PETS, BOSSES } from '/assets.js';
+import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petSprite, bossSprite, bgName, bgLayer, towerLayer, runFrames, petRunFrames, heroImgTag, scrollLayers, iconTag, PETS, BOSSES, gaitFor, GAIT_MS } from '/assets.js';
 import { px, setReadyHandler } from '/px.js';
 const IMG = (svg, w, h, k, cls = '') => `<img class="px ${cls}" alt="" src="${px(svg, w, h)}" width="${w * k}" height="${h * k}">`;
 const gateImg = (open, k = 2) => IMG(gateSVG(open), 32, 40, k);
@@ -302,7 +302,7 @@ function arenaState() {
   const floor = pre ? 1 : e.floor();
   const boss = BOSSES.includes(floor) && !st.cleared.includes(floor) && st.tower === null;
   const running = !pre && !phase && st.tower === null && st.blocked === null && !boss;
-  return { e, st, pre, floor, boss, running, eq: st.equipped, pl: e.petLevel(st.equipped), done: st.tower !== null, speed: 1 + 0.5 * st.s };
+  return { e, st, pre, floor, boss, running, eq: st.equipped, pl: e.petLevel(st.equipped), done: st.tower !== null, speed: 1 + 0.5 * st.s, gait: gaitFor(st.s) };
 }
 /** Escena de 240×64: fondo en movimiento, héroe y mascota (corriendo o quietos), jefe y puerta. */
 function arenaHTML(o, big) {
@@ -314,7 +314,7 @@ function arenaHTML(o, big) {
   const door = showDoor ? towerLayer(doorName, doorName !== 'torre_cerrada' && !doorName.startsWith('torre_apertura'), 'door ' + (phase === 'shake' ? 'shake' : phase === 'fade' ? 'fadeout' : '')) : '';
   const idle = o.running ? '' : 'idle', hx = o.boss ? 52 : 46, pxx = o.boss ? 94 : 82;
   ['diaria', 'semanal', 'mensual', 'mueca'].forEach(p => heroSrc(o.floor, p));
-  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.floor}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" style="${vars}">${bg}${door}${heroSprite(o.floor, `left:${U(hx)};bottom:${U(ground)}`, o.done)}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
+  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.floor}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" data-gait="${o.gait}" style="${vars}">${bg}${door}${heroSprite(o.floor, `left:${U(hx)};bottom:${U(ground)}`, o.done)}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
 }
 /** Pone a correr a los personajes de las escenas en carrera (cuadros propios o provisorios). */
 function startAnim() {
@@ -322,12 +322,13 @@ function startAnim() {
   const list = [];
   document.querySelectorAll('.arena[data-run="1"]').forEach(ar => {
     const floor = +ar.dataset.floor, speed = +ar.dataset.speed, hero = ar.querySelector('.hero'), pet = ar.querySelector('.pet');
-    const rf = runFrames(floor, ar.dataset.crown === '1'), pf = petRunFrames(ar.dataset.eq, +ar.dataset.pl);
+    const rf = runFrames(floor, ar.dataset.crown === '1', ar.dataset.gait), pf = petRunFrames(ar.dataset.eq, +ar.dataset.pl);
     hero.classList.remove('idle'); hero.classList.add('running'); hero.classList.toggle('bob', rf.bob); hero.style.setProperty('--bobt', (0.5 / speed).toFixed(2) + 's');
+    hero.classList.toggle('wide', rf.w > 32); hero.style.setProperty('--w', rf.w);
     if (rf.frames.length > 1) { hero.src = rf.frames[0]; list.push([hero, rf.frames]); }
     else hero.src = rf.frames[0];
     if (pf) { pet.src = pf[0]; pet.classList.add('noBob'); list.push([pet, pf]); }
-    ar._ms = Math.round(240 / speed);
+    ar._ms = rf.w > 32 ? GAIT_MS[rf.gait] : Math.round(240 / speed);
   });
   if (!list.length) return;
   let k = 0; const ms = +(document.querySelector('.arena[data-run="1"]')._ms || 240);
@@ -343,7 +344,7 @@ function renderStrip() {
   const into = st.xp - cumXp(floor, e.cfg.A, e.cfg.r), cost = e.cfg.A * Math.pow(e.cfg.r, floor - 1);
   const pct = o.pre ? 0 : Math.round(Math.min(100, into / cost * 100));
   const open = dockOpen || o.pre || !!phase;
-  const key = JSON.stringify({ o: [o.pre, floor, o.eq, o.pl, o.running, o.boss, o.done, o.speed], pct, phase, open, readyN, tab: tab === 'hoy' });
+  const key = JSON.stringify({ o: [o.pre, floor, o.eq, o.pl, o.running, o.boss, o.done, o.speed, o.gait], pct, phase, open, readyN, tab: tab === 'hoy' });
   if (key === stripKey) return; stripKey = key;
   const z = zoneOf(floor), act = Math.min(10, Math.ceil(floor / 10)), stage = ((floor - 1) % 10) + 1;
   const title = o.pre ? `La torre se abre el ${pretty(S.startDate)}` : `${z.n} · ${act}-${stage}`;
@@ -366,7 +367,8 @@ function fx(delta, pose = 'diaria') {
   const hero = document.querySelector('.hero');
   if (hero) {
     const { e } = current(), r = heroSrc(e.floor(), pose), base = hero.src, ms = { diaria: 1000, semanal: 1500, mensual: 2500, mueca: 1500 }[pose];
-    hero.dataset.pose = '1'; hero.classList.remove('running', 'bob', 'idle'); hero.src = r.src; hero.classList.toggle('hop', r.hop);
+    hero.dataset.pose = '1'; hero.classList.remove('running', 'bob', 'idle', 'wide'); hero.src = r.src; hero.classList.toggle('hop', r.hop);
+    if (hero.classList.contains('sp')) hero.style.setProperty('--w', 32);
     if (pose === 'mensual') for (let i = 0; i < 6; i++) { const t = document.createElement('i'); t.className = 'spark'; t.textContent = '✦'; t.style.cssText = `left:calc(${46 + (i % 3) * 14 - 6} * 100cqw / 240);bottom:calc(${14 + Math.floor(i / 3) * 20 + (i % 2) * 6} * 100cqw / 240);animation-delay:${i * 0.18}s`; (s.querySelector('.arena') || s).appendChild(t); setTimeout(() => t.remove(), ms); }
     setTimeout(() => { if (hero.isConnected) { stripKey = ''; render(); } }, ms);
   }

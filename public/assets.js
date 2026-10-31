@@ -47,9 +47,22 @@ export function heroSrc(floor, pose = '', crown = false) {
   return { src: px(heroSVG('a', crown, pose), 32, 40), hop: false };
 }
 export const heroSprite = (floor, style, crown, k = 1) => { const r = heroSrc(floor, '', crown); return `<img class="px sp hero idle" alt="" src="${r.src}" style="--w:${32 * k};${style}">`; };
-/** Héroe quieto (sin lienzo): para la franja chica, Estadísticas, etc. Sube y baja suavemente. */
+/** Cuadros numerados que existan (nombre_1, nombre_2…), cortando en el primero que falte. */
+const seq = (name, max = 12) => { const r = []; for (let n = 1; n <= max; n++) { if (has(`${name}_${n}`)) r.push(url(`${name}_${n}`)); else break; } return r; };
+/** Respiración de frente (heroe_tX_eY_respirar_1..8, 32×40) para las vistas del personaje. */
+export const breathFrames = floor => { const r = seq(`${heroBase(floor)}_respirar`); return r.length >= 2 ? r : null; };
+/** Héroe quieto (sin lienzo): para la franja chica, Estadísticas, etc. Respira si hay cuadros; si no, sube y baja suavemente. */
 export const heroImgTag = (floor, k = 2, crown = false, cls = '') => heroTag(floor, k, cls, crown);
-export const heroTag = (floor, k = 2, cls = '', crown = false) => `<img class="px hero idle ${cls}" alt="" src="${heroSrc(floor, '', crown).src}" width="${32 * k}" height="${40 * k}">`;
+export function heroTag(floor, k = 2, cls = '', crown = false) {
+  const br = breathFrames(floor), size = `width="${32 * k}" height="${40 * k}"`;
+  if (br) return `<img class="px hero breathe ${cls.replace(/\bidle\b/, '')}" alt="" src="${br[0]}" data-frames='${JSON.stringify(br)}' ${size}>`;
+  return `<img class="px hero idle ${cls}" alt="" src="${heroSrc(floor, '', crown).src}" ${size}>`;
+}
+// Las respiraciones avanzan solas en cualquier pantalla donde aparezcan.
+setInterval(() => document.querySelectorAll('img.breathe').forEach(el => {
+  if (el.dataset.pose) return;
+  const fr = JSON.parse(el.dataset.frames), k = ((+el.dataset.k || 0) + 1) % fr.length; el.dataset.k = k; el.src = fr[k];
+}), 220);
 // ---- mascotas: 32×32 ----
 const petFb = (c, lv) => () => px(petSVG(c, lv, 32), 32, 32);
 export const petName = (c, lv) => `mascota_${PETS[c].key}_n${lv}`;
@@ -63,8 +76,8 @@ export function petRunFrames(c, lv) {
 }
 export const petRunner = (c, lv, style, k = 1) => { const fr = petRunFrames(c, lv); if (!fr) return petSprite(c, lv, style, k).replace('class="px sp pet"', 'class="px sp pet running"');
   return `<img class="px sp pet running framed" alt="" src="${fr[0]}" data-frames='${JSON.stringify(fr)}' style="--w:${32 * k};${style}">`; };
-export const heroRunner = (floor, style, crown, k = 1) => { const rf = runFrames(floor, crown);
-  return `<img class="px sp hero running ${rf.bob ? 'bob' : ''}" alt="" src="${rf.frames[0]}" data-frames='${JSON.stringify(rf.frames)}' style="--w:${32 * k};${style}">`; };
+export const heroRunner = (floor, style, crown, k = 1, gait = 'caminar') => { const rf = runFrames(floor, crown, gait);
+  return `<img class="px sp hero running ${rf.bob ? 'bob' : ''} ${rf.w > 32 ? 'wide' : ''}" alt="" src="${rf.frames[0]}" data-frames='${JSON.stringify(rf.frames)}' style="--w:${rf.w * k};${style}">`; };
 // ---- jefes: 48×48 ----
 export const bossName = floor => `jefe_${floor}`;
 export const bossSprite = (floor, style, k = 1) => sp(bossName(floor), () => px(enemySVG(Z12[zone12(floor) - 1]).replace('viewBox="0 0 56 48"', 'viewBox="0 -4 56 56"'), 48, 48), 48 * k, style, 'boss');
@@ -81,13 +94,17 @@ export const roomTile = id => { const r = ROOMS.find(x => x[0] === id), n = 'amb
   return has(n) ? `<img class="px tile" alt="${r[1]}" src="${url(n)}">` : `<span class="tile fb" style="background:linear-gradient(${r[3]},color-mix(in srgb,${r[3]} 55%,#000))">${r[2]}</span>`; };
 
 // ---- carrera y fondo en movimiento ----
-/** Cuadros de la carrera del héroe: los tuyos (heroe_tX_eY_correr_1..6) o, si faltan, dos provisorios. */
-export function runFrames(floor, crown) {
-  const base = heroBase(floor), real = [];
-  for (let n = 1; n <= 6; n++) { if (has(`${base}_correr_${n}`)) real.push(url(`${base}_correr_${n}`)); else break; }
-  if (real.length >= 2) return { frames: real, bob: false };
-  if (has(base)) return { frames: [url(base)], bob: true };
-  return { frames: [px(heroSVG('a', crown, 'run1'), 32, 40), px(heroSVG('a', crown, 'run2'), 32, 40)], bob: false };
+/** Marcha según la racha mensual: sin racha camina, con 1-2 meses corre, con 3 o más hace sprint. */
+export const gaitFor = s => s >= 3 ? 'sprint' : s >= 1 ? 'correr' : 'caminar';
+/** Milisegundos por cuadro de cada marcha. */
+export const GAIT_MS = { caminar: 110, correr: 80, sprint: 60 };
+/** Cuadros de la marcha del héroe (heroe_tX_eY_<marcha>_N, 48×40); si falta esa marcha usa la más cercana,
+ *  después el sprite quieto con rebote y por último dos provisorios. */
+export function runFrames(floor, crown, gait = 'caminar') {
+  const base = heroBase(floor), order = { caminar: ['caminar', 'correr', 'sprint'], correr: ['correr', 'sprint', 'caminar'], sprint: ['sprint', 'correr', 'caminar'] }[gait] || ['caminar'];
+  for (const g of order) { const fr = seq(`${base}_${g}`); if (fr.length >= 2) return { frames: fr, bob: false, w: 48, gait: g }; }
+  if (has(base)) return { frames: [url(base)], bob: true, w: 32, gait };
+  return { frames: [px(heroSVG('a', crown, 'run1'), 32, 40), px(heroSVG('a', crown, 'run2'), 32, 40)], bob: false, w: 32, gait };
 }
 /** Capas del fondo (cada imagen se repite sin cortes): lejana (opcional) y cercana. */
 export function scrollLayers(floor, tNear) {

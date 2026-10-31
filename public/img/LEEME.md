@@ -24,5 +24,8 @@ Para ver un cambio en el iPhone, cerrá y abrí la app dos veces (usa caché).
 | `marco.png` (opcional) | 24×24 | Marco de los paneles: se estira en 9 partes, con esquinas de 6 px. Si no existe, la app usa un marco dibujado por código |
 | `ambiente_cocina.png`, `ambiente_bano.png`, `ambiente_habitacion.png`, `ambiente_living.png`, `ambiente_oficina.png`, `ambiente_patio.png` | 48×48 | Cuadritos para elegir el ambiente que ordenaste (misión de Orden) |
 | `fondo_01_lejos.png` … `fondo_12_lejos.png` (opcionales) | 240×64 | Capa lejana (cielo, montañas) que se mueve más lento; también sin cortes. Con ella `fondo_NN` debe tener fondo transparente arriba |
-| `heroe_tX_eY_correr_1.png` … `_4.png` (hasta 6) | 32×40 | Cuadros de la carrera. Se usan todos los que existan, en orden |
+| `heroe_tX_eY_caminar_1.png` … (hasta 12) | 48×40 | Marcha sin racha mensual. Vista de perfil mirando a la derecha, pies 2 px sobre el borde inferior, personaje centrado. Se usan todos los que existan, en orden, en loop |
+| `heroe_tX_eY_correr_1.png` … (hasta 12) | 48×40 | Marcha con racha de 1-2 meses (mismo formato que caminar) |
+| `heroe_tX_eY_sprint_1.png` … (hasta 12) | 48×40 | Marcha con racha de 3 meses o más (mismo formato). Si falta una marcha se usa la más cercana |
+| `heroe_tX_eY_respirar_1.png` … (hasta 12) | 32×40 | Respiración de frente para las vistas del personaje (franja chica, Estadísticas). Si falta, el sprite quieto sube y baja |
 | `mascota_<nombre>_nN_correr_1.png` … `_4.png` (N = 1 a 5, mín. 2 cuadros) | 32×32 | Mascota **corriendo** (franja expandida y Torre). Si faltan, se usa la quieta con saltitos. El huevo (n0) no corre |
