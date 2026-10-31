@@ -157,3 +157,6 @@ img.breathe{animation:none}
 .statshero .spark,.statshero .dmg{position:absolute}
 
 .arena .hero[data-act=gait]{cursor:pointer}.gaitlbl{position:absolute;left:3%;top:4%;font-size:10px;background:rgba(0,0,0,.55);color:#fff;padding:2px 6px}
+
+/* sin 'subir y bajar': el héroe respira con sus propios cuadros */
+img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:none}

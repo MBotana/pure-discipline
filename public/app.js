@@ -179,7 +179,7 @@ function viewHoy() {
 let mapAct = 0, mapSel = 0;
 const z0 = f => { const z = zoneOf(f), act = Math.min(10, Math.ceil(f / 10)); return `${z.n} · ${act}-${((f - 1) % 10) + 1}`; };
 function viewTorre() {
-  if (!S.startDate || dayIdx(todayISO()) < 0) return `<h1>Torre</h1><div class="card mute">Empieza el ${S.startDate ? pretty(S.startDate) : '—'}.</div>`;
+  if (!S.startDate || dayIdx(todayISO()) < 0) return `<h1>Torre</h1>${S.startDate ? `<div class="strip scene"><div class="top"><span>Vista previa</span></div>${arenaHTML(arenaState(), true)}</div>` : ''}<div class="card mute">Empieza el ${S.startDate ? pretty(S.startDate) : '—'}. Tocá al héroe para ver cómo camina, corre y hace sprint.</div>`;
   const { e } = compute(dayIdx(todayISO())), st = e.state, cfg = e.cfg, L = e.floor();
   const into = st.xp - cumXp(L, cfg.A, cfg.r), cost = cfg.A * Math.pow(cfg.r, L - 1);
   const gates = buildGates(cfg), nums = Object.keys(gates).map(Number).sort((a, b) => a - b);
@@ -301,13 +301,13 @@ function arenaState() {
   const { e, st, pre } = current();
   const floor = pre ? 1 : e.floor();
   const boss = BOSSES.includes(floor) && !st.cleared.includes(floor) && st.tower === null;
-  const running = !pre && !phase && st.tower === null && st.blocked === null && !boss;
+  const running = !phase && ((!pre && st.tower === null && st.blocked === null && !boss) || (pre && !!previewGait));
   return { e, st, pre, floor, boss, running, eq: st.equipped, pl: e.petLevel(st.equipped), done: st.tower !== null, speed: previewGait ? { caminar: 1, correr: 1.5, sprint: 2.5 }[previewGait] : 1 + 0.5 * st.s, gait: previewGait || gaitFor(st.s) };
 }
 /** Escena de 240×64: fondo en movimiento, héroe y mascota (corriendo o quietos), jefe y puerta. */
 function arenaHTML(o, big) {
   const z = zoneOf(o.floor), vars = `--sky1:${z.sky[0]};--sky2:${z.sky[1]};--gr:${z.gr};--gr2:${z.gr2}`;
-  const showDoor = o.pre || phase, ground = 6;
+  const showDoor = (o.pre && !o.running) || phase, ground = 6;
   const doorName = phase === 'open' || phase === 'fade' ? 'torre_abierta' : phase.startsWith('f') ? 'torre_apertura_' + phase.slice(1) : 'torre_cerrada';
   const tNear = +(9 / o.speed).toFixed(2);
   const bg = showDoor && o.pre ? '' : `<div class="scrollwrap ${o.running ? '' : 'paused'}">${scrollLayers(o.floor, tNear)}</div>`;
