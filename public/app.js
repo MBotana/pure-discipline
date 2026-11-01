@@ -16,7 +16,7 @@ let S = { token: '', startDate: '', days: {}, settings: {}, device: Math.random(
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch { /* sin almacenamiento */ }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* ignorar */ } };
 
-const THEMES = [['cielo', 'Cielo', '#9fd8f7'], ['noche', 'Noche', '#0b1830'], ['plata', 'Plata', '#c3ccd8'], ['bronce', 'Bronce', '#120c0b']];
+const THEMES = [['cielo', 'Cielo', '#9fd8f7'], ['noche', 'Noche', '#0b1830'], ['plata', 'Plata', '#c3ccd8'], ['bronce', 'Bronce', '#120c0b'], ['gladiador', 'Gladiador', '#1b1210'], ['caballero', 'Caballero', '#0e1626']];
 function applyTheme() {
   const t = THEMES.find(x => x[0] === S.theme) ? S.theme : 'cielo';
   document.documentElement.dataset.theme = t;
