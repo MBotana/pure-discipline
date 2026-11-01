@@ -224,7 +224,7 @@ function viewStats() {
   if (up.length || !S.seenStat) { S.seenStat = { ...st.stat }; save(); }
   if (up.length) setTimeout(() => { if (tab === 'stats') fx(0, 'semanal'); }, 500);
   const sf = statsStage < 0 ? o.floor : [1, 10, 20][statsStage], sl = o.floor < 25 || statsStage >= 0 ? `Gladiador, etapa ${[1, 10, 20].indexOf(sf) + 1 || '·'} · tocá al héroe para cambiar` : '';
-  let h = `<h1>Estadísticas</h1><!--fit--><div class="card statshero"><div class="stand" style="--gr:${zoneOf(sf).gr};--gr2:${zoneOf(sf).gr2}">${heroImgTag(sf, 4, o.done, 'idle').replace('<img ', '<img data-act="statstage" ')}<i class="floor"></i></div>${sl ? `<span class="gaitlbl" style="top:6px">${sl}</span>` : ''}</div><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} (hasta superar la próxima puerta de estadísticas)</div>` : '');
+  let h = `<h1>Estadísticas</h1><!--fit--><div class="card statshero"><div class="stand" style="--gr:${zoneOf(o.floor).gr};--gr2:${zoneOf(o.floor).gr2}">${heroImgTag(sf, 4, o.done, 'idle').replace('<img ', '<img data-act="statstage" ')}<i class="floor"></i></div>${sl ? `<span class="gaitlbl" style="top:6px">${sl}</span>` : ''}</div><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} (hasta superar la próxima puerta de estadísticas)</div>` : '');
   for (const c of CATS) h += `<div style="margin-top:12px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}</b><b>${st.stat[c]}${Number.isFinite(cap) ? ' / ' + cap : ''}</b></div><div class="bar"><i style="width:${Number.isFinite(cap) ? Math.min(100, st.stat[c] / cap * 100) : 100}%"></i></div></div>`;
   return h + `<p class="mute">+1 por cada semanal cumplida, −1 por cada objetivo mensual fallado.</p></div>`;
 }
@@ -387,7 +387,9 @@ document.fonts?.ready.then(fit);
 
 // ---------- franja de batalla ----------
 // Lienzo lógico de 240×64: todo se posiciona en unidades de ese lienzo (cqw) para que escale parejo en cualquier pantalla.
-const STEPS = [1, 11, 25, 26, 36, 50, 51, 61, 75, 76, 86, 100].map((f, i) => ({ f, g: ['caminar', 'correr', 'sprint'][i % 3] }));
+// Orden: etapa 1 (caminar, correr, sprint), etapa 2 (…), etapa 3 (…); en cada toque cambia también la zona del fondo.
+const ZSTARTS = [1, 11, 25, 26, 36, 50, 51, 61, 75, 76, 86, 100];
+const STEPS = Array.from({ length: 36 }, (_, n) => ({ f: ZSTARTS[n % 12], g: ['caminar', 'correr', 'sprint'][n % 3], e: Math.floor(n / 3) % 3 + 1, hs: [1, 10, 20][Math.floor(n / 3) % 3] }));
 let statsStage = -1, previewIdx = -1, dockOpen = false, runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
 const U = v => `calc(${v} * 100cqw / 240)`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -398,20 +400,20 @@ function arenaState() {
   const running = !phase && ((!pre && st.tower === null && st.blocked === null && !boss) || pre);
   if (pre && previewIdx < 0) previewIdx = 0;
   const stp = previewIdx >= 0 ? STEPS[previewIdx] : null;
-  return { e, st, pre, floor, hf: stp ? stp.f : floor, step: stp, boss, running, eq: st.equipped, pl: e.petLevel(st.equipped), done: st.tower !== null, speed: stp ? { caminar: 1, correr: 1.5, sprint: 2.5 }[stp.g] : 1 + 0.5 * st.s, gait: stp ? stp.g : gaitFor(st.s) };
+  return { e, st, pre, floor, hf: stp ? stp.hs : floor, hz: stp ? stp.f : floor, step: stp, boss, running, eq: st.equipped, pl: e.petLevel(st.equipped), done: st.tower !== null, speed: stp ? { caminar: 1, correr: 1.5, sprint: 2.5 }[stp.g] : 1 + 0.5 * st.s, gait: stp ? stp.g : gaitFor(st.s) };
 }
 /** Escena de 240×64: fondo en movimiento, héroe y mascota (corriendo o quietos), jefe y puerta. */
 function arenaHTML(o, big) {
-  const z = zoneOf(o.hf), vars = `--sky1:${z.sky[0]};--sky2:${z.sky[1]};--gr:${z.gr};--gr2:${z.gr2}`;
+  const z = zoneOf(o.hz), vars = `--sky1:${z.sky[0]};--sky2:${z.sky[1]};--gr:${z.gr};--gr2:${z.gr2}`;
   const showDoor = (o.pre && !o.running) || phase, ground = 6;
   const doorName = phase === 'open' || phase === 'fade' ? 'torre_abierta' : phase.startsWith('f') ? 'torre_apertura_' + phase.slice(1) : 'torre_cerrada';
   const tNear = +(9 / o.speed).toFixed(2);
-  const bg = showDoor && o.pre ? '' : `<div class="scrollwrap ${o.running ? '' : 'paused'}">${scrollLayers(o.hf, tNear)}</div>`;
+  const bg = showDoor && o.pre ? '' : `<div class="scrollwrap ${o.running ? '' : 'paused'}">${scrollLayers(o.hz, tNear)}</div>`;
   const door = showDoor ? towerLayer(doorName, doorName !== 'torre_cerrada' && !doorName.startsWith('torre_apertura'), 'door ' + (phase === 'shake' ? 'shake' : phase === 'fade' ? 'fadeout' : '')) : '';
   const idle = o.running ? '' : 'idle', hx = o.boss ? 60 : 56, pxx = Math.max(2, hx + 4 - petArenaW(o.eq, o.pl));
   ['diaria', 'semanal', 'mensual', 'mueca'].forEach(p => heroSrc(o.floor, p));
   const floorBand = showDoor && o.pre ? '' : `<div class="scrollwrap floorwrap ${o.running ? '' : 'paused'}"><div class="scroll floorband" style="--t:${tNear}s"><i></i><i></i></div></div>`;
-  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.hf}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" data-gait="${o.gait}" style="${vars}">${bg}${floorBand}${door}${heroSprite(o.hf, `left:${U(hx)};bottom:${U(ground)}`, o.done).replace('class="px sp hero', 'data-act="gait" class="px sp hero')}${o.step && o.running ? `<span class="gaitlbl">${zoneOf(o.hf).n} · ${o.step.g} · tocá al héroe para cambiar</span>` : ''}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
+  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.hf}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" data-gait="${o.gait}" style="${vars}">${bg}${floorBand}${door}${heroSprite(o.hf, `left:${U(hx)};bottom:${U(ground)}`, o.done).replace('class="px sp hero', 'data-act="gait" class="px sp hero')}${o.step && o.running ? `<span class="gaitlbl">${zoneOf(o.hz).n} · etapa ${o.step.e} · ${o.step.g} · tocá al héroe para cambiar</span>` : ''}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
 }
 /** Pone a correr a los personajes de las escenas en carrera (cuadros propios o provisorios). */
 function startAnim() {
@@ -442,7 +444,7 @@ function renderStrip0() {
   const into = st.xp - cumXp(floor, e.cfg.A, e.cfg.r), cost = e.cfg.A * Math.pow(e.cfg.r, floor - 1);
   const pct = o.pre ? 0 : Math.round(Math.min(100, into / cost * 100));
   const open = dockOpen || o.pre || !!phase;
-  const key = JSON.stringify({ o: [o.pre, floor, o.eq, o.pl, o.running, o.boss, o.done, o.speed, o.gait, o.hf], pct, phase, open, readyN, tab: tab === 'hoy' });
+  const key = JSON.stringify({ o: [o.pre, floor, o.eq, o.pl, o.running, o.boss, o.done, o.speed, o.gait, o.hf, o.hz], pct, phase, open, readyN, tab: tab === 'hoy' });
   if (key === stripKey) return; stripKey = key;
   const z = zoneOf(floor), act = Math.min(10, Math.ceil(floor / 10)), stage = ((floor - 1) % 10) + 1;
   const title = `${z.n} · ${act}-${stage}`;
