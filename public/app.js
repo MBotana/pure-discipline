@@ -280,7 +280,7 @@ function modalHTML() {
 }
 function render() {
   const view = TABS.find(t => t[0] === tab)[3];
-  const app = document.getElementById('app'), focus = document.activeElement?.id, y = window.scrollY;
+  const app = document.getElementById('app'), focus = document.activeElement?.id, y = app.scrollTop;
   const offline = (!navigator.onLine || pending() > 0) && S.token ? `<div class="mute" style="text-align:right">${navigator.onLine ? 'pendiente de sincronizar' : 'sin conexión'}</div>` : '';
   if (!S.token && tab !== 'ajustes') { tab = 'ajustes'; return render(); }
   document.documentElement.classList.toggle('cf', has('marco'));
@@ -291,7 +291,8 @@ function render() {
   document.getElementById('modal').innerHTML = modalHTML();
   document.getElementById('tabs').innerHTML = TABS.map(t => `<button class="${t[0] === tab ? 'on' : ''}" data-act="tab" data-t="${t[0]}"><span>${t[1]}</span>${t[2]}</button>`).join('');
   if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
-  window.scrollTo(0, y);
+  app.scrollTop = y;
+  document.body.classList.toggle('nostrip', tab === 'torre' || tab === 'stats');
 }
 
 // ---------- franja de batalla ----------
@@ -407,7 +408,7 @@ async function enablePush() {
 document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act;
-  if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); window.scrollTo(0, 0); }
+  if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); document.getElementById('app').scrollTop = 0; }
   else if (a === 'gait') { previewIdx = previewIdx + 1 >= STEPS.length ? (current().pre ? 0 : -1) : previewIdx + 1; stripKey = ''; render(); }
   else if (a === 'statstage') { const f = current().e.floor(), real = f < 10 ? 0 : f < 20 ? 1 : f < 25 ? 2 : -1; statsStage = ((statsStage < 0 ? real : statsStage) + 1) % 3; render(); }
   else if (a === 'dock') { dockOpen = !dockOpen; stripKey = ''; renderStrip(); }
@@ -477,3 +478,9 @@ setReadyHandler(() => { readyN++; render(); });
 onAssets(() => { readyN++; render(); });
 render(); detectMode(); sync();
 preloadHero().then(() => { readyN++; render(); });
+
+// Como una aplicación: sin zoom por pellizco ni doble toque, sin rebote de la página.
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, e => e.preventDefault());
+document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+document.addEventListener('dblclick', e => { if (!e.target.closest('input')) e.preventDefault(); });
+document.addEventListener('contextmenu', e => { if (!e.target.closest('input')) e.preventDefault(); });
