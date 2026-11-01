@@ -307,25 +307,82 @@ function render() {
 }
 /** Todo entra en la pantalla: se mide el espacio libre (sobre la franja y la barra de solapas) y se reduce el contenido lo justo. Solo si ni así entra, se permite desplazar dentro de la solapa. */
 let fitting = false;
+/** Apoya los pies en el suelo: mide cuántas filas vacías tiene cada sprite abajo y lo baja esa cantidad. */
+const gapCache = new Map();
+function bottomGap(img) {
+  const s = img.currentSrc || img.src;
+  if (gapCache.has(s)) return gapCache.get(s);
+  let g = 0;
+  try {
+    const w = img.naturalWidth, h = img.naturalHeight; if (!w || !h) return 0;
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, w, h).data;
+    while (g < h && ![...Array(w).keys()].some(i => d[((h - 1 - g) * w + i) * 4 + 3] > 20)) g++;
+  } catch { g = 0; }
+  gapCache.set(s, g); return g;
+}
+function sinkFeet() {
+  // escena de carrera: los pies tocan la franja de suelo (6 unidades de alto)
+  document.querySelectorAll('.arena img.sp.hero, .arena img.sp.pet').forEach(img => {
+    const w = parseFloat(img.style.getPropertyValue('--w'));
+    if (!img.complete || img.naturalWidth < 8 || !w || (img.classList.contains('pet') && /calc\(14 /.test(img.getAttribute('style') || ''))) return;
+    img.style.bottom = `calc(${(5 - bottomGap(img) * w / img.naturalWidth).toFixed(2)} * 100cqw / 240)`;
+  });
+  document.querySelectorAll('.dockrow img.px:not(.ico), .stand img.hero').forEach(img => {
+    if (!img.complete || !img.naturalHeight) return;
+    const g = bottomGap(img);
+    img.style.marginBottom = g ? `-${(g * (parseFloat(img.getAttribute('height')) / img.naturalHeight)).toFixed(2)}px` : '';
+  });
+}
+function variants() {
+  if (tab === 'hoy' && S.startDate) return { get: () => mtab, set: v => { mtab = v; }, list: ['dia', 'sem', 'mes'] };
+  if (tab === 'torre' && S.startDate && dayIdx(todayISO()) >= 0) return { get: () => SUB.torre, set: v => { SUB.torre = v; }, list: ['res', 'mapa', 'puertas'] };
+  if (tab === 'ajustes' && S.token) return { get: () => SUB.ajustes, set: v => { SUB.ajustes = v; }, list: ['gen', 'notif'] };
+  return null;
+}
+/** Mayor zoom (0.55 a 1) con el que el elemento entra en el alto disponible. */
+function bestZoom(el, avail) {
+  const h = z => { el.style.zoom = z; return el.getBoundingClientRect().height; };
+  if (h(1) <= avail + 0.5) return 1;
+  let lo = 0.55, hi = 1;
+  if (h(lo) > avail + 0.5) return lo;
+  for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (h(m) <= avail + 0.5) lo = m; else hi = m; }
+  return lo;
+}
 function fit() {
   if (fitting) return; fitting = true;
   try {
     const app = document.getElementById('app'), f = document.getElementById('fit'), strip = document.getElementById('strip'), tabs = document.getElementById('tabs');
     if (!f) return;
+    sinkFeet();
     const bar = strip && strip.firstElementChild ? strip : tabs;
     app.style.setProperty('--bot', Math.max(0, innerHeight - bar.getBoundingClientRect().top) + 'px');
     const cs = getComputedStyle(app), avail = app.getBoundingClientRect().bottom - parseFloat(cs.paddingBottom) - f.getBoundingClientRect().top;
-    const h = z => { f.style.zoom = z; return f.getBoundingClientRect().height; };
-    if (h(1) > avail + 0.5) {
-      let lo = 0.55, hi = 1;
-      if (h(lo) > avail + 0.5) { f.style.zoom = lo; }
-      else { for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (h(m) <= avail + 0.5) lo = m; else hi = m; } f.style.zoom = lo.toFixed(3); }
+    f.style.zoom = 1;
+    const geo = `left:${f.offsetLeft}px;top:${f.offsetTop}px;right:${app.clientWidth - f.offsetLeft - f.offsetWidth}px`;
+    let z = bestZoom(f, avail);
+    // Las subpestañas de una misma solapa comparten el zoom (el menor), así el texto no cambia de tamaño al cambiar de pestaña.
+    const vs = variants();
+    if (vs) {
+      const cur = vs.get(), view = TABS.find(t => t[0] === tab)[3], probe = document.createElement('div');
+      probe.id = 'fitp'; probe.setAttribute('aria-hidden', 'true');
+      probe.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;${geo}`;
+      app.appendChild(probe);
+      try {
+        for (const v of vs.list) {
+          if (v === cur) continue;
+          vs.set(v); const html = view(), k = html.indexOf('<!--fit-->'); vs.set(cur);
+          probe.innerHTML = k < 0 ? html : html.slice(k + 10);
+          z = Math.min(z, bestZoom(probe, avail));
+        }
+      } finally { vs.set(cur); probe.remove(); }
     }
+    f.style.zoom = z < 1 ? z.toFixed(3) : 1;
     app.style.overflowY = f.getBoundingClientRect().height > avail + 1 ? 'auto' : 'hidden';
   } finally { fitting = false; }
 }
 addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 300));
-document.addEventListener('load', () => fit(), true);
+document.addEventListener('load', e => { const t = e.target; if (t.tagName === 'IMG' && t.matches('.hero, .pet')) sinkFeet(); else fit(); }, true);
 document.fonts?.ready.then(fit);
 
 // ---------- franja de batalla ----------
@@ -353,7 +410,8 @@ function arenaHTML(o, big) {
   const door = showDoor ? towerLayer(doorName, doorName !== 'torre_cerrada' && !doorName.startsWith('torre_apertura'), 'door ' + (phase === 'shake' ? 'shake' : phase === 'fade' ? 'fadeout' : '')) : '';
   const idle = o.running ? '' : 'idle', hx = o.boss ? 60 : 56, pxx = Math.max(2, hx + 4 - petArenaW(o.eq, o.pl));
   ['diaria', 'semanal', 'mensual', 'mueca'].forEach(p => heroSrc(o.floor, p));
-  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.hf}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" data-gait="${o.gait}" style="${vars}">${bg}${door}${heroSprite(o.hf, `left:${U(hx)};bottom:${U(ground)}`, o.done).replace('class="px sp hero', 'data-act="gait" class="px sp hero')}${o.step && o.running ? `<span class="gaitlbl">${zoneOf(o.hf).n} · ${o.step.g} · tocá al héroe para cambiar</span>` : ''}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
+  const floorBand = showDoor && o.pre ? '' : `<div class="scrollwrap floorwrap ${o.running ? '' : 'paused'}"><div class="scroll floorband" style="--t:${tNear}s"><i></i><i></i></div></div>`;
+  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.hf}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" data-gait="${o.gait}" style="${vars}">${bg}${floorBand}${door}${heroSprite(o.hf, `left:${U(hx)};bottom:${U(ground)}`, o.done).replace('class="px sp hero', 'data-act="gait" class="px sp hero')}${o.step && o.running ? `<span class="gaitlbl">${zoneOf(o.hf).n} · ${o.step.g} · tocá al héroe para cambiar</span>` : ''}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
 }
 /** Pone a correr a los personajes de las escenas en carrera (cuadros propios o provisorios). */
 function startAnim() {

@@ -240,3 +240,9 @@ img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:
 .seg{margin:0 0 8px}.seg button{min-height:34px;padding:6px 4px}
 .mrow{padding-top:6px;padding-bottom:6px}
 .dockrow{padding-top:4px;gap:8px}
+#fitp{display:flow-root}
+.stand .floor{margin-top:0}
+.dockrow{padding-bottom:10px}
+
+.floorwrap{inset:auto 0 0 0;height:calc(6 * 100cqw / 240);z-index:0;pointer-events:none}
+.floorband{height:100%}.floorband i{width:50%;height:100%;display:block;background:linear-gradient(var(--gr2) 0 calc(1 * 100cqw / 240),var(--gr) calc(1 * 100cqw / 240) calc(4 * 100cqw / 240),var(--gr2) calc(4 * 100cqw / 240)),repeating-linear-gradient(90deg,transparent 0 calc(7 * 100cqw / 240),rgba(0,0,0,.25) calc(7 * 100cqw / 240) calc(8 * 100cqw / 240));background-blend-mode:normal}
