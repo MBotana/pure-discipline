@@ -8,11 +8,11 @@ Fondo transparente en los sprites, sin suavizado (pixel art puro). La app los mu
 | `heroe_t1_e1.png` … `heroe_t4_e3.png` (12) | 32×40 | Héroe quieto (Estadísticas, franja chica, jefes). `t` = armadura 1 gladiador · 2 espartano · 3 caballero · 4 dragón, `e` = etapa 1-3. Cambia en los pisos 1/10/20, 25/35/45, 50/60/70, 75/85/95 |
 | `heroe_tX_eY_diaria.png`, `_semanal.png`, `_mensual.png` | 32×40 | Festejo al cumplir una misión diaria / semanal / mensual (36 en total). Si falta, el héroe salta |
 | `heroe_tX_eY_mueca.png` (12) | 32×40 | Mueca de decepción al registrar una sesión de videojuegos o violar un antiobjetivo |
-| `mascota_behemot_n0.png` … `n5.png` | 32×32 | Fuerza. Mascota **quieta** (sección Mascotas y donde el héroe está quieto). `n0` = huevo, `n5` = adulto |
-| `mascota_esfinge_n0..n5.png` | 32×32 | Inteligencia |
-| `mascota_fenix_n0..n5.png` | 32×32 | Vitalidad |
-| `mascota_grifo_n0..n5.png` | 32×32 | Disciplina |
-| `mascota_qilin_n0..n5.png` | 32×32 | Orden |
+| `mascota_behemot_n0.png` … `n5.png` | n0 32×32 · n1–n2 24×24 · n3–n4 40×40 · n5 64×64 | Fuerza. Mascota **quieta** (sección Mascotas y donde el héroe está quieto). `n0` = huevo, `n5` = adulto |
+| `mascota_esfinge_n0..n5.png` | n0 32 · n1–n2 24 · n3–n4 40 · n5 64 | Inteligencia |
+| `mascota_fenix_n0..n5.png` | n0 32 · n1–n2 24 · n3–n4 40 · n5 64 | Vitalidad |
+| `mascota_grifo_n0..n5.png` | n0 32 · n1–n2 24 · n3–n4 40 · n5 64 | Disciplina |
+| `mascota_qilin_n0..n5.png` | n0 32 · n1–n2 24 · n3–n4 40 · n5 64 | Orden |
 | `icono_fuerza.png`, `icono_inteligencia.png`, `icono_vitalidad.png`, `icono_disciplina.png`, `icono_orden.png` | 16×16 | Íconos de estadísticas |
 | `torre_cerrada.png`, `torre_abierta.png` | 240×64 | Escena de la torre con la puerta cerrada / abierta (antes del inicio) |
 | `torre_apertura_1.png` … `_6.png` (opcionales) | 240×64 | Cuadros intermedios de la puerta abriéndose (se usan los que existan, ~0,5 s cada uno) |
@@ -28,5 +28,5 @@ Para ver un cambio en el iPhone, cerrá y abrí la app dos veces (usa caché).
 | `heroe_tX_eY_correr_1.png` … (hasta 12) | 48×40 | Marcha con racha de 1-2 meses (mismo formato que caminar) |
 | `heroe_tX_eY_sprint_1.png` … (hasta 12) | 48×40 | Marcha con racha de 3 meses o más (mismo formato). Si falta una marcha se usa la más cercana |
 | `heroe_tX_eY_respirar_1.png` … (hasta 12) | 32×40 | Respiración de frente para las vistas del personaje (franja chica, Estadísticas). Si falta, el sprite quieto sube y baja |
-| `mascota_<nombre>_nN_correr_1.png` … `_4.png` (N = 1 a 5, mín. 2 cuadros) | 32×32 | Mascota **corriendo** (franja expandida y Torre). Si faltan, se usa la quieta con saltitos. El huevo (n0) no corre |
+| `mascota_<nombre>_nN_correr_1.png` … `_4.png` (N = 1 a 5, 2 a 8 cuadros; Fénix y Qilin vuelan) | mismo tamaño que su versión quieta | Mascota **corriendo** (franja expandida y Torre). Si faltan, se usa la quieta con saltitos. El huevo (n0) no corre |
 | `torre_zona_01.png` … `torre_zona_12.png` | 240×96 | Imagen de la torre con el fondo de la zona (se muestra arriba en la pestaña Torre). La torre debe verse completa; hoy hay una provisoria dibujada por código |

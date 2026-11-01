@@ -226,3 +226,5 @@ img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:
 /* el huevo va detrás del héroe */
 .arena .pet{z-index:1}.arena .hero{z-index:2}
 .zoneimg{margin-bottom:10px;box-shadow:none}.zoneimg img{width:100%;height:auto;display:block;image-rendering:pixelated}
+
+.pface{position:relative;display:inline-block;width:var(--s);height:var(--s);overflow:hidden;flex:none;border-radius:6px;background:rgba(0,0,0,.18)}.pface img{position:absolute;max-width:none;height:auto}
