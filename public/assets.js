@@ -1,7 +1,7 @@
 // Imágenes del juego. Cada una se busca en /img/<nombre>.png; si el archivo no existe se usa un dibujo provisorio.
 // Para reemplazar un dibujo basta con subir el archivo con el nombre exacto (ver img/LEEME.md).
 import { px } from '/px.js';
-import { heroSVG, petSVG, enemySVG, iconSVG, towerSVG, farSVG, nearSVG, zoneOf, zone12, ZONES } from '/art.js';
+import { heroSVG, petSVG, enemySVG, iconSVG, towerSVG, towerSceneSVG, farSVG, nearSVG, zoneOf, zone12, ZONES } from '/art.js';
 export { zone12 };
 
 const state = new Map(); let notify = () => {};
@@ -21,7 +21,14 @@ export function has(name) {
   return s === 'y';
 }
 /** Prueba de existencia que espera el resultado (para los cuadros de la apertura). */
-export const exists = name => new Promise(res => { const im = new Image(); im.onload = () => { state.set(name, 'y'); res(true); }; im.onerror = () => res(false); im.src = url(name); });
+export const exists = name => new Promise(res => { const im = new Image(); im.onload = () => { state.set(name, 'y'); res(true); }; im.onerror = () => { state.set(name, 'n'); res(false); }; im.src = url(name); });
+const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+/** Carga de antemano las imágenes del héroe (para que nunca se vea un dibujo provisorio mientras llegan). */
+export function preloadHero() {
+  const names = [];
+  for (let e = 1; e <= 3; e++) { const b = `heroe_t1_e${e}`; names.push(b); POSES.forEach(p => names.push(`${b}_${p}`)); for (const g of ['caminar', 'correr', 'sprint', 'respirar']) for (let n = 1; n <= 8; n++) names.push(`${b}_${g}_${n}`); }
+  return Promise.race([Promise.all(names.map(exists)), new Promise(r => setTimeout(r, 4000))]);
+}
 
 // ---- nombres y reglas ----
 export const STAT = { F: 'fuerza', I: 'inteligencia', V: 'vitalidad', D: 'disciplina', O: 'orden' };
@@ -32,7 +39,8 @@ export function heroLook(floor) { let i = 0; STARTS.forEach((s, k) => { if (floo
 export const Z12 = ZONES;
 export const bgName = floor => 'fondo_' + String(zone12(floor)).padStart(2, '0');
 export const BOSSES = [25, 50, 75, 100];
-export const heroBase = floor => { const { t, e } = heroLook(floor); return `heroe_t${t}_e${e}`; };
+// Las armaduras 2 a 4 todavía no tienen imágenes: mientras tanto se usa la de gladiador de la misma etapa.
+export const heroBase = floor => { const { t, e } = heroLook(floor); return t > 1 && !has(`heroe_t${t}_e${e}`) ? `heroe_t1_e${e}` : `heroe_t${t}_e${e}`; };
 export const POSES = ['diaria', 'semanal', 'mensual', 'mueca'];
 
 const tag = (name, fb, w, h, k, cls) => `<img class="px ${cls}" alt="" src="${has(name) ? url(name) : fb()}" width="${w * k}" height="${h * k}">`;
@@ -44,7 +52,7 @@ export function heroSrc(floor, pose = '', crown = false) {
   const base = heroBase(floor);
   if (pose && has(`${base}_${pose}`)) return { src: url(`${base}_${pose}`), hop: false };
   if (has(base)) return { src: url(base), hop: !!pose };
-  return { src: px(heroSVG('a', crown, pose), 32, 40), hop: false };
+  return { src: BLANK, hop: false };
 }
 export const heroSprite = (floor, style, crown, k = 1) => { const r = heroSrc(floor, '', crown); return `<img class="px sp hero idle" alt="" src="${r.src}" style="--w:${32 * k};${style}">`; };
 /** Cuadros numerados que existan (nombre_1, nombre_2…), cortando en el primero que falte. */
@@ -56,7 +64,7 @@ export const heroImgTag = (floor, k = 2, crown = false, cls = '') => heroTag(flo
 export function heroTag(floor, k = 2, cls = '', crown = false) {
   const br = breathFrames(floor), size = `width="${32 * k}" height="${40 * k}"`;
   if (br) return `<img class="px hero breathe ${cls.replace(/\bidle\b/, '')}" alt="" src="${br[0]}" data-frames='${JSON.stringify(br)}' ${size}>`;
-  return `<img class="px hero idle ${cls}" alt="" src="${heroSrc(floor, '', crown).src}" ${size}>`;
+  return `<img class="px hero ${cls}" alt="" src="${BLANK}" ${size}>`;
 }
 // Las respiraciones avanzan solas en cualquier pantalla donde aparezcan.
 setInterval(() => document.querySelectorAll('img.breathe').forEach(el => {
@@ -104,7 +112,7 @@ export function runFrames(floor, crown, gait = 'caminar') {
   const base = heroBase(floor), order = { caminar: ['caminar', 'correr', 'sprint'], correr: ['correr', 'sprint', 'caminar'], sprint: ['sprint', 'correr', 'caminar'] }[gait] || ['caminar'];
   for (const g of order) { const fr = seq(`${base}_${g}`); if (fr.length >= 2) return { frames: fr, bob: false, w: 48, gait: g }; }
   if (has(base)) return { frames: [url(base)], bob: true, w: 32, gait };
-  return { frames: [px(heroSVG('a', crown, 'run1'), 32, 40), px(heroSVG('a', crown, 'run2'), 32, 40)], bob: false, w: 32, gait };
+  return { frames: [BLANK], bob: false, w: 32, gait };
 }
 /** Capas del fondo (cada imagen se repite sin cortes): lejana (opcional) y cercana. */
 export function scrollLayers(floor, tNear) {
@@ -113,3 +121,6 @@ export function scrollLayers(floor, tNear) {
   if (main && !far) return lay('near', tNear, url(n));
   return lay('far', (tNear * 2.2).toFixed(2), far ? url(n + '_lejos') : px(farSVG(z), 240, 64)) + lay('near', tNear, main ? url(n) : px(nearSVG(z), 240, 64));
 }
+
+// ---- imagen de la torre por zona: 240×96 (torre_zona_01 … 12). Si falta, se dibuja una provisoria ----
+export const zoneTowerSrc = floor => { const n = 'torre_zona_' + String(zone12(floor)).padStart(2, '0'); return has(n) ? url(n) : px(towerSceneSVG(zoneOf(floor), floor), 240, 96); };

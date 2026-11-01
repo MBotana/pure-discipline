@@ -136,3 +136,22 @@ export function nearSVG(z) {
   return s + '</svg>';
 }
 
+
+/** Imagen provisoria de la zona con la torre (240×96): cielo, montañas, suelo y la torre con una marca en el piso actual. */
+export function towerSceneSVG(z, floor = 1) {
+  const gy = 84, top = 12, my = (gy - (gy - top) * Math.min(1, floor / 100)).toFixed(1);
+  const mount = (c, o) => `<path d="M0 ${gy}V${58 + o}l22-20 18 12 26-26 30 30 20-12 34 24 28-22 30 18 32-14V${gy}z" fill="${c}"/>`;
+  let s = `<svg viewBox="0 0 240 96" width="240" height="96" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${z.sky[0]}"/><stop offset="1" stop-color="${z.sky[1]}"/></linearGradient></defs><rect width="240" height="96" fill="url(#g)"/>`;
+  s += mount(z.far, 8) + `<g opacity=".55">${mount(z.gr2, 22)}</g>`;
+  s += `<rect y="${gy}" width="240" height="12" fill="${z.gr}"/><rect y="${gy}" width="240" height="3" fill="${z.gr2}"/>`;
+  const tx = 150, w = 34, c1 = '#8d8aa3', c2 = '#6a6680', c3 = '#4a4660';
+  s += `<path d="M${tx - w / 2 - 4} ${gy}V${top + 8}h-3V${top}h5v4h4V${top}h5v4h4V${top}h5v4h4V${top}h5v4h4V${top}h5v8h-3V${gy}z" transform="translate(0 0)" fill="${c1}" stroke="${INK}" stroke-width="1.4"/>`;
+  s += `<rect x="${tx - w / 2 + 14}" y="${top + 8}" width="${w / 2 - 6}" height="${gy - top - 8}" fill="${c2}"/>`;
+  for (let k = 0; k < 9; k++) s += `<rect x="${tx - 14}" y="${top + 12 + k * 8}" width="${w}" height="1" fill="${c3}" opacity=".7"/>`;
+  for (let k = 0; k < 6; k++) s += `<rect x="${tx - 3 + (k % 2) * 8 - 4}" y="${top + 16 + k * 11}" width="4" height="6" fill="#241d36"/>`;
+  s += `<path d="M${tx - 6} ${gy}V${gy - 14}c0-5 3-8 6-8s6 3 6 8V${gy}z" fill="#3a2616" stroke="${INK}" stroke-width="1.2"/>`;
+  s += `<path d="M${tx} ${top}v-9" stroke="${INK}" stroke-width="1.4"/><path d="M${tx} ${top - 9}h9l-2 3 2 3h-9z" fill="${z.ac}" stroke="${INK}" stroke-width=".8"/>`;
+  s += `<rect x="${tx - w / 2 - 8}" y="${my}" width="${w + 16}" height="2" fill="#ffd36b" stroke="${INK}" stroke-width=".6"/><circle cx="${tx - w / 2 - 8}" cy="${my}" r="2.4" fill="#ffd36b" stroke="${INK}" stroke-width=".8"/>`;
+  s += `<text x="${tx + w / 2 + 12}" y="${+my + 3}" font-size="7" font-family="monospace" fill="#fff" stroke="${INK}" stroke-width=".5" paint-order="stroke">${floor}</text>`;
+  return s + '</svg>';
+}

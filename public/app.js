@@ -1,6 +1,6 @@
 import { Engine, levelOf, cumXp, buildGates } from '/engine.js';
 import { gateSVG, flagSVG, zoneOf, ZONES } from '/art.js';
-import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petSprite, bossSprite, bgName, bgLayer, towerLayer, runFrames, petRunFrames, heroImgTag, scrollLayers, iconTag, PETS, BOSSES, gaitFor, GAIT_MS } from '/assets.js';
+import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petSprite, bossSprite, bgName, bgLayer, towerLayer, runFrames, petRunFrames, heroImgTag, scrollLayers, iconTag, PETS, BOSSES, gaitFor, GAIT_MS, preloadHero, zoneTowerSrc } from '/assets.js';
 import { px, setReadyHandler } from '/px.js';
 const IMG = (svg, w, h, k, cls = '') => `<img class="px ${cls}" alt="" src="${px(svg, w, h)}" width="${w * k}" height="${h * k}">`;
 const gateImg = (open, k = 2) => IMG(gateSVG(open), 32, 40, k);
@@ -177,9 +177,10 @@ function viewHoy() {
 }
 
 let mapAct = 0, mapSel = 0;
+const zoneImg = floor => `<div class="strip scene zoneimg"><div class="top"><span>${zoneOf(floor).n}</span><span>Torre</span></div><img class="px" alt="" src="${zoneTowerSrc(floor)}"></div>`;
 const z0 = f => { const z = zoneOf(f), act = Math.min(10, Math.ceil(f / 10)); return `${z.n} · ${act}-${((f - 1) % 10) + 1}`; };
 function viewTorre() {
-  if (!S.startDate || dayIdx(todayISO()) < 0) return `<h1>Torre</h1>${S.startDate ? `<div class="strip scene"><div class="top"><span>Vista previa</span></div>${arenaHTML(arenaState(), true)}</div>` : ''}<div class="card mute">Empieza el ${S.startDate ? pretty(S.startDate) : '—'}. Tocá al héroe para ver cómo camina, corre y hace sprint.</div>`;
+  if (!S.startDate || dayIdx(todayISO()) < 0) return `<h1>Torre</h1>${S.startDate ? `${zoneImg(1)}<div class="strip scene"><div class="top"><span>Vista previa</span></div>${arenaHTML(arenaState(), true)}</div>` : ''}<div class="card mute">Empieza el ${S.startDate ? pretty(S.startDate) : '—'}. Tocá al héroe para ver cómo camina, corre y hace sprint.</div>`;
   const { e } = compute(dayIdx(todayISO())), st = e.state, cfg = e.cfg, L = e.floor();
   const into = st.xp - cumXp(L, cfg.A, cfg.r), cost = cfg.A * Math.pow(cfg.r, L - 1);
   const gates = buildGates(cfg), nums = Object.keys(gates).map(Number).sort((a, b) => a - b);
@@ -189,7 +190,7 @@ function viewTorre() {
     if (d.streak !== undefined) parts.push(`racha de ${d.streak} meses (tenés ${st.s})`);
     return parts.join('<br>'); };
   const o = arenaState(), nextG = nums.find(g => g >= L && !st.cleared.includes(g));
-  let h = `<h1>Torre</h1><div class="strip scene"><div class="top"><span>${z0(L)}</span><span>Piso ${L}</span></div>${arenaHTML(o, true)}</div>`;
+  let h = `<h1>Torre</h1>${zoneImg(L)}<div class="strip scene"><div class="top"><span>${z0(L)}</span><span>Piso ${L}</span></div>${arenaHTML(o, true)}</div>`;
   h += `<div class="card"><div class="row"><div><div class="mute">Piso actual</div><div class="big">${L}</div></div><div style="text-align:right"><div class="mute">XP total</div><b>${fmt(st.xp)}</b></div></div>`;
   h += st.tower !== null ? `<div class="banner ok">🏆 ¡Torre completada!</div>` : `<div class="bar"><i style="width:${Math.min(100, into / cost * 100)}%"></i></div><div class="mute">${fmt(into)} / ${fmt(cost)} XP para el piso ${L + 1}</div>`;
   h += `<div class="mute">Racha mensual activa: <b>${st.s}</b> ${st.s === 1 ? 'mes' : 'meses'}</div></div>`;
@@ -475,3 +476,4 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 setReadyHandler(() => { readyN++; render(); });
 onAssets(() => { readyN++; render(); });
 render(); detectMode(); sync();
+preloadHero().then(() => { readyN++; render(); });

@@ -218,3 +218,7 @@ img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:
 :is([data-theme=gladiador],[data-theme=caballero]) .map .ribbon{font-family:var(--fd);letter-spacing:.1em}
 :is([data-theme=gladiador],[data-theme=caballero]) .daytitle,:is([data-theme=gladiador],[data-theme=caballero]) #app>.mute,:is([data-theme=gladiador],[data-theme=caballero]) .allok{color:#d8c79b}
 [data-theme=caballero] .daytitle,[data-theme=caballero] #app>.mute{color:#b9c8e2}
+
+/* el huevo va detrás del héroe */
+.arena .pet{z-index:1}.arena .hero{z-index:2}
+.zoneimg{margin-bottom:10px;box-shadow:none}.zoneimg img{width:100%;height:auto;display:block;image-rendering:pixelated}
