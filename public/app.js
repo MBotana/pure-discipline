@@ -294,15 +294,18 @@ function render() {
 
 // ---------- franja de batalla ----------
 // Lienzo lógico de 240×64: todo se posiciona en unidades de ese lienzo (cqw) para que escale parejo en cualquier pantalla.
-let previewGait = '', dockOpen = false, runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
+const STEPS = [1, 10, 20].flatMap(f => ['caminar', 'correr', 'sprint'].map(g => ({ f, g, e: f === 1 ? 1 : f === 10 ? 2 : 3 })));
+let previewIdx = -1, dockOpen = false, runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
 const U = v => `calc(${v} * 100cqw / 240)`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function arenaState() {
   const { e, st, pre } = current();
   const floor = pre ? 1 : e.floor();
   const boss = BOSSES.includes(floor) && !st.cleared.includes(floor) && st.tower === null;
-  const running = !phase && ((!pre && st.tower === null && st.blocked === null && !boss) || (pre && !!previewGait));
-  return { e, st, pre, floor, boss, running, eq: st.equipped, pl: e.petLevel(st.equipped), done: st.tower !== null, speed: previewGait ? { caminar: 1, correr: 1.5, sprint: 2.5 }[previewGait] : 1 + 0.5 * st.s, gait: previewGait || gaitFor(st.s) };
+  const running = !phase && ((!pre && st.tower === null && st.blocked === null && !boss) || pre);
+  if (pre && previewIdx < 0) previewIdx = 0;
+  const stp = previewIdx >= 0 ? STEPS[previewIdx] : null;
+  return { e, st, pre, floor, hf: stp ? stp.f : floor, step: stp, boss, running, eq: st.equipped, pl: e.petLevel(st.equipped), done: st.tower !== null, speed: stp ? { caminar: 1, correr: 1.5, sprint: 2.5 }[stp.g] : 1 + 0.5 * st.s, gait: stp ? stp.g : gaitFor(st.s) };
 }
 /** Escena de 240×64: fondo en movimiento, héroe y mascota (corriendo o quietos), jefe y puerta. */
 function arenaHTML(o, big) {
@@ -314,7 +317,7 @@ function arenaHTML(o, big) {
   const door = showDoor ? towerLayer(doorName, doorName !== 'torre_cerrada' && !doorName.startsWith('torre_apertura'), 'door ' + (phase === 'shake' ? 'shake' : phase === 'fade' ? 'fadeout' : '')) : '';
   const idle = o.running ? '' : 'idle', hx = o.boss ? 52 : 46, pxx = o.boss ? 94 : 82;
   ['diaria', 'semanal', 'mensual', 'mueca'].forEach(p => heroSrc(o.floor, p));
-  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.floor}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" data-gait="${o.gait}" style="${vars}">${bg}${door}${heroSprite(o.floor, `left:${U(hx)};bottom:${U(ground)}`, o.done).replace('class="px sp hero', 'data-act="gait" class="px sp hero')}${previewGait && o.running ? `<span class="gaitlbl">Vista previa: ${previewGait} · tocá al héroe para cambiar</span>` : ''}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
+  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.hf}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" data-gait="${o.gait}" style="${vars}">${bg}${door}${heroSprite(o.hf, `left:${U(hx)};bottom:${U(ground)}`, o.done).replace('class="px sp hero', 'data-act="gait" class="px sp hero')}${o.step && o.running ? `<span class="gaitlbl">Gladiador, etapa ${o.step.e} · ${o.step.g}${o.pre ? '' : ' · tocá al héroe para cambiar'}</span>` : ''}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
 }
 /** Pone a correr a los personajes de las escenas en carrera (cuadros propios o provisorios). */
 function startAnim() {
@@ -344,7 +347,7 @@ function renderStrip() {
   const into = st.xp - cumXp(floor, e.cfg.A, e.cfg.r), cost = e.cfg.A * Math.pow(e.cfg.r, floor - 1);
   const pct = o.pre ? 0 : Math.round(Math.min(100, into / cost * 100));
   const open = dockOpen || o.pre || !!phase;
-  const key = JSON.stringify({ o: [o.pre, floor, o.eq, o.pl, o.running, o.boss, o.done, o.speed, o.gait], pct, phase, open, readyN, tab: tab === 'hoy' });
+  const key = JSON.stringify({ o: [o.pre, floor, o.eq, o.pl, o.running, o.boss, o.done, o.speed, o.gait, o.hf], pct, phase, open, readyN, tab: tab === 'hoy' });
   if (key === stripKey) return; stripKey = key;
   const z = zoneOf(floor), act = Math.min(10, Math.ceil(floor / 10)), stage = ((floor - 1) % 10) + 1;
   const title = o.pre ? `La torre se abre el ${pretty(S.startDate)}` : `${z.n} · ${act}-${stage}`;
@@ -403,7 +406,7 @@ document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act;
   if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); window.scrollTo(0, 0); }
-  else if (a === 'gait') { previewGait = { '': 'caminar', caminar: 'correr', correr: 'sprint', sprint: '' }[previewGait]; stripKey = ''; render(); }
+  else if (a === 'gait') { previewIdx = previewIdx + 1 >= STEPS.length ? (current().pre ? 0 : -1) : previewIdx + 1; stripKey = ''; render(); }
   else if (a === 'dock') { dockOpen = !dockOpen; stripKey = ''; renderStrip(); }
   else if (a === 't') {
     const k = el.dataset.k, now = Date.now();
@@ -467,6 +470,12 @@ async function detectMode() {
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 window.addEventListener('online', sync);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (viewDate > todayISO()) viewDate = todayISO(); sync(); render(); } });
+setInterval(() => {
+  if (!S.token || !S.startDate || dayIdx(todayISO()) >= 0 || phase || opening || modal || document.hidden) return;
+  if (tab !== 'hoy' && tab !== 'torre') return;
+  previewIdx = (previewIdx + 1) % STEPS.length; stripKey = '';
+  if (tab === 'torre') render(); else renderStrip();
+}, 4500);
 setReadyHandler(() => { readyN++; render(); });
 onAssets(() => { readyN++; render(); });
 render(); detectMode(); sync();
