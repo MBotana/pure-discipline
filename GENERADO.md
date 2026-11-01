@@ -1,5 +1,18 @@
 # Imágenes generadas con PixelLab
 
+## Rehecho de animaciones t1_e3 y caminar t1_e2 (2026-11-01)
+El quieto `heroe_t1_e3.png` no se tocó. Todo lo demás de e3 se rehízo copiando el **movimiento** de e1/e2 y poniéndole el **atuendo** de e3 con `transfer_outfit` (referencia: `heroe_t1_e3.png`). Reemplaza a las animaciones de e3 de la tabla de más abajo.
+
+| Archivos | Movimiento base | Job(s) PixelLab | Notas |
+|---|---|---|---|
+| `heroe_t1_e3_correr_1..8` | `heroe_t1_e2_correr_1..8` | `d2edf79c-4c75-4e97-ac5d-22a19adeb779` | seed 42. La rodela no se ve en 2-5 (brazo detrás del cuerpo, como en e2) |
+| `heroe_t1_e3_sprint_1..8` | `heroe_t1_e1_sprint_1..8` | `46e6d5b7-3cb1-4596-9bb3-3bf53de28da9` | seed 42 |
+| `heroe_t1_e2_caminar_1..8` (antes 5 cuadros) | `heroe_t1_e1_caminar_1..8` | `d2df511d-e793-49b2-bf3b-6ba502eec84e` + cuadro 3 con `edit_image` `02d04c0a-60c1-461e-9bc7-bee51c834b4a` | El cuadro 3 había perdido la manica |
+| `heroe_t1_e3_caminar_1..8` | `heroe_t1_e2_caminar` nuevo | `891fdbfd-2757-423e-a49f-ae17da36a7ac` | seed 42. Partir de e1 salía raro (botas doradas, manica perdida); desde e2 solo cambian casco, dorado, falda y rodela |
+| `heroe_t1_e3_respirar_1..8` | ritmo de `heroe_t1_e2_respirar` | cuadro 1 de `0a6d41f1-c2fd-4f23-961d-2e8c05a260bc` | Animado por código: cabeza (filas 0-8) y piernas (33-39) fijas; filas 9-32 suben 1 px en los cuadros 4-7, igual que e2. La transferencia directa movía todo el cuerpo |
+
+Lección: `transfer_outfit` sobre una animación ya aprobada del mismo personaje es lo más fiable (≈10 generaciones por animación de 8 cuadros). Conviene partir de la etapa con el atuendo más parecido. `sw.js`: caché `pd-v21`.
+
 ## Integración en la app (2026-10-31)
 - `public/img/`: 92 PNG nuevos de t1 (quietos `heroe_t1_e2.png` y `heroe_t1_e3.png`; `_respirar_N` 32×40; `_caminar_N`, `_correr_N`, `_sprint_N` 48×40). `heroe_t1_e1.png` no se tocó.
 - `assets.js`: `gaitFor(racha)` elige la marcha (0 → caminar, 1-2 → correr, 3+ → sprint), `runFrames` busca la marcha pedida y si falta usa la más cercana; `heroTag` muestra la respiración en la franja chica y Estadísticas.
