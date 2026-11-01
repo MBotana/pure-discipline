@@ -217,7 +217,8 @@ function viewStats() {
   const o = arenaState(), seen = S.seenStat || {}, up = CATS.filter(c => st.stat[c] > (seen[c] ?? st.stat[c]));
   if (up.length || !S.seenStat) { S.seenStat = { ...st.stat }; save(); }
   if (up.length) setTimeout(() => { if (tab === 'stats') fx(0, 'semanal'); }, 500);
-  let h = `<h1>Estadísticas</h1><div class="card statshero">${heroImgTag(o.floor, 4, o.done, 'idle')}${petTag(o.eq, o.pl, 3, 'pet idle')}</div><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} (hasta superar la próxima puerta de estadísticas)</div>` : '');
+  const sf = statsStage < 0 ? o.floor : [1, 10, 20][statsStage], sl = o.floor < 25 || statsStage >= 0 ? `Gladiador, etapa ${[1, 10, 20].indexOf(sf) + 1 || '·'} · tocá al héroe para cambiar` : '';
+  let h = `<h1>Estadísticas</h1><div class="card statshero">${heroImgTag(sf, 4, o.done, 'idle').replace('<img ', '<img data-act="statstage" ')}${petTag(o.eq, o.pl, 3, 'pet idle')}${sl ? `<span class="gaitlbl" style="top:6px">${sl}</span>` : ''}</div><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} (hasta superar la próxima puerta de estadísticas)</div>` : '');
   for (const c of CATS) h += `<div style="margin-top:12px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}</b><b>${st.stat[c]}${Number.isFinite(cap) ? ' / ' + cap : ''}</b></div><div class="bar"><i style="width:${Number.isFinite(cap) ? Math.min(100, st.stat[c] / cap * 100) : 100}%"></i></div></div>`;
   return h + `<p class="mute">+1 por cada semanal cumplida, −1 por cada objetivo mensual fallado.</p></div>`;
 }
@@ -295,7 +296,7 @@ function render() {
 // ---------- franja de batalla ----------
 // Lienzo lógico de 240×64: todo se posiciona en unidades de ese lienzo (cqw) para que escale parejo en cualquier pantalla.
 const STEPS = [1, 10, 20].flatMap(f => ['caminar', 'correr', 'sprint'].map(g => ({ f, g, e: f === 1 ? 1 : f === 10 ? 2 : 3 })));
-let previewIdx = -1, dockOpen = false, runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
+let statsStage = -1, previewIdx = -1, dockOpen = false, runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
 const U = v => `calc(${v} * 100cqw / 240)`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function arenaState() {
@@ -407,6 +408,7 @@ document.addEventListener('click', async ev => {
   const a = el.dataset.act;
   if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); window.scrollTo(0, 0); }
   else if (a === 'gait') { previewIdx = previewIdx + 1 >= STEPS.length ? (current().pre ? 0 : -1) : previewIdx + 1; stripKey = ''; render(); }
+  else if (a === 'statstage') { const f = current().e.floor(), real = f < 10 ? 0 : f < 20 ? 1 : f < 25 ? 2 : -1; statsStage = ((statsStage < 0 ? real : statsStage) + 1) % 3; render(); }
   else if (a === 'dock') { dockOpen = !dockOpen; stripKey = ''; renderStrip(); }
   else if (a === 't') {
     const k = el.dataset.k, now = Date.now();
