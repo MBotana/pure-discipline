@@ -231,3 +231,12 @@ img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:
 .statshero{gap:0}
 #fit{display:flow-root}
 .acts{overflow:visible;gap:4px;padding:2px 0 6px}.acts button{flex:1 1 0;min-width:0;padding:0}
+
+.dockrow{position:relative;padding-bottom:12px}.dockrow::after,.floor{content:"";position:absolute;left:0;right:0;bottom:0;height:10px;background:linear-gradient(var(--gr2,#6a5a3a) 0 2px,var(--gr,#8a7a4a) 2px 6px,var(--gr2,#6a5a3a) 6px);image-rendering:pixelated}
+.stand{display:flex;flex-direction:column;align-items:center}.stand .floor{position:static;display:block;width:200px;height:10px;margin-top:-3px;border-radius:2px}
+
+.wk{margin-bottom:3px}.wd{min-height:44px;padding:3px 0 4px}.wd i{margin-top:0}.daytitle{margin:0 0 6px;font-size:12px}
+.sum{margin:0 0 8px}.sum span{padding:3px 4px;gap:0}.sum b{font-size:14px}
+.seg{margin:0 0 8px}.seg button{min-height:34px;padding:6px 4px}
+.mrow{padding-top:6px;padding-bottom:6px}
+.dockrow{padding-top:4px;gap:8px}

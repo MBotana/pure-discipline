@@ -129,10 +129,9 @@ function viewHoy() {
   const bar = (n, max) => `<span class="mini"><i style="width:${Math.min(100, n / max * 100)}%"></i></span>`;
   const sections = [['dia', 'Diarias'], ['sem', 'Semanales'], ['mes', 'Mensuales']];
   let h = nav;
-  if (pre) h += `<div class="banner">Tu torre empieza el <b>${pretty(S.startDate)}</b> (faltan ${-dayIdx(today)} días). Así se verán tus misiones; todavía no se pueden registrar.</div>`;
   if (st.blocked !== null && viewDate === today) h += `<div class="banner">🔒 <b>Bloqueado en el piso ${st.blocked}.</b> No sumás XP hasta cumplir la puerta (mirá la pestaña Torre).</div>`;
   h += `<div class="sum"><span><small>XP del día</small><b>+${fmt(gained)}</b></span><span><small>Piso</small><b>${r.floor}</b></span><span><small>Racha</small><b>${st.s} ${st.s === 1 ? 'mes' : 'meses'}</b></span><span><small>Multiplicador</small><b>×${st.s >= 1 ? st.s + 1 : 1}</b></span></div>${lost > 0 ? `<div class="mute" style="margin:-6px 0 10px">No cobrada por bloqueo: ${fmt(lost)}</div>` : ''}`;
-  h += `<div class="seg">${sections.map(([k, l]) => `<button class="${mtab === k ? 'on' : ''}" data-act="mtab" data-v="${k}">${l}</button>`).join('')}</div>`;
+  h += `<div class="seg">${sections.map(([k, l]) => `<button class="${mtab === k ? 'on' : ''}" data-act="mtab" data-v="${k}">${l}</button>`).join('')}</div><!--fit-->`;
   const wi = pre ? { n: 1, of: 4 } : e.weekInfo(idx), games = st.gameWk, today0 = inp.gaming || 0;
   const petIc = c => petFace(c, e.petLevel(c), 1);
   if (mtab === 'dia') {
@@ -153,10 +152,10 @@ function viewHoy() {
     h += rows.map(([c, nm, goal, max]) => info(c, nm, goal, pips(w(c), max), st.wdone.includes(c))).join('');
     h += info('D', 'Disciplina', DTEXT[Math.min(wi.n, 5) - 1], '', st.wu.D >= 3);
     h += info('P', 'Alimentación', `${cfg.foodDays} días de alimentación`, pips(st.foodWk, cfg.foodDays), st.foodWk >= cfg.foodDays);
-    h += `<p class="mute">Cada semanal cumplida da +1 punto de estadística (Disciplina se confirma en el cierre del domingo; la alimentación le da XP a tu mascota). Semanas buenas seguidas: ${st.wstreak}.</p></div>`;
+    h += `<div class="mute">Semanas buenas seguidas: ${st.wstreak}</div></div>`;
     h += `<div class="card slim"><h2>Cierre de semana</h2>`;
     if (dd === 6 && !pre) h += `<button class="btn" data-act="closeweek">${inp.dform ? 'Revisar el cierre' : 'Completar el cierre'}</button><p class="mute">${inp.dform ? `Disciplina: ${inp.dweek ? 'cumplida' : 'no cumplida'} · celular > 5 h: ${inp.phone ? 'sí' : 'no'}` : 'Respondé tu objetivo de Disciplina y el promedio de celular.'}</p>`;
-    else h += `<p class="mute">El domingo se abre el formulario con tu objetivo de Disciplina de la semana y la pregunta del celular. Videojuegos esta semana: ${games} (máximo 3).</p>`;
+    else h += `<div class="mute">Se habilita el domingo · videojuegos esta semana: ${games} (máx. 3)</div>`;
     h += `</div>`;
   } else {
     const rows = [['F', 'Fuerza', `${cfg.gymM} sesiones`, cfg.gymM], ['V', 'Vitalidad', `${cfg.aeroM} aeróbicos`, cfg.aeroM]];
@@ -165,8 +164,8 @@ function viewHoy() {
     h += rows.map(([c, nm, goal, max]) => info(c, nm, `${m(c)} de ${goal}`, bar(m(c), max), st.mdone.includes(c))).join('');
     h += info('I', 'Inteligencia', 'Libro terminado', '', st.mdone.includes('I')) + info('O', 'Orden', 'Arreglo en la casa', '', st.mdone.includes('O'));
     h += info('D', 'Disciplina', `${m('D')} de ${wi.of} objetivos semanales`, bar(m('D'), wi.of), st.mdone.includes('D'));
-    h += `<p class="mute">Fallar 2 o más reinicia la racha; cada uno fallado resta 1 punto de estadística.</p></div>`;
-    h += `<div class="card slim"><h2>Registrar hoy</h2>${row('book', 'I', 'Libro terminado', 'se cumple el día que lo marcás · el XP se reparte en 6 días')}${row('repair', 'O', 'Arreglo en la casa', 'se cumple el día que lo marcás · el XP se reparte en 6 días')}<p class="mute">También aparecen en el cierre del último domingo del mes.</p></div>`;
+    h += `</div>`;
+    h += `<div class="card slim"><h2>Registrar hoy</h2>${row('book', 'I', 'Libro terminado', 'se cumple el día que lo marcás · el XP se reparte en 6 días')}${row('repair', 'O', 'Arreglo en la casa', 'se cumple el día que lo marcás · el XP se reparte en 6 días')}</div>`;
   }
   if (doneRows.length) {
     h += `<div class="card slim"><button class="donebtn" data-act="showdone"><span>Completadas (${doneRows.length})</span><span>${showDone ? '▲' : '▼'}</span></button>`;
@@ -180,7 +179,7 @@ let mapAct = 0, mapSel = 0;
 const zoneImg = floor => `<div class="strip scene zoneimg"><div class="top"><span>${zoneOf(floor).n}</span><span>Torre</span></div><img class="px" alt="" src="${zoneTowerSrc(floor)}"></div>`;
 const z0 = f => { const z = zoneOf(f), act = Math.min(10, Math.ceil(f / 10)); return `${z.n} · ${act}-${((f - 1) % 10) + 1}`; };
 function viewTorre() {
-  if (!S.startDate || dayIdx(todayISO()) < 0) return `<h1>Torre</h1>${S.startDate ? `${zoneImg(1)}<div class="strip scene"><div class="top"><span>Vista previa</span></div>${arenaHTML(arenaState(), true)}</div>` : ''}<div class="card mute">Empieza el ${S.startDate ? pretty(S.startDate) : '—'}. Tocá al héroe para ver cómo camina, corre y hace sprint.</div>`;
+  if (!S.startDate || dayIdx(todayISO()) < 0) return `<h1>Torre</h1><!--fit-->${S.startDate ? `${zoneImg(1)}<div class="strip scene"><div class="top"><span>Vista previa</span></div>${arenaHTML(arenaState(), true)}</div>` : ''}`;
   const { e } = compute(dayIdx(todayISO())), st = e.state, cfg = e.cfg, L = e.floor();
   const into = st.xp - cumXp(L, cfg.A, cfg.r), cost = cfg.A * Math.pow(cfg.r, L - 1);
   const gates = buildGates(cfg), nums = Object.keys(gates).map(Number).sort((a, b) => a - b);
@@ -190,7 +189,7 @@ function viewTorre() {
     if (d.streak !== undefined) parts.push(`racha de ${d.streak} meses (tenés ${st.s})`);
     return parts.join('<br>'); };
   const o = arenaState(), nextG = nums.find(g => g >= L && !st.cleared.includes(g));
-  let h = `<h1>Torre</h1>` + subtabs('torre', [['res', 'Resumen'], ['mapa', 'Mapa'], ['puertas', 'Puertas']]);
+  let h = `<h1>Torre</h1>` + subtabs('torre', [['res', 'Resumen'], ['mapa', 'Mapa'], ['puertas', 'Puertas']]) + '<!--fit-->';
   if (SUB.torre === 'res') h += `${zoneImg(L)}<div class="strip scene"><div class="top"><span>${z0(L)}</span><span>Piso ${L}</span></div>${arenaHTML(o, true)}</div>`;
   if (SUB.torre === 'res') h += `<div class="card"><div class="row"><div><div class="mute">Piso actual</div><div class="big">${L}</div></div><div style="text-align:right"><div class="mute">XP total</div><b>${fmt(st.xp)}</b></div></div>`;
   if (SUB.torre === 'res') h += st.tower !== null ? `<div class="banner ok">🏆 ¡Torre completada!</div>` : `<div class="bar"><i style="width:${Math.min(100, into / cost * 100)}%"></i></div><div class="mute">${fmt(into)} / ${fmt(cost)} XP para el piso ${L + 1}</div>`;
@@ -225,7 +224,7 @@ function viewStats() {
   if (up.length || !S.seenStat) { S.seenStat = { ...st.stat }; save(); }
   if (up.length) setTimeout(() => { if (tab === 'stats') fx(0, 'semanal'); }, 500);
   const sf = statsStage < 0 ? o.floor : [1, 10, 20][statsStage], sl = o.floor < 25 || statsStage >= 0 ? `Gladiador, etapa ${[1, 10, 20].indexOf(sf) + 1 || '·'} · tocá al héroe para cambiar` : '';
-  let h = `<h1>Estadísticas</h1><div class="card statshero">${petTag(o.eq, o.pl, 3, 'pet idle')}${heroImgTag(sf, 4, o.done, 'idle').replace('<img ', '<img data-act="statstage" ')}${sl ? `<span class="gaitlbl" style="top:6px">${sl}</span>` : ''}</div><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} (hasta superar la próxima puerta de estadísticas)</div>` : '');
+  let h = `<h1>Estadísticas</h1><!--fit--><div class="card statshero"><div class="stand" style="--gr:${zoneOf(sf).gr};--gr2:${zoneOf(sf).gr2}">${heroImgTag(sf, 4, o.done, 'idle').replace('<img ', '<img data-act="statstage" ')}<i class="floor"></i></div>${sl ? `<span class="gaitlbl" style="top:6px">${sl}</span>` : ''}</div><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} (hasta superar la próxima puerta de estadísticas)</div>` : '');
   for (const c of CATS) h += `<div style="margin-top:12px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}</b><b>${st.stat[c]}${Number.isFinite(cap) ? ' / ' + cap : ''}</b></div><div class="bar"><i style="width:${Number.isFinite(cap) ? Math.min(100, st.stat[c] / cap * 100) : 100}%"></i></div></div>`;
   return h + `<p class="mute">+1 por cada semanal cumplida, −1 por cada objetivo mensual fallado.</p></div>`;
 }
@@ -234,7 +233,7 @@ function viewMascotas() {
   if (!S.startDate) return `<h1>Mascotas</h1><div class="card mute">Disponibles al ingresar.</div>`;
   const { e, st } = current(), lv = e.petLevels();
   const cum = [0]; for (const x of e.cfg.petCosts) cum.push(cum[cum.length - 1] + x);
-  let h = `<h1>Mascotas</h1>`;
+  let h = `<h1>Mascotas</h1><!--fit-->`;
   if (st.feedStreak >= 1) h += `<div class="banner">Semanas sin alimentar seguidas: <b>${st.feedStreak}</b>. ${st.feedStreak >= 2 ? 'La mascota equipada pierde 1 nivel por cada semana fallada.' : 'Con la próxima semana fallada baja 1 nivel.'}</div>`;
   h += `<div class="pgrid">`;
   for (const c of CATS) {
@@ -257,7 +256,7 @@ function viewAjustes() {
     h += `<div class="err">${esc(errMsg)}</div><button class="btn" data-act="login">${mode === 'setup' ? 'Crear y entrar' : 'Entrar'}</button></div>`;
     return h;
   }
-  h += subtabs('ajustes', [['gen', 'General'], ['notif', 'Notificaciones']]);
+  h += subtabs('ajustes', [['gen', 'General'], ['notif', 'Notificaciones']]) + '<!--fit-->';
   if (SUB.ajustes === 'gen') h += `<div class="card"><h2>Apariencia</h2><div class="themes">${THEMES.map(t => `<button class="theme ${(S.theme || 'gladiador') === t[0] ? 'on' : ''}" data-act="theme" data-v="${t[0]}"><i style="background:${t[2]}"></i>${t[1]}</button>`).join('')}</div></div>`;
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   if (SUB.ajustes === 'gen') h += `<div class="card"><h2>Sincronización</h2><div class="row"><span>${pending() ? pending() + ' día(s) pendientes' : 'Todo sincronizado'}</span><button class="btn sm" data-act="sync" ${syncing ? 'disabled' : ''}>${syncing ? 'Sincronizando…' : 'Sincronizar'}</button></div><div class="mute">${S.lastSync ? 'Última vez: ' + new Date(S.lastSync).toLocaleString('es-AR') : 'Nunca'}</div><div class="err">${esc(syncMsg)}</div></div>`;
@@ -299,7 +298,8 @@ function render() {
   if (tab === 'hoy' && S.startDate && !modal && viewDate === todayISO() && dayIdx(viewDate) >= 0 && dayIdx(viewDate) % 7 === 6 && askedFor !== viewDate && !(S.days[viewDate]?.input?.dform)) {
     askedFor = viewDate; modal = { kind: 'week', dw: false, ph: false, date: viewDate };
   }
-  app.innerHTML = `<div id="fit">${offline}${view()}</div>`; renderStrip();
+  const html = offline + view(), mk = html.indexOf('<!--fit-->');
+  app.innerHTML = mk < 0 ? `<div id="fit">${html}</div>` : `${html.slice(0, mk)}<div id="fit">${html.slice(mk + 10)}</div>`; renderStrip();
   document.getElementById('modal').innerHTML = modalHTML();
   document.getElementById('tabs').innerHTML = TABS.map(t => `<button class="${t[0] === tab ? 'on' : ''}" data-act="tab" data-t="${t[0]}"><span>${t[1]}</span>${t[2]}</button>`).join('');
   if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
@@ -314,10 +314,10 @@ function fit() {
     if (!f) return;
     const bar = strip && strip.firstElementChild ? strip : tabs;
     app.style.setProperty('--bot', Math.max(0, innerHeight - bar.getBoundingClientRect().top) + 'px');
-    const cs = getComputedStyle(app), avail = app.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const cs = getComputedStyle(app), avail = app.getBoundingClientRect().bottom - parseFloat(cs.paddingBottom) - f.getBoundingClientRect().top;
     const h = z => { f.style.zoom = z; return f.getBoundingClientRect().height; };
     if (h(1) > avail + 0.5) {
-      let lo = 0.6, hi = 1;
+      let lo = 0.55, hi = 1;
       if (h(lo) > avail + 0.5) { f.style.zoom = lo; }
       else { for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (h(m) <= avail + 0.5) lo = m; else hi = m; } f.style.zoom = lo.toFixed(3); }
     }
@@ -387,9 +387,9 @@ function renderStrip0() {
   const key = JSON.stringify({ o: [o.pre, floor, o.eq, o.pl, o.running, o.boss, o.done, o.speed, o.gait, o.hf], pct, phase, open, readyN, tab: tab === 'hoy' });
   if (key === stripKey) return; stripKey = key;
   const z = zoneOf(floor), act = Math.min(10, Math.ceil(floor / 10)), stage = ((floor - 1) % 10) + 1;
-  const title = o.pre ? `La torre se abre el ${pretty(S.startDate)}` : `${z.n} · ${act}-${stage}`;
+  const title = `${z.n} · ${act}-${stage}`;
   if (open) el.innerHTML = `<div class="strip ${!o.running && !o.pre ? 'blocked' : ''}" ${o.pre || phase ? '' : 'data-act="dock"'}><div class="top"><span>${title}</span>${o.pre ? '' : `<span class="hp" title="Avance al próximo piso"><i style="width:${pct}%"></i></span>`}</div>${arenaHTML(o)}</div>`;
-  else el.innerHTML = `<div class="strip dock" data-act="dock"><div class="dockrow">${petTag(o.eq, o.pl, 2, 'pet idle')}${heroImgTag(floor, 2, o.done, 'idle')}<div class="dockinfo"><b>Piso ${floor}</b><small>${z.n}</small><span class="hp"><i style="width:${pct}%"></i></span><small>Tocá para ver la carrera</small></div></div></div>`;
+  else el.innerHTML = `<div class="strip dock" data-act="dock"><div class="dockrow" style="--gr:${z.gr};--gr2:${z.gr2}">${petTag(o.eq, o.pl, 1, 'pet idle')}${heroImgTag(floor, 1, o.done, 'idle')}<div class="dockinfo"><b>Piso ${floor}</b><small>${z.n}</small><span class="hp"><i style="width:${pct}%"></i></span><small>Tocá para ver la carrera</small></div></div></div>`;
   startAnim();
   if (phase === 'fade') requestAnimationFrame(() => requestAnimationFrame(() => el.querySelector('.door')?.classList.add('gone')));
 }
