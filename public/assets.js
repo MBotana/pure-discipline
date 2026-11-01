@@ -80,6 +80,7 @@ const PET_ARENA = { 0: 32, 1: 24, 2: 24, 3: 34, 4: 34, 5: 48 };
 const FLYERS = ['fenix', 'qilin'];
 /** Píxeles reales del archivo (32 si todavía es el dibujo provisorio). */
 export const petPx = (c, lv) => has(petName(c, lv)) ? (PET_PX[lv] || 32) : 32;
+export const petArenaW = (c, lv) => has(petName(c, lv)) ? (PET_ARENA[lv] || 32) : 32;
 const petW = (c, lv, k) => (has(petName(c, lv)) ? (PET_ARENA[lv] || 32) : 32) * k;
 export const petTag = (c, lv, k = 2, cls = '') => { const s = petPx(c, lv), kk = Math.max(1, Math.round(k * 32 / s)); return tag(petName(c, lv), petFb(c, lv), s, s, kk, cls); };
 /** Las que vuelan van un poco en el aire. */

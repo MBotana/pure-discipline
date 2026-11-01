@@ -1,6 +1,6 @@
 import { Engine, levelOf, cumXp, buildGates } from '/engine.js';
 import { gateSVG, flagSVG, zoneOf, ZONES } from '/art.js';
-import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petFace, petSprite, bossSprite, bgName, bgLayer, towerLayer, runFrames, petRunFrames, heroImgTag, scrollLayers, iconTag, PETS, BOSSES, gaitFor, GAIT_MS, preloadHero, zoneTowerSrc } from '/assets.js';
+import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petFace, petSprite, petArenaW, bossSprite, bgName, bgLayer, towerLayer, runFrames, petRunFrames, heroImgTag, scrollLayers, iconTag, PETS, BOSSES, gaitFor, GAIT_MS, preloadHero, zoneTowerSrc } from '/assets.js';
 import { px, setReadyHandler } from '/px.js';
 const IMG = (svg, w, h, k, cls = '') => `<img class="px ${cls}" alt="" src="${px(svg, w, h)}" width="${w * k}" height="${h * k}">`;
 const gateImg = (open, k = 2) => IMG(gateSVG(open), 32, 40, k);
@@ -16,9 +16,9 @@ let S = { token: '', startDate: '', days: {}, settings: {}, device: Math.random(
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch { /* sin almacenamiento */ }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* ignorar */ } };
 
-const THEMES = [['cielo', 'Cielo', '#9fd8f7'], ['noche', 'Noche', '#0b1830'], ['plata', 'Plata', '#c3ccd8'], ['bronce', 'Bronce', '#120c0b'], ['gladiador', 'Gladiador', '#1b1210'], ['caballero', 'Caballero', '#0e1626']];
+const THEMES = [['gladiador', 'Gladiador', '#1b1210'], ['caballero', 'Caballero', '#0e1626']];
 function applyTheme() {
-  const t = THEMES.find(x => x[0] === S.theme) ? S.theme : 'cielo';
+  const t = THEMES.find(x => x[0] === S.theme) ? S.theme : 'gladiador';
   document.documentElement.dataset.theme = t;
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = THEMES.find(x => x[0] === t)[2];
 }
@@ -190,11 +190,13 @@ function viewTorre() {
     if (d.streak !== undefined) parts.push(`racha de ${d.streak} meses (tenés ${st.s})`);
     return parts.join('<br>'); };
   const o = arenaState(), nextG = nums.find(g => g >= L && !st.cleared.includes(g));
-  let h = `<h1>Torre</h1>${zoneImg(L)}<div class="strip scene"><div class="top"><span>${z0(L)}</span><span>Piso ${L}</span></div>${arenaHTML(o, true)}</div>`;
-  h += `<div class="card"><div class="row"><div><div class="mute">Piso actual</div><div class="big">${L}</div></div><div style="text-align:right"><div class="mute">XP total</div><b>${fmt(st.xp)}</b></div></div>`;
-  h += st.tower !== null ? `<div class="banner ok">🏆 ¡Torre completada!</div>` : `<div class="bar"><i style="width:${Math.min(100, into / cost * 100)}%"></i></div><div class="mute">${fmt(into)} / ${fmt(cost)} XP para el piso ${L + 1}</div>`;
-  h += `<div class="mute">Racha mensual activa: <b>${st.s}</b> ${st.s === 1 ? 'mes' : 'meses'}</div></div>`;
-  if (nextG && st.tower === null) h += `<div class="card slim"><h2>Próxima puerta · piso ${nextG}${BOSSES.includes(nextG) ? ' · jefe' : ''}</h2><div class="row"><div>${reqLines(nextG)}</div><span class="pill ${st.blocked === nextG ? 'bad' : ''}">${st.blocked === nextG ? 'bloqueada' : 'pendiente'}</span></div></div>`;
+  let h = `<h1>Torre</h1>` + subtabs('torre', [['res', 'Resumen'], ['mapa', 'Mapa'], ['puertas', 'Puertas']]);
+  if (SUB.torre === 'res') h += `${zoneImg(L)}<div class="strip scene"><div class="top"><span>${z0(L)}</span><span>Piso ${L}</span></div>${arenaHTML(o, true)}</div>`;
+  if (SUB.torre === 'res') h += `<div class="card"><div class="row"><div><div class="mute">Piso actual</div><div class="big">${L}</div></div><div style="text-align:right"><div class="mute">XP total</div><b>${fmt(st.xp)}</b></div></div>`;
+  if (SUB.torre === 'res') h += st.tower !== null ? `<div class="banner ok">🏆 ¡Torre completada!</div>` : `<div class="bar"><i style="width:${Math.min(100, into / cost * 100)}%"></i></div><div class="mute">${fmt(into)} / ${fmt(cost)} XP para el piso ${L + 1}</div>`;
+  if (SUB.torre === 'res') h += `<div class="mute">Racha mensual activa: <b>${st.s}</b> ${st.s === 1 ? 'mes' : 'meses'}</div></div>`;
+  if (SUB.torre === 'res' && nextG && st.tower === null) h += `<div class="card slim"><h2>Próxima puerta · piso ${nextG}${BOSSES.includes(nextG) ? ' · jefe' : ''}</h2><div class="row"><div>${reqLines(nextG)}</div><span class="pill ${st.blocked === nextG ? 'bad' : ''}">${st.blocked === nextG ? 'bloqueada' : 'pendiente'}</span></div></div>`;
+  if (SUB.torre === 'mapa') {
   h += `<div class="acts">${Array.from({ length: 10 }, (_, i) => i + 1).map(a => `<button class="${a === act ? 'on' : ''} ${a > curAct ? 'lock' : ''}" data-act="map" data-a="${a}">${a}</button>`).join('')}</div>`;
   const pts = Array.from({ length: 10 }, (_, i) => [50 + 27 * Math.sin(i * 1.05 + (act % 2) * 1.6), 88 - i * 8, (act - 1) * 10 + i + 1]);
   h += `<div class="map ${act > curAct ? 'dim' : ''}" style="--sky1:${z.sky[0]};--sky2:${z.sky[1]};--gr:${z.gr}"><div class="ribbon">Acto ${act} · ${z.n}</div>`;
@@ -207,9 +209,13 @@ function viewTorre() {
   const gd = gates[sel], selAct = Math.ceil(sel / 10), selStage = ((sel - 1) % 10) + 1;
   h += `<div class="card" style="margin-top:12px"><h2>Piso ${sel} · ${selAct}-${selStage}</h2>`;
   h += gd ? `<div class="row"><div>${reqLines(sel)}</div><span class="pill ${st.cleared.includes(sel) ? 'ok' : st.blocked === sel ? 'bad' : ''}">${st.cleared.includes(sel) ? 'abierta' : st.blocked === sel ? 'bloqueada' : 'pendiente'}</span></div>` : `<div class="mute">Piso sin puerta: solo suma XP.</div>`;
-  h += `</div><div class="card"><h2>Todas las puertas</h2>`;
+  h += `</div>`;
+  } else if (SUB.torre === 'puertas') {
+  h += `<div class="card"><h2>Todas las puertas</h2>`;
   for (const g of nums) h += `<div class="gate"><div style="width:44px;font-weight:800">${g}</div><div style="flex:1">${reqLines(g)}</div><span class="pill ${st.cleared.includes(g) ? 'ok' : st.blocked === g ? 'bad' : ''}">${st.cleared.includes(g) ? 'abierta' : st.blocked === g ? 'bloqueada' : 'pendiente'}</span></div>`;
-  return h + `</div>`;
+  h += `</div>`;
+  }
+  return h;
 }
 
 function viewStats() {
@@ -219,7 +225,7 @@ function viewStats() {
   if (up.length || !S.seenStat) { S.seenStat = { ...st.stat }; save(); }
   if (up.length) setTimeout(() => { if (tab === 'stats') fx(0, 'semanal'); }, 500);
   const sf = statsStage < 0 ? o.floor : [1, 10, 20][statsStage], sl = o.floor < 25 || statsStage >= 0 ? `Gladiador, etapa ${[1, 10, 20].indexOf(sf) + 1 || '·'} · tocá al héroe para cambiar` : '';
-  let h = `<h1>Estadísticas</h1><div class="card statshero">${heroImgTag(sf, 4, o.done, 'idle').replace('<img ', '<img data-act="statstage" ')}${petTag(o.eq, o.pl, 3, 'pet idle')}${sl ? `<span class="gaitlbl" style="top:6px">${sl}</span>` : ''}</div><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} (hasta superar la próxima puerta de estadísticas)</div>` : '');
+  let h = `<h1>Estadísticas</h1><div class="card statshero">${petTag(o.eq, o.pl, 3, 'pet idle')}${heroImgTag(sf, 4, o.done, 'idle').replace('<img ', '<img data-act="statstage" ')}${sl ? `<span class="gaitlbl" style="top:6px">${sl}</span>` : ''}</div><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} (hasta superar la próxima puerta de estadísticas)</div>` : '');
   for (const c of CATS) h += `<div style="margin-top:12px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}</b><b>${st.stat[c]}${Number.isFinite(cap) ? ' / ' + cap : ''}</b></div><div class="bar"><i style="width:${Number.isFinite(cap) ? Math.min(100, st.stat[c] / cap * 100) : 100}%"></i></div></div>`;
   return h + `<p class="mute">+1 por cada semanal cumplida, −1 por cada objetivo mensual fallado.</p></div>`;
 }
@@ -230,13 +236,17 @@ function viewMascotas() {
   const cum = [0]; for (const x of e.cfg.petCosts) cum.push(cum[cum.length - 1] + x);
   let h = `<h1>Mascotas</h1>`;
   if (st.feedStreak >= 1) h += `<div class="banner">Semanas sin alimentar seguidas: <b>${st.feedStreak}</b>. ${st.feedStreak >= 2 ? 'La mascota equipada pierde 1 nivel por cada semana fallada.' : 'Con la próxima semana fallada baja 1 nivel.'}</div>`;
+  h += `<div class="pgrid">`;
   for (const c of CATS) {
-    const l = lv[c], max = l >= 5, eq = st.equipped === c;
-    h += `<div class="card"><div class="row"><span style="display:flex;align-items:center;gap:8px">${petFace(c, l, 2)}<b>${PETS[c].name} <small class="mute">(${NAMES[c]})</small></b></span>${eq ? '<span class="pill gold">equipada</span>' : `<button class="btn sm ghost" data-act="equip" data-c="${c}">Equipar</button>`}</div><div class="row mute"><span>Nivel ${l} / 5</span>${max ? '<span>máximo</span>' : `<span>${st.px[c] - cum[l]} / ${e.cfg.petCosts[l]} XP</span>`}</div><div class="bar gold"><i style="width:${max ? 100 : (st.px[c] - cum[l]) / e.cfg.petCosts[l] * 100}%"></i></div></div>`;
+    const l = lv[c], max = l >= 5, eq = st.equipped === c, pct = max ? 100 : (st.px[c] - cum[l]) / e.cfg.petCosts[l] * 100;
+    h += `<div class="card pcard"><div class="phead"><div class="pface-wrap">${petFace(c, l, 2)}</div><div><b>${PETS[c].name}</b><small class="mute"> ${NAMES[c]}</small><div class="mute">Nivel ${l} / 5</div></div></div><div class="bar gold"><i style="width:${pct}%"></i></div><div class="row mute"><span>${max ? 'máximo' : `${st.px[c] - cum[l]} / ${e.cfg.petCosts[l]} XP`}</span>${eq ? '<span class="pill gold">equipada</span>' : `<button class="btn sm ghost" data-act="equip" data-c="${c}">Equipar</button>`}</div></div>`;
   }
+  h += `</div>`;
   return h + `<p class="mute">Solo la mascota equipada aporta puntos en una puerta de estadísticas y solo a su propia estadística. Cada semana de alimentación perfecta le da 10 XP.</p>`;
 }
 
+const SUB = { torre: 'res', ajustes: 'gen' };
+const subtabs = (k, items) => `<div class="seg">${items.map(([v, l]) => `<button class="${SUB[k] === v ? 'on' : ''}" data-act="sub" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
 function viewAjustes() {
   let h = `<h1>Ajustes</h1>`;
   if (!S.token) {
@@ -247,15 +257,17 @@ function viewAjustes() {
     h += `<div class="err">${esc(errMsg)}</div><button class="btn" data-act="login">${mode === 'setup' ? 'Crear y entrar' : 'Entrar'}</button></div>`;
     return h;
   }
-  h += `<div class="card"><h2>Apariencia</h2><div class="themes">${THEMES.map(t => `<button class="theme ${(S.theme || 'cielo') === t[0] ? 'on' : ''}" data-act="theme" data-v="${t[0]}"><i style="background:${t[2]}"></i>${t[1]}</button>`).join('')}</div></div>`;
+  h += subtabs('ajustes', [['gen', 'General'], ['notif', 'Notificaciones']]);
+  if (SUB.ajustes === 'gen') h += `<div class="card"><h2>Apariencia</h2><div class="themes">${THEMES.map(t => `<button class="theme ${(S.theme || 'gladiador') === t[0] ? 'on' : ''}" data-act="theme" data-v="${t[0]}"><i style="background:${t[2]}"></i>${t[1]}</button>`).join('')}</div></div>`;
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-  h += `<div class="card"><h2>Sincronización</h2><div class="row"><span>${pending() ? pending() + ' día(s) pendientes' : 'Todo sincronizado'}</span><button class="btn sm" data-act="sync" ${syncing ? 'disabled' : ''}>${syncing ? 'Sincronizando…' : 'Sincronizar'}</button></div><div class="mute">${S.lastSync ? 'Última vez: ' + new Date(S.lastSync).toLocaleString('es-AR') : 'Nunca'}</div><div class="err">${esc(syncMsg)}</div></div>`;
+  if (SUB.ajustes === 'gen') h += `<div class="card"><h2>Sincronización</h2><div class="row"><span>${pending() ? pending() + ' día(s) pendientes' : 'Todo sincronizado'}</span><button class="btn sm" data-act="sync" ${syncing ? 'disabled' : ''}>${syncing ? 'Sincronizando…' : 'Sincronizar'}</button></div><div class="mute">${S.lastSync ? 'Última vez: ' + new Date(S.lastSync).toLocaleString('es-AR') : 'Nunca'}</div><div class="err">${esc(syncMsg)}</div></div>`;
   const st = S.settings || {};
+  if (SUB.ajustes === 'notif') {
   h += `<div class="card"><h2>Notificaciones</h2>`;
   if (!standalone) h += `<div class="banner">En el iPhone: abrí esta página en Safari, tocá Compartir → <b>Agregar a pantalla de inicio</b> y abrila desde ahí. Sin eso iOS no permite notificaciones.</div>`;
   h += `<div class="row"><button class="btn sm" data-act="push">Activar</button><button class="btn sm ghost" data-act="pushtest">Probar</button></div><div class="err" id="pushmsg">${esc(errMsg)}</div>`;
   h += `<label>Recordatorio diario (hora local)<input id="rh" type="number" min="0" max="23" value="${esc(st.reminder_hour ?? 21)}"></label><label>Aviso de alimentación del domingo (hora)<input id="fh" type="number" min="0" max="23" value="${esc(st.feed_hour ?? 18)}"></label><button class="btn sm ghost" data-act="saveset">Guardar horarios</button></div>`;
-  h += `<div class="card"><h2>Datos</h2><div class="mute">Primer día: ${S.startDate ? pretty(S.startDate) : '—'}</div><div class="row" style="margin-top:8px"><button class="btn sm ghost" data-act="export">Descargar respaldo</button><button class="btn sm ghost" data-act="logout">Cerrar sesión</button></div></div>`;
+  } else h += `<div class="card"><h2>Datos</h2><div class="mute">Primer día: ${S.startDate ? pretty(S.startDate) : '—'}</div><div class="row" style="margin-top:8px"><button class="btn sm ghost" data-act="export">Descargar respaldo</button><button class="btn sm ghost" data-act="logout">Cerrar sesión</button></div></div>`;
   return h;
 }
 
@@ -280,24 +292,45 @@ function modalHTML() {
 }
 function render() {
   const view = TABS.find(t => t[0] === tab)[3];
-  const app = document.getElementById('app'), focus = document.activeElement?.id, y = app.scrollTop;
+  const app = document.getElementById('app'), focus = document.activeElement?.id;
   const offline = (!navigator.onLine || pending() > 0) && S.token ? `<div class="mute" style="text-align:right">${navigator.onLine ? 'pendiente de sincronizar' : 'sin conexión'}</div>` : '';
   if (!S.token && tab !== 'ajustes') { tab = 'ajustes'; return render(); }
   document.documentElement.classList.toggle('cf', has('marco'));
   if (tab === 'hoy' && S.startDate && !modal && viewDate === todayISO() && dayIdx(viewDate) >= 0 && dayIdx(viewDate) % 7 === 6 && askedFor !== viewDate && !(S.days[viewDate]?.input?.dform)) {
     askedFor = viewDate; modal = { kind: 'week', dw: false, ph: false, date: viewDate };
   }
-  app.innerHTML = offline + view(); renderStrip();
+  app.innerHTML = `<div id="fit">${offline}${view()}</div>`; renderStrip();
   document.getElementById('modal').innerHTML = modalHTML();
   document.getElementById('tabs').innerHTML = TABS.map(t => `<button class="${t[0] === tab ? 'on' : ''}" data-act="tab" data-t="${t[0]}"><span>${t[1]}</span>${t[2]}</button>`).join('');
   if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
-  app.scrollTop = y;
-  document.body.classList.toggle('nostrip', tab === 'torre' || tab === 'stats');
+  fit();
 }
+/** Todo entra en la pantalla: se mide el espacio libre (sobre la franja y la barra de solapas) y se reduce el contenido lo justo. Solo si ni así entra, se permite desplazar dentro de la solapa. */
+let fitting = false;
+function fit() {
+  if (fitting) return; fitting = true;
+  try {
+    const app = document.getElementById('app'), f = document.getElementById('fit'), strip = document.getElementById('strip'), tabs = document.getElementById('tabs');
+    if (!f) return;
+    const bar = strip && strip.firstElementChild ? strip : tabs;
+    app.style.setProperty('--bot', Math.max(0, innerHeight - bar.getBoundingClientRect().top) + 'px');
+    const cs = getComputedStyle(app), avail = app.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const h = z => { f.style.zoom = z; return f.getBoundingClientRect().height; };
+    if (h(1) > avail + 0.5) {
+      let lo = 0.6, hi = 1;
+      if (h(lo) > avail + 0.5) { f.style.zoom = lo; }
+      else { for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (h(m) <= avail + 0.5) lo = m; else hi = m; } f.style.zoom = lo.toFixed(3); }
+    }
+    app.style.overflowY = f.getBoundingClientRect().height > avail + 1 ? 'auto' : 'hidden';
+  } finally { fitting = false; }
+}
+addEventListener('resize', fit); addEventListener('orientationchange', () => setTimeout(fit, 300));
+document.addEventListener('load', () => fit(), true);
+document.fonts?.ready.then(fit);
 
 // ---------- franja de batalla ----------
 // Lienzo lógico de 240×64: todo se posiciona en unidades de ese lienzo (cqw) para que escale parejo en cualquier pantalla.
-const STEPS = [1, 10, 20].flatMap(f => ['caminar', 'correr', 'sprint'].map(g => ({ f, g, e: f === 1 ? 1 : f === 10 ? 2 : 3 })));
+const STEPS = [1, 11, 25, 26, 36, 50, 51, 61, 75, 76, 86, 100].map((f, i) => ({ f, g: ['caminar', 'correr', 'sprint'][i % 3] }));
 let statsStage = -1, previewIdx = -1, dockOpen = false, runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
 const U = v => `calc(${v} * 100cqw / 240)`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -312,15 +345,15 @@ function arenaState() {
 }
 /** Escena de 240×64: fondo en movimiento, héroe y mascota (corriendo o quietos), jefe y puerta. */
 function arenaHTML(o, big) {
-  const z = zoneOf(o.floor), vars = `--sky1:${z.sky[0]};--sky2:${z.sky[1]};--gr:${z.gr};--gr2:${z.gr2}`;
+  const z = zoneOf(o.hf), vars = `--sky1:${z.sky[0]};--sky2:${z.sky[1]};--gr:${z.gr};--gr2:${z.gr2}`;
   const showDoor = (o.pre && !o.running) || phase, ground = 6;
   const doorName = phase === 'open' || phase === 'fade' ? 'torre_abierta' : phase.startsWith('f') ? 'torre_apertura_' + phase.slice(1) : 'torre_cerrada';
   const tNear = +(9 / o.speed).toFixed(2);
-  const bg = showDoor && o.pre ? '' : `<div class="scrollwrap ${o.running ? '' : 'paused'}">${scrollLayers(o.floor, tNear)}</div>`;
+  const bg = showDoor && o.pre ? '' : `<div class="scrollwrap ${o.running ? '' : 'paused'}">${scrollLayers(o.hf, tNear)}</div>`;
   const door = showDoor ? towerLayer(doorName, doorName !== 'torre_cerrada' && !doorName.startsWith('torre_apertura'), 'door ' + (phase === 'shake' ? 'shake' : phase === 'fade' ? 'fadeout' : '')) : '';
-  const idle = o.running ? '' : 'idle', hx = o.boss ? 52 : 46, pxx = o.boss ? 94 : 82;
+  const idle = o.running ? '' : 'idle', hx = o.boss ? 60 : 56, pxx = Math.max(2, hx + 4 - petArenaW(o.eq, o.pl));
   ['diaria', 'semanal', 'mensual', 'mueca'].forEach(p => heroSrc(o.floor, p));
-  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.hf}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" data-gait="${o.gait}" style="${vars}">${bg}${door}${heroSprite(o.hf, `left:${U(hx)};bottom:${U(ground)}`, o.done).replace('class="px sp hero', 'data-act="gait" class="px sp hero')}${o.step && o.running ? `<span class="gaitlbl">Gladiador, etapa ${o.step.e} · ${o.step.g}${' · tocá al héroe para cambiar'}</span>` : ''}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
+  return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.hf}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" data-gait="${o.gait}" style="${vars}">${bg}${door}${heroSprite(o.hf, `left:${U(hx)};bottom:${U(ground)}`, o.done).replace('class="px sp hero', 'data-act="gait" class="px sp hero')}${o.step && o.running ? `<span class="gaitlbl">${zoneOf(o.hf).n} · ${o.step.g} · tocá al héroe para cambiar</span>` : ''}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;
 }
 /** Pone a correr a los personajes de las escenas en carrera (cuadros propios o provisorios). */
 function startAnim() {
@@ -340,7 +373,8 @@ function startAnim() {
   let k = 0; const ms = +(document.querySelector('.arena[data-run="1"]')._ms || 240);
   runTimer = setInterval(() => { k++; for (const [el, fr] of list) { if (!el.isConnected) { clearInterval(runTimer); return; } if (el.dataset.pose) continue; el.src = fr[k % fr.length]; } }, ms);
 }
-function renderStrip() {
+function renderStrip() { renderStrip0(); fit(); }
+function renderStrip0() {
   const el = document.getElementById('strip');
   const idx = S.startDate ? dayIdx(todayISO()) : -1;
   if (!S.token || !S.startDate) { el.innerHTML = ''; stripKey = ''; return; }
@@ -355,7 +389,7 @@ function renderStrip() {
   const z = zoneOf(floor), act = Math.min(10, Math.ceil(floor / 10)), stage = ((floor - 1) % 10) + 1;
   const title = o.pre ? `La torre se abre el ${pretty(S.startDate)}` : `${z.n} · ${act}-${stage}`;
   if (open) el.innerHTML = `<div class="strip ${!o.running && !o.pre ? 'blocked' : ''}" ${o.pre || phase ? '' : 'data-act="dock"'}><div class="top"><span>${title}</span>${o.pre ? '' : `<span class="hp" title="Avance al próximo piso"><i style="width:${pct}%"></i></span>`}</div>${arenaHTML(o)}</div>`;
-  else el.innerHTML = `<div class="strip dock" data-act="dock"><div class="dockrow">${heroImgTag(floor, 2, o.done, 'idle')}${petTag(o.eq, o.pl, 2, 'pet idle')}<div class="dockinfo"><b>Piso ${floor}</b><small>${z.n}</small><span class="hp"><i style="width:${pct}%"></i></span><small>Tocá para ver la carrera</small></div></div></div>`;
+  else el.innerHTML = `<div class="strip dock" data-act="dock"><div class="dockrow">${petTag(o.eq, o.pl, 2, 'pet idle')}${heroImgTag(floor, 2, o.done, 'idle')}<div class="dockinfo"><b>Piso ${floor}</b><small>${z.n}</small><span class="hp"><i style="width:${pct}%"></i></span><small>Tocá para ver la carrera</small></div></div></div>`;
   startAnim();
   if (phase === 'fade') requestAnimationFrame(() => requestAnimationFrame(() => el.querySelector('.door')?.classList.add('gone')));
 }
@@ -408,7 +442,8 @@ async function enablePush() {
 document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act;
-  if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); document.getElementById('app').scrollTop = 0; }
+  if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); }
+  else if (a === 'sub') { SUB[el.dataset.k] = el.dataset.v; render(); }
   else if (a === 'gait') { previewIdx = previewIdx + 1 >= STEPS.length ? (current().pre ? 0 : -1) : previewIdx + 1; stripKey = ''; render(); }
   else if (a === 'statstage') { const f = current().e.floor(), real = f < 10 ? 0 : f < 20 ? 1 : f < 25 ? 2 : -1; statsStage = ((statsStage < 0 ? real : statsStage) + 1) % 3; render(); }
   else if (a === 'dock') { dockOpen = !dockOpen; stripKey = ''; renderStrip(); }

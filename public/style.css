@@ -1,15 +1,12 @@
-/* Pure Discipline — temas: cielo (por defecto), noche, plata, bronce */
+/* Pure Discipline — temas: gladiador (por defecto) y caballero */
 :root{color-scheme:light;--shadow:rgba(0,0,0,.35);--frame:url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2724%27%20height%3D%2724%27%20viewBox%3D%270%200%2024%2024%27%20shape-rendering%3D%27crispEdges%27%3E%3Crect%20width%3D%2724%27%20height%3D%2724%27%20fill%3D%27%230b0706%27/%3E%3Crect%20x%3D%271%27%20y%3D%271%27%20width%3D%2722%27%20height%3D%2722%27%20fill%3D%27%23a8742f%27/%3E%3Crect%20x%3D%272%27%20y%3D%272%27%20width%3D%2720%27%20height%3D%2720%27%20fill%3D%27%230b0706%27/%3E%3Crect%20x%3D%273%27%20y%3D%273%27%20width%3D%2718%27%20height%3D%2718%27%20fill%3D%27%238e2a22%27/%3E%3Crect%20x%3D%275%27%20y%3D%275%27%20width%3D%2714%27%20height%3D%2714%27%20fill%3D%27%23241817%27/%3E%3Crect%20x%3D%270%27%20y%3D%270%27%20width%3D%276%27%20height%3D%276%27%20fill%3D%27%23e0a83a%27/%3E%3Crect%20x%3D%271%27%20y%3D%271%27%20width%3D%274%27%20height%3D%274%27%20fill%3D%27%237a1d18%27/%3E%3Crect%20x%3D%272%27%20y%3D%272%27%20width%3D%272%27%20height%3D%272%27%20fill%3D%27%23ffd36b%27/%3E%3Crect%20x%3D%2718%27%20y%3D%270%27%20width%3D%276%27%20height%3D%276%27%20fill%3D%27%23e0a83a%27/%3E%3Crect%20x%3D%2719%27%20y%3D%271%27%20width%3D%274%27%20height%3D%274%27%20fill%3D%27%237a1d18%27/%3E%3Crect%20x%3D%2720%27%20y%3D%272%27%20width%3D%272%27%20height%3D%272%27%20fill%3D%27%23ffd36b%27/%3E%3Crect%20x%3D%270%27%20y%3D%2718%27%20width%3D%276%27%20height%3D%276%27%20fill%3D%27%23e0a83a%27/%3E%3Crect%20x%3D%271%27%20y%3D%2719%27%20width%3D%274%27%20height%3D%274%27%20fill%3D%27%237a1d18%27/%3E%3Crect%20x%3D%272%27%20y%3D%2720%27%20width%3D%272%27%20height%3D%272%27%20fill%3D%27%23ffd36b%27/%3E%3Crect%20x%3D%2718%27%20y%3D%2718%27%20width%3D%276%27%20height%3D%276%27%20fill%3D%27%23e0a83a%27/%3E%3Crect%20x%3D%2719%27%20y%3D%2719%27%20width%3D%274%27%20height%3D%274%27%20fill%3D%27%237a1d18%27/%3E%3Crect%20x%3D%2720%27%20y%3D%2720%27%20width%3D%272%27%20height%3D%272%27%20fill%3D%27%23ffd36b%27/%3E%3C/svg%3E");--red:var(--accent);--red2:var(--accent2)}
-:root,:root[data-theme=cielo]{--h2:#1b5ea0;--bg:#9fd8f7;--bg2:#d9f1ff;--panel:#eef8ff;--field:#ffffff;--btn:#dbe9f6;--ink:#10304f;--mute:#476787;--deep:#17385d;--bronze:#9aa9bd;--line2:#b9c9dc;--line3:#8fa6c0;--gold:#f2b01e;--gold2:#c98a0c;--accent:#2f86d6;--accent2:#58a8f0;--accent-d:#1b5ea0;--accent-ink:#ffffff;--top1:#2b6cb0;--banner:#fff1c9;--bar1:#4aa3ee;--bar2:#2f7fd1;--title:#ffffff;--title-sh:#1b5ea0;--tabbar:#c9d6e6;--ok:#1f9d55;--bad:#d63b2f}
-:root[data-theme=noche]{--h2:#ffd04a;--bg:#0b1830;--bg2:#17315a;--panel:#13294d;--field:#0d1d38;--btn:#1d3a68;--ink:#e8f2ff;--mute:#9db6d6;--deep:#071225;--bronze:#b9c6d9;--line2:#3a5a8c;--line3:#4d6ea3;--gold:#ffd04a;--gold2:#d8a21a;--accent:#2b7bd9;--accent2:#5aa3f2;--accent-d:#154f96;--accent-ink:#ffffff;--top1:#1b4f94;--banner:#3b3410;--bar1:#58a8f0;--bar2:#2b7bd9;--title:#ffd04a;--title-sh:#000000;--tabbar:#071225;--ok:#4cc26b;--bad:#ff6b5c}
-:root[data-theme=plata]{--h2:#38485f;--bg:#c3ccd8;--bg2:#eef2f7;--panel:#f6f8fb;--field:#ffffff;--btn:#e1e7ef;--ink:#1f2937;--mute:#5b6778;--deep:#2b3544;--bronze:#8b97a8;--line2:#c3ccd8;--line3:#9aa6b6;--gold:#e5a91a;--gold2:#b9810a;--accent:#566a86;--accent2:#7b90ad;--accent-d:#38485f;--accent-ink:#ffffff;--top1:#3f5068;--banner:#fff1c9;--bar1:#e5a91a;--bar2:#b9810a;--title:#ffffff;--title-sh:#38485f;--tabbar:#d3dae4;--ok:#1f9d55;--bad:#d63b2f}
-:root[data-theme=bronce]{--h2:#ffd36b;--bg:#120c0b;--bg2:#2a1a16;--panel:#241817;--field:#150e0d;--btn:#2a1d1a;--ink:#f3e6cf;--mute:#b79d7d;--deep:#0b0706;--bronze:#a8742f;--line2:#4a3326;--line3:#5a3e24;--gold:#ffd36b;--gold2:#c98d1a;--accent:#8e2a22;--accent2:#c2493b;--accent-d:#5a1612;--accent-ink:#ffe7b0;--top1:#3a1612;--banner:#3a2410;--bar1:#d9503f;--bar2:#a8332a;--title:#ffd36b;--title-sh:#000000;--tabbar:#0b0706;--ok:#4cc26b;--bad:#ff6b5c}
+:root{--h2:#1b5ea0;--bg:#9fd8f7;--bg2:#d9f1ff;--panel:#eef8ff;--field:#ffffff;--btn:#dbe9f6;--ink:#10304f;--mute:#476787;--deep:#17385d;--bronze:#9aa9bd;--line2:#b9c9dc;--line3:#8fa6c0;--gold:#f2b01e;--gold2:#c98a0c;--accent:#2f86d6;--accent2:#58a8f0;--accent-d:#1b5ea0;--accent-ink:#ffffff;--top1:#2b6cb0;--banner:#fff1c9;--bar1:#4aa3ee;--bar2:#2f7fd1;--title:#ffffff;--title-sh:#1b5ea0;--tabbar:#c9d6e6;--ok:#1f9d55;--bad:#d63b2f}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:700 15px/1.4 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
 body{background:radial-gradient(120% 60% at 50% 0,var(--bg2) 0,var(--bg) 70%) fixed}
 img.px{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
-#app{position:fixed;inset:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:calc(env(safe-area-inset-top) + 12px) max(14px,calc((100vw - 560px)/2 + 14px)) calc(196px + env(safe-area-inset-bottom))}
-#app::-webkit-scrollbar{display:none}.nostrip #app{padding-top:calc(env(safe-area-inset-top) + 6px);padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+#app{position:fixed;left:0;right:0;top:0;bottom:var(--bot,60px);overflow:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:calc(env(safe-area-inset-top) + 8px) max(14px,calc((100vw - 560px)/2 + 14px)) 6px}
+#app::-webkit-scrollbar{display:none}
 html,body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:manipulation;-webkit-text-size-adjust:100%;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 input{-webkit-user-select:text;user-select:text;font-size:16px}
 button,a,[data-act]{touch-action:manipulation}
@@ -220,11 +217,17 @@ img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:
 :is([data-theme=gladiador],[data-theme=caballero]) .modal{background:rgba(8,5,3,.78)}
 :is([data-theme=gladiador],[data-theme=caballero]) .map{border:2px solid var(--c2);box-shadow:0 0 0 1px var(--c3),0 6px 14px rgba(0,0,0,.55)}
 :is([data-theme=gladiador],[data-theme=caballero]) .map .ribbon{font-family:var(--fd);letter-spacing:.1em}
-:is([data-theme=gladiador],[data-theme=caballero]) .daytitle,:is([data-theme=gladiador],[data-theme=caballero]) #app>.mute,:is([data-theme=gladiador],[data-theme=caballero]) .allok{color:#d8c79b}
-[data-theme=caballero] .daytitle,[data-theme=caballero] #app>.mute{color:#b9c8e2}
+:is([data-theme=gladiador],[data-theme=caballero]) .daytitle,:is([data-theme=gladiador],[data-theme=caballero]) #fit>.mute,:is([data-theme=gladiador],[data-theme=caballero]) .allok{color:#d8c79b}
+[data-theme=caballero] .daytitle,[data-theme=caballero] #fit>.mute{color:#b9c8e2}
 
 /* el huevo va detrás del héroe */
 .arena .pet{z-index:1}.arena .hero{z-index:2}
 .zoneimg{margin-bottom:10px;box-shadow:none}.zoneimg img{width:100%;height:auto;display:block;image-rendering:pixelated}
 
 .pface{position:relative;display:inline-block;width:var(--s);height:var(--s);overflow:hidden;flex:none;border-radius:6px;background:rgba(0,0,0,.18)}.pface img{position:absolute;max-width:none;height:auto}
+
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pgrid .card{margin:0}
+.pcard{display:flex;flex-direction:column;gap:6px;padding:16px 12px 12px!important}.phead{display:flex;align-items:center;gap:8px}.phead b{font-size:15px}.pcard .row{align-items:center;gap:4px}.pcard .btn.sm{padding:5px 8px;font-size:11px}.pface-wrap{display:flex;justify-content:center;align-items:center;flex:none}
+.statshero{gap:0}
+#fit{display:flow-root}
+.acts{overflow:visible;gap:4px;padding:2px 0 6px}.acts button{flex:1 1 0;min-width:0;padding:0}
