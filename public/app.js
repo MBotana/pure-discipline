@@ -179,14 +179,14 @@ let mapAct = 0, mapSel = 0;
 /** Escena de la torre (240 px de ancho, 2× para el terreno y la aguja; 1× para la escena de carrera).
  *  El terreno va arriba; la escena de carrera (loop) va abajo y la torre se apoya en su mismo suelo, sin moverse.
  *  La aguja sigue por encima del loop hacia el cielo. El punto dorado marca el piso: 1 en la base, 100 en la punta. */
-const TV = { W: 240, H: 424, gnd: 6, tx: 200, tw: 36, th: 130 };  // terreno 360 arriba + franja de caminata 64 abajo
+const TV = { W: 240, H: 360, gnd: 6, tx: 200, tw: 36, th: 130 };  // terreno arriba (360); la aguja se apoya en su borde inferior
 function torreScene(floor, o, top) {
   const f = Math.min(100, Math.max(1, floor));
   const yBottom = TV.H - TV.gnd;                              // base de la aguja, sobre el suelo del loop
   const yc = yBottom - 2 - (f - 1) / 99 * (TV.th - 4);        // centro del punto (1 px de la aguja = 2 px de pantalla)
   const xc = TV.tx + TV.tw / 2 + 6 * Math.sin((f - 1) / 10 * 2 * Math.PI);  // espiral: una vuelta cada 10 pisos
   const tower = has('torre_base') ? `<img class="px tvt" alt="" src="${url('torre_base')}">` : '';
-  return `<div class="torrescene">${top ? `<div class="tvtop">${top}</div>` : ''}<div class="tvwrap"><img class="px tvg" alt="" src="${zoneTowerSrc(o.hz)}"><div class="tvfloor">${arenaHTML(o, true)}</div>${tower}<i class="tvd" title="Piso ${f}" style="left:${xc / TV.W * 100}%;top:${yc / TV.H * 100}%"></i></div></div>`;
+  return `<div class="torrescene">${top ? `<div class="tvtop">${top}</div>` : ''}<div class="tvwrap"><img class="px tvg" alt="" src="${zoneTowerSrc(o.hz)}">${tower}<i class="tvd" title="Piso ${f}" style="left:${xc / TV.W * 100}%;top:${yc / TV.H * 100}%"></i></div><div class="tvfloor">${arenaHTML(o, true)}</div></div>`;
 }
 const z0 = f => { const z = zoneOf(f), act = Math.min(10, Math.ceil(f / 10)); return `${z.n} · ${act}-${((f - 1) % 10) + 1}`; };
 function viewTorre() {
