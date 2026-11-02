@@ -50,14 +50,26 @@ test('v1.3: jugar con faltas termina más tarde que el juego perfecto', () => {
   assert.ok(oneDay > perfect, `falla 1 día por semana: ${oneDay} vs ${perfect}`);
 });
 
-test('v1.3: el sobrante de un día que ya subió un piso se cobra al día siguiente (no se pierde)', () => {
-  const e = new Engine();
-  let paid = 0, deferred = 0;
-  for (let d = 0; d < 60; d++) {
-    const dd = d % 7; const r = e.processDay({ gym: true, read: true, aero: true, clean: true, room: ROOMS[dd % 6], food: true, dweek: dd === 6 });
-    for (const x of r.events) { if (x.kind === 'C') continue; paid += x.paid; deferred += x.deferred ?? 0; }
+test('v1.3: el XP se suma el mismo día, pero el piso sube como máximo uno por día', () => {
+  const e = new Engine(); let prev = 1, paid = 0;
+  for (let d = 0; d < 120; d++) {
+    const dd = d % 7, wi = e.weekInfo(d), m = wi.n === 1 && dd === 0;   // libro y arreglo temprano: días de mucho XP
+    const r = e.processDay({ gym: true, read: true, aero: true, clean: true, room: ROOMS[dd % 6], food: true, dweek: dd === 6, book: m, repair: m });
+    for (const x of r.events) paid += x.paid;
+    assert.ok(r.floor - prev <= 1, `día ${d}: subió ${r.floor - prev} pisos`); prev = r.floor;
+    assert.ok(e.xpFloor() >= r.floor, 'el piso nunca va por delante del XP');
   }
-  const carry = Object.values(e.state.carry!).reduce((a, b) => a + b, 0);
-  assert.ok(Math.abs(e.state.xp - (paid + deferred - carry)) < 1e-6, 'todo el XP ganado está en la torre o pendiente para mañana');
-  assert.ok(cumXp(2, e.cfg.A, e.cfg.r) === e.cfg.A);
+  assert.ok(Math.abs(e.state.xp - paid) < 1e-6, 'todo el XP ganado está sumado');
+});
+
+test('v1.3: las diarias también se multiplican por la racha', () => {
+  const e = new Engine(); let k = 0;
+  for (let d = 0; d < 35; d++) {   // primer mes perfecto: racha 1 desde el cierre de noviembre
+    const dd = d % 7, wi = e.weekInfo(d), m = wi.n === wi.of && dd === 6; if (dd === 0) k = 0;
+    e.processDay({ gym: true, read: true, aero: true, clean: true, room: ROOMS[k++ % 6], food: true, dweek: dd === 6, book: m, repair: m });
+  }
+  assert.equal(e.state.s, 1);
+  const daily = e.processDay({ gym: true }).events.find(x => x.kind === 'D')!;   // lunes 7-dic-2026
+  assert.equal(daily.mult, 1.5);
+  assert.equal(daily.amount, 75);
 });

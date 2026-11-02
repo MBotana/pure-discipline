@@ -120,7 +120,7 @@ function viewHoy() {
   const dd = pre ? 0 : idx % 7, inp = pre ? {} : S.days[viewDate]?.input ?? {};
   const on = k => !!inp[k];
   const w = c => st.wu[c], m = c => st.mu[c];
-  const later = r.events.reduce((a, x) => a + (x.deferred || 0), 0);
+  const ahead = pre ? 0 : e.xpFloor() - r.floor;   // pisos que el XP ya cubre pero todavía no se subieron (uno por día)
   const gained = r.events.reduce((a, x) => a + x.paid, 0), lost = r.events.filter(x => x.outcome !== 'paid').reduce((a, x) => a + x.amount - x.paid, 0);
   const tick = k => !!inp[k];
   const ic = c => c === 'P' ? petFace(st.equipped, e.petLevel(st.equipped), 1) : iconTag(c, 2);
@@ -132,7 +132,7 @@ function viewHoy() {
   const sections = [['dia', 'Diarias'], ['sem', 'Semanales'], ['mes', 'Mensuales']];
   let h = title + nav;
   if (st.blocked !== null && viewDate === today) h += `<div class="banner">🔒 <b>Bloqueado en el piso ${st.blocked}.</b> No sumás XP hasta cumplir la puerta (mirá la pestaña Torre).</div>`;
-  h += `<div class="sum"><span><small>XP del día</small><b>+${fmt(gained)}</b></span><span><small>Piso</small><b>${r.floor}</b></span><span><small>Racha</small><b>${st.s} ${st.s === 1 ? 'mes' : 'meses'}</b></span><span><small>Multiplicador</small><b>×${String(+st.bonusW.toFixed(2)).replace('.', ',')}</b></span></div>${lost > 0 ? `<div class="mute" style="margin:-6px 0 10px">No cobrada por bloqueo: ${fmt(lost)}</div>` : ''}${later > 0 ? `<div class="mute" style="margin:-6px 0 10px">Ya subiste un piso hoy: ${fmt(later)} XP pasan a mañana</div>` : ''}`;
+  h += `<div class="sum"><span><small>XP del día</small><b>+${fmt(gained)}</b></span><span><small>Piso</small><b>${r.floor}</b></span><span><small>Racha</small><b>${st.s} ${st.s === 1 ? 'mes' : 'meses'}</b></span><span><small>Multiplicador</small><b>×${String(+st.bonusW.toFixed(2)).replace('.', ',')}</b></span></div>${lost > 0 ? `<div class="mute" style="margin:-6px 0 10px">No cobrada por bloqueo: ${fmt(lost)}</div>` : ''}${ahead > 0 ? `<div class="mute" style="margin:-6px 0 10px">Tu XP ya alcanza para ${ahead === 1 ? 'un piso más' : ahead + ' pisos más'}: se sube de a uno por día.</div>` : ''}`;
   h += `<div class="seg">${sections.map(([k, l]) => `<button class="${mtab === k ? 'on' : ''}" data-act="mtab" data-v="${k}">${l}</button>`).join('')}</div><!--fit-->`;
   const wi = pre ? { n: 1, of: 4 } : e.weekInfo(idx), games = st.gameWk, today0 = inp.gaming || 0;
   const petIc = c => petFace(c, e.petLevel(c), 1);

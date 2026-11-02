@@ -30,8 +30,8 @@ var DEFAULT_CONFIG = {
   d: 50,
   W: 300,
   Mp: 1500,
-  r: 1.036,
-  A: 638,
+  r: 1.039,
+  A: 605,
   weeklyBonus: [0, 0.2, 0.3, 0.4, 0.5],
   gymM: 18,
   aeroM: 12,
@@ -48,11 +48,12 @@ var DEFAULT_CONFIG = {
   freezeDays: 14,
   hingeEvery: 10,
   combos: COMBOS,
-  statReq: { 10: 1, 20: 2, 30: 4, 40: 8, 50: 12, 60: 16, 70: 22, 80: 30, 90: 40, 100: 45 },
-  streakGates: { 25: 1, 50: 2, 75: 5, 100: 8 },
+  statReq: { 10: 1, 20: 2, 30: 4, 40: 7, 50: 12, 60: 15, 70: 20, 80: 29, 90: 40, 100: 45 },
+  streakGates: { 25: 1, 50: 2, 75: 3, 100: 4 },
   multStep: 0.5,
   multMax: 3,
   dayFloorCap: 1,
+  dailyMult: true,
   discPen: true,
   petRatio: 0.1,
   petCosts: [10, 13, 17, 20, 30],
@@ -67,7 +68,8 @@ var LEGACY_CONFIG = {
   streakGates: { 25: 2, 50: 4, 75: 6, 100: 8 },
   multStep: 1,
   multMax: Infinity,
-  dayFloorCap: 0
+  dayFloorCap: 0,
+  dailyMult: false
 };
 
 // engine/src/engine/types.ts
@@ -127,7 +129,7 @@ function initialState() {
     lostClamp: 0,
     statWasted: 0,
     discPenN: 0,
-    carry: zero()
+    fl: 1
   };
 }
 
@@ -149,6 +151,9 @@ class Engine {
     this.cal = buildCalendar(this.cfg.startDate);
   }
   floor() {
+    return this.cfg.dayFloorCap ? this.state.fl ?? 1 : levelOf(this.state.xp, this.cfg.A, this.cfg.r);
+  }
+  xpFloor() {
     return levelOf(this.state.xp, this.cfg.A, this.cfg.r);
   }
   petLevel(c) {
@@ -214,15 +219,6 @@ class Engine {
     if (input.equip)
       S.equipped = input.equip;
     const ev = [];
-    const L0 = this.floor();
-    const dayLim = cfg.dayFloorCap ? cumXp(L0 + cfg.dayFloorCap + 1, cfg.A, cfg.r) - 0.001 : Infinity;
-    if (!S.carry)
-      S.carry = zero();
-    for (const c of CATS)
-      if (S.carry[c] > 0.000000001) {
-        ev.push([c, "C", S.carry[c]]);
-        S.carry[c] = 0;
-      }
     const wkday = dd < 5;
     const addDone = (arr, c) => {
       if (!arr.includes(c))
@@ -372,7 +368,7 @@ class Engine {
       }
       tryUnblock();
       let mult = kind === "D" || kind === "W" ? S.bonusW : S.multM;
-      if (kind === "D" || kind === "C")
+      if (kind === "D" && !cfg.dailyMult)
         mult = 1;
       if (kind === "M" && S.s === 0)
         mult = 1;
@@ -388,35 +384,20 @@ class Engine {
         continue;
       }
       let rem = amt;
-      const defer = () => {
-        S.carry[cat] += rem;
-        rec.deferred = (rec.deferred ?? 0) + rem;
-        rem = 0;
-      };
-      while (rem > 0.000000001) {
+      while (rem > 0) {
         const pend = Object.keys(this.gates).map(Number).sort((a, b) => a - b).filter((g) => !S.cleared.includes(g));
-        const G = pend.length ? pend[0] : null, cap = G === null ? Infinity : cumXp(G, cfg.A, cfg.r);
-        if (S.xp >= dayLim - 0.000000001) {
-          defer();
-          break;
-        }
-        if (S.xp + rem < Math.min(cap, dayLim) - 0.000000001) {
+        if (!pend.length) {
           S.xp += rem;
           rec.paid += rem;
           rem = 0;
           break;
         }
-        if (dayLim < cap - 0.000000001) {
-          const used = Math.max(dayLim - S.xp, 0);
-          S.xp += used;
-          rec.paid += used;
-          rem -= used;
-          defer();
-          break;
-        }
-        if (G === null)
-          break;
-        {
+        const G = pend[0], cap = cumXp(G, cfg.A, cfg.r);
+        if (S.xp + rem < cap - 0.000000001) {
+          S.xp += rem;
+          rec.paid += rem;
+          rem = 0;
+        } else {
           const used = Math.max(cap - S.xp, 0);
           S.xp = cap;
           rem -= used;
@@ -439,6 +420,8 @@ class Engine {
         }
       }
     }
+    if (cfg.dayFloorCap)
+      S.fl = Math.min(levelOf(S.xp, cfg.A, cfg.r), (S.fl ?? 1) + cfg.dayFloorCap);
     if (S.blocked !== null && !this.statOk(S.blocked))
       S.bd++;
     if (S.tower === null && S.cleared.includes(100))

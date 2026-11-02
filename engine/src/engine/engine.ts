@@ -32,7 +32,7 @@ export function initialState(): State {
     multM: 1, mu: zero(), mdone: [], bd: 0,
     bonusW: 1, wu: zero(), wdone: [],
     arrive: {}, clearedDay: {}, blocks: [], tower: null,
-    lostBlock: 0, lostClamp: 0, statWasted: 0, discPenN: 0, carry: zero(),
+    lostBlock: 0, lostClamp: 0, statWasted: 0, discPenN: 0, fl: 1,
   };
 }
 
@@ -60,7 +60,10 @@ export class Engine {
   }
 
   // ---------- consultas ----------
-  floor(): number { return levelOf(this.state.xp, this.cfg.A, this.cfg.r); }
+  /** Piso alcanzado. Con dayFloorCap, el piso sube como máximo esa cantidad por día aunque el XP alcance para más. */
+  floor(): number { return this.cfg.dayFloorCap ? (this.state.fl ?? 1) : levelOf(this.state.xp, this.cfg.A, this.cfg.r); }
+  /** Piso que corresponde al XP acumulado (puede ir por delante del piso alcanzado). */
+  xpFloor(): number { return levelOf(this.state.xp, this.cfg.A, this.cfg.r); }
   petLevel(c: Cat): number { let n = 0; for (const t of this.cum.slice(1)) if (this.state.px[c] >= t) n++; return n; }
   /** Aporte efectivo de la mascota de la estadística c (solo si está equipada, salvo modo paridad). */
   private petBonus(c: Cat): number {
@@ -104,12 +107,7 @@ export class Engine {
     }
     if (input.equip) S.equipped = input.equip;
 
-    const ev: [Cat, 'D' | 'W' | 'M' | 'S' | 'C', number, number?][] = [];
-    // XP diferido de ayer (límite de pisos por día): se cobra primero, ya multiplicado.
-    const L0 = this.floor();
-    const dayLim = cfg.dayFloorCap ? cumXp(L0 + cfg.dayFloorCap + 1, cfg.A, cfg.r) - 1e-3 : Infinity;
-    if (!S.carry) S.carry = zero();
-    for (const c of CATS) if (S.carry[c] > 1e-9) { ev.push([c, 'C', S.carry[c]]); S.carry[c] = 0; }
+    const ev: [Cat, 'D' | 'W' | 'M' | 'S', number, number?][] = [];
     const wkday = dd < 5;
     const addDone = (arr: Cat[], c: Cat) => { if (!arr.includes(c)) arr.push(c); };
     const weekly = (cat: Cat, units: number) => {
@@ -190,7 +188,7 @@ export class Engine {
       }
       tryUnblock();
       let mult = (kind === 'D' || kind === 'W') ? S.bonusW : S.multM;
-      if (kind === 'D' || kind === 'C') mult = 1;
+      if (kind === 'D' && !cfg.dailyMult) mult = 1;
       if (kind === 'M' && S.s === 0) mult = 1;
       if (mo !== undefined) mult = mo;
       const amt = base * mult;
@@ -198,17 +196,12 @@ export class Engine {
       out.push(rec);
       if (S.blocked !== null) { S.lostBlock += amt; rec.outcome = 'lost_block'; rec.gate = S.blocked; continue; }
       let rem = amt;
-      const defer = () => { S.carry![cat] += rem; rec.deferred = (rec.deferred ?? 0) + rem; rem = 0; };
-      while (rem > 1e-9) {
+      while (rem > 0) {
         const pend = Object.keys(this.gates).map(Number).sort((a, b) => a - b).filter(g => !S.cleared.includes(g));
-        const G = pend.length ? pend[0] : null, cap = G === null ? Infinity : cumXp(G, cfg.A, cfg.r);
-        if (S.xp >= dayLim - 1e-9) { defer(); break; }
-        if (S.xp + rem < Math.min(cap, dayLim) - 1e-9) { S.xp += rem; rec.paid += rem; rem = 0; break; }
-        if (dayLim < cap - 1e-9) {  // el límite diario llega antes que la puerta: lo que sobra se cobra mañana
-          const used = Math.max(dayLim - S.xp, 0); S.xp += used; rec.paid += used; rem -= used; defer(); break;
-        }
-        if (G === null) break;
-        {
+        if (!pend.length) { S.xp += rem; rec.paid += rem; rem = 0; break; }
+        const G = pend[0], cap = cumXp(G, cfg.A, cfg.r);
+        if (S.xp + rem < cap - 1e-9) { S.xp += rem; rec.paid += rem; rem = 0; }
+        else {
           const used = Math.max(cap - S.xp, 0); S.xp = cap; rem -= used; rec.paid += used;
           if (!(G in S.arrive)) S.arrive[G] = i;
           if (this.gateOk(G)) { S.cleared.push(G); S.clearedDay[G] = i; unlocked.push(G); }
@@ -221,6 +214,7 @@ export class Engine {
         }
       }
     }
+    if (cfg.dayFloorCap) S.fl = Math.min(levelOf(S.xp, cfg.A, cfg.r), (S.fl ?? 1) + cfg.dayFloorCap);
     if (S.blocked !== null && !this.statOk(S.blocked)) S.bd++;
     if (S.tower === null && S.cleared.includes(100)) S.tower = i;
 

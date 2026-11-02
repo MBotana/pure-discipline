@@ -13,23 +13,25 @@ Todos los campos nuevos son aditivos: el motor sigue aceptando las entradas v1.0
 - **Calibración:** A = 5.000 (antes 5.150). Año perfecto: piso 100 el día 364, pico diario 0,76 del costo del piso siguiente, 0 días con más de un piso.
 
 ## v1.3 — curva nueva (rápida al principio, lenta al final)
-Objetivo: con juego perfecto desde el lunes 2-nov-2026, el piso 100 se abre alrededor del 31-dic-2027; la curva arranca rápida y termina mucho más lenta; jugar bien nunca pierde XP. Simulado con el motor real (`engine/test/v13.test.ts`).
+Objetivo: con juego perfecto desde el lunes 2-nov-2026, el piso 100 se abre alrededor del 31-dic-2027 y solo así; la curva arranca rápida y termina mucho más lenta; jugar bien nunca pierde XP. Simulado con el motor real (`engine/test/v13.test.ts`).
 
-- **Curva:** `costo(n → n+1) = 638 · 1,036^(n−1)` (638 XP el primer piso, ~20.300 el último; acumulado ~575.000). Antes 5.000 · 1,015^(n−1).
-- **Multiplicador de racha con tope:** racha 1 mes ×1,5 · 2 ×2 · 3 ×2,5 · 4 o más ×3 (`multStep` 0,5, `multMax` 3). Antes 1 + racha, sin tope: era lo que hacía que la curva fuera lenta al principio y rápida al final.
-- **Un piso por día, sin pérdida:** si un día ya subió un piso, el XP que sobra se cobra al día siguiente (`dayFloorCap` = 1, eventos tipo `C`). Antes la regla se cumplía solo por calibración y obligaba a que los primeros pisos fueran caros.
-- **Puertas de estadísticas** (lo que un jugador perfecto ya tiene dos semanas antes de llegar, máximo 90 % del tope): 10 → 1 · 20 → 2 · 30 → 4 · 40 → 8 · 50 → 12 · 60 → 16 · 70 → 22 · 80 → 30 · 90 → 40 · 100 → 45 (`statReq`). Combinaciones y topes sin cambios.
-- **Puertas de racha:** 25 → 1 mes · 50 → 2 · 75 → 5 · 100 → 8.
-- **Recompensas sin cambios:** diaria 50 (L–V, nunca multiplicada), semanal 300, mensual 1.500.
-- **Armadura:** cambia después de vencer a cada jefe (pisos 26, 51 y 76), no al llegar al jefe.
+- **Curva:** `costo(n → n+1) = 605 · 1,039^(n−1)` (605 XP el primer piso, ~26.000 el último). Antes 5.000 · 1,015^(n−1).
+- **Multiplicador de racha con tope, también para las diarias:** racha 1 mes ×1,5 · 2 ×2 · 3 ×2,5 · 4 o más ×3 (`multStep` 0,5, `multMax` 3, `dailyMult`). Con racha 0 sigue el bonus semanal ×1,0…×1,5. Antes 1 + racha sin tope y diarias sin multiplicar: era lo que hacía que la curva fuera lenta al principio y rápida al final.
+- **Un piso por día:** el XP se suma completo el mismo día; el piso sube como máximo uno por día y alcanza al XP en los días siguientes (`dayFloorCap` = 1, campo `fl` del estado). La app avisa cuando el XP ya cubre pisos que todavía no se subieron.
+- **Puertas de estadísticas** (lo que un jugador perfecto ya tiene dos semanas antes de llegar, máximo 90 % del tope): 10 → 1 · 20 → 2 · 30 → 4 · 40 → 7 · 50 → 12 · 60 → 15 · 70 → 20 · 80 → 29 · 90 → 40 · 100 → 45 (`statReq`). Combinaciones y topes sin cambios.
+- **Puertas de racha:** 25 → 1 mes · 50 → 2 · 75 → 3 · 100 → 4.
+- **Recompensas base sin cambios:** diaria 50 (L–V), semanal 300, mensual 1.500.
+- **Orden semanal:** se mantienen 6 ambientes distintos (a propósito: limpiar todos los días menos uno).
+- **Armadura:** cambia después de vencer a cada jefe (pisos 26, 51 y 76).
 
 | Piso | Juego perfecto | Días por piso en el tramo |
 |---|---|---|
-| 10 | día 9 (11-nov-2026) | 1,0 |
-| 25 | día 34 (6-dic-2026) | 1,7 |
-| 50 | día 95 (5-feb-2027) | 2,4 |
-| 75 | día 191 (12-may-2027) | 3,8 |
-| 100 | día 422 (29-dic-2027) | 9,2 |
+| 10 | día 9 (11-nov-2026) | 0,9 |
+| 25 | día 32 (4-dic-2026) | 1,5 |
+| 50 | día 93 (3-feb-2027) | 2,4 |
+| 75 | día 185 (6-may-2027) | 3,7 |
+| 100 | día 421 (28-dic-2027) | 9,4 |
 
-Escenarios (motor real): falla 1 día por semana → 5-ene-2028 · 97 % de cumplimiento al azar → 5-ene-2028 · 93 % → 9-ene-2028 · 88 % → 8-feb-2028 · nunca el libro → 15-feb-2028 · romper la racha en el mes 6 → 10-may-2028 · ignorar Orden, o no hacer ninguna mensual → bloqueado para siempre (piso 20 / 25).
+Escenarios (motor real; el día del libro y del arreglo dentro del mes mueve el final entre el 21 y el 28-dic-2027, siempre sin perder XP):
+falla un día por semana → 12-ene-2028 · falla el gimnasio un día por semana → 3-ene-2028 · cada misión al azar con 97 % → 6-ene-2028 · con 93 % → 5-jul-2028 · pierde 3 % de los días enteros → 28-mar-2028 · 7 % → 31-jul-2028 · nunca el libro → 30-ene-2028 · romper la racha en el mes 6 → 27-mar-2028 · ignorar Orden (o limpiar solo 5 días por semana), o no hacer ninguna mensual → bloqueado para siempre (piso 20 / 25).
 Las pruebas de paridad con el simulador v7 usan `LEGACY_CONFIG` (balance v1.2).
