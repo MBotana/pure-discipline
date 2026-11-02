@@ -29,4 +29,5 @@ Para ver un cambio en el iPhone, cerrá y abrí la app dos veces (usa caché).
 | `heroe_tX_eY_sprint_1.png` … (hasta 12) | 48×40 | Marcha con racha de 3 meses o más (mismo formato). Si falta una marcha se usa la más cercana |
 | `heroe_tX_eY_respirar_1.png` … (hasta 12) | 32×40 | Respiración de frente para las vistas del personaje (franja chica, Estadísticas). Si falta, el sprite quieto sube y baja |
 | `mascota_<nombre>_nN_correr_1.png` … `_4.png` (N = 1 a 5, 2 a 8 cuadros; Fénix y Qilin vuelan) | mismo tamaño que su versión quieta | Mascota **corriendo** (franja expandida y Torre). Si faltan, se usa la quieta con saltitos. El huevo (n0) no corre |
-| `torre_zona_01.png` … `torre_zona_12.png` | 120×180 (vertical) | Imagen de la torre con el fondo de la zona (se muestra arriba en la pestaña Torre). La torre (aguja gótica gris clara con borde, 18×65) va pegada abajo a la derecha. Hay 01-03; para las demás se usa una provisoria dibujada por código (240×96) |
+| `torre_zona_01.png` … `torre_zona_12.png` | 120×180 (vertical) | Solo el terreno y el cielo de la zona, **sin torre**. Se muestra en la pestaña Torre. |
+| `torre_base.png` | 18×65 | La aguja gótica sola, con borde (transparente). La app la pega abajo a la derecha (píxeles 100-118, 109-173 de la vista) y dibuja encima el punto dorado del piso actual |
