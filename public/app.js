@@ -201,12 +201,13 @@ function viewTorre() {
     const d = gates[nextG], lines = [];
     if (d.stats) for (const c of d.stats) lines.push(`${NAMES[c]} ${st.stat[c]}/${d.req}`);
     if (d.streak !== undefined) lines.push(`Racha ${st.s}/${d.streak}`);
+    lines.unshift(`Próxima puerta piso ${nextG}`);
     info = `<div class="gatenums">${lines.map(x => `<span>${x}</span>`).join('')}</div>`;
   }
   return torreFull(L, arenaState(), info);
 }
 /** Escena completa: el terreno, el personaje caminando abajo y la torre. Sin títulos ni tarjetas. */
-function torreFull(floor, o, info) { const sc = torreScene(floor, o, '').replace(/<\/div>$/, `${info}</div>`); return `<div class="torrefull" data-torre="1"><div class="tvhead">${zoneOf(floor).n} · Piso ${floor}</div>${sc}</div>`; }
+function torreFull(floor, o, info) { const sc = torreScene(floor, o, '').replace(/<\/div>$/, `${info}</div>`); return `<div class="torrehead"><h1>Torre</h1><small>${zoneOf(floor).n} · Piso ${floor}</small></div><!--fit--><div class="torrefull" data-torre="1">${sc}</div>`; }
 
 function viewStats() {
   if (!S.startDate) return `<h1>Estadísticas</h1><div class="card mute">Disponibles al ingresar.</div>`;
@@ -344,7 +345,7 @@ function zs() {
   // Se mide hasta la barra de solapas (no hasta la franja), así el zoom no cambia según la pestaña.
   const app = document.getElementById('app'), cs = getComputedStyle(app), HH = 22, tabs = document.getElementById('tabs');
   const top = tabs ? tabs.getBoundingClientRect().top : innerHeight;
-  const inner = top - parseFloat(cs.paddingTop);
+  const inner = top - parseFloat(cs.paddingTop) - 64;  // 64: franja de título de la Torre (igual en todas las pestañas)
   return Math.max(0.5, Math.min(2, (app.clientWidth - 16) / 240, (inner - 4) / (428 + HH)));
 }
 function fit() {
@@ -364,7 +365,11 @@ function fit() {
     if (scene) {
       // Torre: la escena llena el ancho y el alto disponibles (240 px de escena, 360 de terreno + 60 de suelo)
       const HH = 22, z = zs();
+      f.style.paddingTop = '0px';
       f.style.zoom = z.toFixed(3);
+      // Si sobra alto, la escena baja para apoyarse abajo (el espacio queda arriba, bajo el título).
+      const left = avail - f.getBoundingClientRect().height;
+      if (left > 0) f.style.paddingTop = (left / z).toFixed(1) + 'px';
       // El suelo de abajo se estira hasta llenar lo que queda de pantalla (en unidades de escena).
       const g = f.querySelector('.tvground');
       if (g) g.style.height = '0px';  // sin relleno: la escena tiene el mismo tamaño que la senda de las otras pestañas
