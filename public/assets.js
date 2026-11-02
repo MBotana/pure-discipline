@@ -74,9 +74,9 @@ setInterval(() => document.querySelectorAll('img.breathe').forEach(el => {
 // ---- mascotas: tamaño según el nivel (n0 huevo 32, n1-n2 chica 24, n3-n4 intermedia 40, n5 grande 64) ----
 const petFb = (c, lv) => () => px(petSVG(c, lv, 32), 32, 32);
 export const petName = (c, lv) => `mascota_${PETS[c].key}_n${lv}`;
-const PET_PX = { 0: 32, 1: 24, 2: 24, 3: 40, 4: 40, 5: 64 };
+const PET_PX = { 0: 32, 1: 32, 2: 32, 3: 40, 4: 40, 5: 64 };
 /** Ancho mostrado en la escena de 240 (la de 64 px se reduce para entrar en la franja). */
-const PET_ARENA = { 0: 32, 1: 24, 2: 24, 3: 34, 4: 34, 5: 48 };
+const PET_ARENA = { 0: 32, 1: 28, 2: 28, 3: 38, 4: 38, 5: 52 };
 const FLYERS = ['fenix', 'qilin'];
 /** Píxeles reales del archivo (32 si todavía es el dibujo provisorio). */
 export const petPx = (c, lv) => has(petName(c, lv)) ? (PET_PX[lv] || 32) : 32;
@@ -87,11 +87,11 @@ export const petTag = (c, lv, k = 2, cls = '') => { const s = petPx(c, lv), kk =
 const lift = (c, style) => FLYERS.includes(PETS[c].key) ? `${style};bottom:calc(14 * 100cqw / 240)` : style;
 export const petSprite = (c, lv, style, k = 1) => sp(petName(c, lv), petFb(c, lv), petW(c, lv, k), lift(c, style), 'pet');
 /** Solo el rostro (recorte [x, y, lado] en fracciones del sprite, mirando a la derecha); ajustar cuando estén las imágenes finales. */
-const FACE = { behemot: [0.5, 0.02, 0.5], esfinge: [0.45, 0.0, 0.5], fenix: [0.5, 0.0, 0.5], grifo: [0.5, 0.0, 0.5], qilin: [0.5, 0.02, 0.5] };
+const FACE = { behemot: { c: [0.45, 0.0, 0.5], m: [0.55, 0.02, 0.45], g: [0.55, 0.1, 0.45] }, esfinge: { c: [0.5, 0, 0.5] }, fenix: { c: [0.5, 0.08, 0.5] }, grifo: { c: [0.5, 0.08, 0.5] }, qilin: { c: [0.5, 0.05, 0.5] } };
 export function petFace(c, lv, k = 2, cls = '') {
   const n = petName(c, lv);
   if (lv === 0 || !has(n)) return petTag(c, lv, k, cls);
-  const [x, y, s] = FACE[PETS[c].key] || [0.5, 0, 0.5], cs = 24 * k;
+  const F = FACE[PETS[c].key] || {}, [x, y, s] = F[lv >= 5 ? 'g' : lv >= 3 ? 'm' : 'c'] || F.c || [0.5, 0, 0.5], cs = 24 * k;
   return `<span class="pface ${cls}" style="--s:${cs}px"><img class="px" alt="" src="${url(n)}" style="width:${cs / s}px;left:${-x / s * cs}px;top:${-y / s * cs}px"></span>`;
 }
 /** Cuadros de carrera / vuelo de la mascota (mascota_X_nN_correr_1..8); sin ellos queda el sprite quieto con rebote. */
