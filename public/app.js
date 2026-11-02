@@ -186,7 +186,7 @@ function torreScene(floor, o, top) {
   const yc = yBottom - 2 - (f - 1) / 99 * (TV.th - 4);        // centro del punto (1 px de la aguja = 2 px de pantalla)
   const xc = TV.tx + TV.tw / 2 + 6 * Math.sin((f - 1) / 10 * 2 * Math.PI);  // espiral: una vuelta cada 10 pisos
   const tower = has('torre_base') ? `<img class="px tvt" alt="" src="${url('torre_base')}">` : '';
-  return `<div class="torrescene">${top ? `<div class="tvtop">${top}</div>` : ''}<div class="tvwrap"><img class="px tvg" alt="" src="${zoneTowerSrc(o.hz)}">${tower}<i class="tvd" title="Piso ${f}" style="left:${xc / TV.W * 100}%;top:${yc / TV.H * 100}%"></i></div><div class="tvfloor">${arenaHTML(o, true)}</div></div>`;
+  return `<div class="torrescene">${top ? `<div class="tvtop">${top}</div>` : ''}<div class="tvwrap"><img class="px tvg" alt="" src="${zoneTowerSrc(o.hz)}">${tower}<i class="tvd" title="Piso ${f}" style="left:${xc / TV.W * 100}%;top:${yc / TV.H * 100}%"></i></div><div class="tvfloor">${arenaHTML(o, true)}</div><div class="tvground" style="--gr:${zoneOf(o.hz).gr};--gr2:${zoneOf(o.hz).gr2}"></div></div>`;
 }
 const z0 = f => { const z = zoneOf(f), act = Math.min(10, Math.ceil(f / 10)); return `${z.n} · ${act}-${((f - 1) % 10) + 1}`; };
 function viewTorre() {
@@ -354,7 +354,11 @@ function fit() {
     if (scene) {
       // Torre: la escena llena el ancho y el alto disponibles (240 px de escena, 360 de terreno + 60 de suelo)
       const s = Math.min((app.clientWidth - 16) / 240, (avail - 4) / 428);
-      f.style.zoom = Math.max(0.5, Math.min(2, s)).toFixed(3);
+      const z = Math.max(0.5, Math.min(2, s));
+      f.style.zoom = z.toFixed(3);
+      // El suelo de abajo se estira hasta llenar lo que queda de pantalla (en unidades de escena).
+      const g = f.querySelector('.tvground');
+      if (g) g.style.height = Math.max(0, (avail - 4) / z - 428).toFixed(1) + 'px';
       app.style.overflowY = 'hidden';
       return;
     }
