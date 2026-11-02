@@ -28,6 +28,10 @@ export interface DayInput {
   book?: boolean;       // libro terminado (misión mensual de Inteligencia, una sola unidad)
   repair?: boolean;     // arreglo en la casa (misión mensual de Orden, una sola unidad)
   room?: string;        // ambiente limpiado ese día (cada uno cuenta una vez por semana)
+  // --- v1.5 ---
+  rooms?: string[];     // varios ambientes limpiados el mismo día (cada uno cuenta una vez por semana)
+  gameH?: number;       // horas de videojuegos de ese día (el tope semanal es gameCapH)
+  books?: { t: string; a?: string }[]; // libros terminados ese día (el primero del mes cumple la misión mensual de Inteligencia)
   equip?: Cat;          // cambiar mascota equipada equipada (se aplica al inicio del día)
 }
 
@@ -57,7 +61,10 @@ export interface Config {
   multMax?: number;                   // tope del multiplicador (por defecto sin tope)
   dayFloorCap?: number;               // máximo de pisos por día: el XP se suma igual, el piso alcanza al XP en los días siguientes (0 o ausente = sin límite)
   dailyMult?: boolean;                // las diarias también se multiplican por la racha (por defecto no)
-  foodRule?: { meat: number; veg: number; junkMax: number }; // semanal de alimentación por tipo de comida (si falta: foodDays días)
+  foodRule?: { meat: number; veg: number; junkMax: number }; // semanal de alimentación por tipo de comida (si falta: foodDays días aprobados)
+  weekendComp?: boolean;              // sábado y domingo pagan la diaria solo si faltó un día de lunes a viernes (máximo 5 diarias pagadas por semana y categoría)
+  gameCapH?: number;                  // tope semanal de horas de videojuegos; si falta, rige el modo de sesiones (anti)
+  gameGraceWeeks?: number;            // semanas iniciales en que las horas se miden pero no se premian ni castigan
   discPen: boolean;
   petRatio: number; petCosts: number[]; petWeek: number;
   /** true = solo la mascota equipada aporta a la puerta (regla del diseño). false = paridad con el simulador. */
@@ -90,4 +97,6 @@ export interface State {
   lostBlock: number; lostClamp: number; statWasted: number; discPenN: number;
   fl?: number;                   // piso alcanzado (solo con dayFloorCap: sube como máximo dayFloorCap por día)
   meatWk?: number; vegWk?: number; junkWk?: number; // días de la semana con carne, verduras y basura
+  gameHWk?: number;              // horas de videojuegos de la semana
+  dpaid?: Record<Cat, number>;   // diarias pagadas en la semana, por categoría (tope 5 con compensación de fin de semana)
 }

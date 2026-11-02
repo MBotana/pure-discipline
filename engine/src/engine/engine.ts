@@ -33,6 +33,7 @@ export function initialState(): State {
     bonusW: 1, wu: zero(), wdone: [],
     arrive: {}, clearedDay: {}, blocks: [], tower: null,
     lostBlock: 0, lostClamp: 0, statWasted: 0, discPenN: 0, fl: 1, meatWk: 0, vegWk: 0, junkWk: 0,
+    gameHWk: 0, dpaid: zero(),
   };
 }
 
@@ -104,6 +105,7 @@ export class Engine {
       }
       S.bonusW = S.s >= 1 ? S.multM : 1 + cfg.weeklyBonus[Math.min(S.wstreak, 4)];
       S.wu = zero(); S.wdone = []; S.gameWk = 0; S.foodWk = 0; S.roomsWk = []; S.meatWk = 0; S.vegWk = 0; S.junkWk = 0;
+      S.gameHWk = 0; S.dpaid = zero();
     }
     if (input.equip) S.equipped = input.equip;
 
@@ -124,14 +126,19 @@ export class Engine {
       }
     };
 
-    if (input.gym) { if (wkday) ev.push(['F', 'D', cfg.d]); weekly('F', 3); monthly('F', cfg.gymM, cfg.Mp / cfg.gymM); }
-    if (input.read) { if (wkday) ev.push(['I', 'D', cfg.d]); weekly('I', 3); }
+    // Diaria: de lunes a viernes siempre. Con weekendComp, sábado y domingo la pagan solo si faltó algún día de lunes a viernes
+    // (nunca más de 5 diarias pagadas por semana y categoría): el fin de semana compensa, no suma XP extra.
+    const dp = S.dpaid ?? (S.dpaid = zero());
+    const dailyPay = (cat: Cat) => { if (wkday || (cfg.weekendComp && dp[cat] < 5)) { dp[cat]++; ev.push([cat, 'D', cfg.d]); } };
+    if (input.gym) { dailyPay('F'); weekly('F', 3); monthly('F', cfg.gymM, cfg.Mp / cfg.gymM); }
+    if (input.read) { dailyPay('I'); weekly('I', 3); }
     if (input.bookTramo) monthly('I', cfg.bookTramos, cfg.Mp / cfg.bookTramos);
-    if (input.aero) { if (wkday) ev.push(['V', 'D', cfg.d]); weekly('V', 3); monthly('V', cfg.aeroM, cfg.Mp / cfg.aeroM); }
-    if (input.clean) {
-      if (wkday) ev.push(['O', 'D', cfg.d]);
-      const rm = input.room;
-      if (!rm || !S.roomsWk.includes(rm)) { if (rm) S.roomsWk.push(rm); weekly('O', cfg.namb); }
+    if (input.aero) { dailyPay('V'); weekly('V', 3); monthly('V', cfg.aeroM, cfg.Mp / cfg.aeroM); }
+    const rooms = input.rooms?.length ? input.rooms : input.room ? [input.room] : [];
+    if (input.clean || rooms.length) {
+      dailyPay('O');
+      if (!rooms.length) weekly('O', cfg.namb);
+      for (const rm of rooms) if (!S.roomsWk.includes(rm)) { S.roomsWk.push(rm); weekly('O', cfg.namb); }
     }
     // Misiones mensuales de una sola unidad: la misión se cumple el día en que se marca; el XP se paga en dripDays cuotas diarias
     // (así ningún día concentra el pozo entero y se mantiene el límite de un piso por día).
@@ -140,12 +147,20 @@ export class Engine {
       S.mu[cat]++; addDone(S.mdone, cat); completed.monthly.push(cat);
       S.drips.push({ cat, base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
     };
-    if (input.book) mark('I');
+    if (input.book || input.books?.length) mark('I');
     if (input.repair) mark('O');
     for (const d of S.drips) { ev.push([d.cat, 'M', d.base, d.mult]); d.left--; }
     S.drips = S.drips.filter(d => d.left > 0);
+    // Disciplina por horas de videojuegos (v1.5): el domingo se evalúa sola. ≤ tope cumple · entre 100 % y 120 % no suma · más de 120 % resta 1 punto.
+    // Las primeras gameGraceWeeks semanas se miden pero no se premian ni castigan: cuentan como cumplidas.
+    const hoursMode = cfg.gameCapH !== undefined;
+    if (input.gameH) S.gameHWk = (S.gameHWk ?? 0) + input.gameH;
+    const grace = hoursMode && w < (cfg.gameGraceWeeks ?? 0);
+    const gameRatio = hoursMode ? (S.gameHWk ?? 0) / cfg.gameCapH! : 0;
+    const gameOk = hoursMode && dd === 6 && (grace || gameRatio <= 1 + 1e-9);
+    const dweek = hoursMode ? gameOk : !!input.dweek;
     if (input.dwork && S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
-    if (input.dweek) while (S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
+    if (dweek) while (S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
     if (input.gaming) S.gameWk += input.gaming;
     const fr = cfg.foodRule;
     const fedOk = () => fr ? (S.meatWk ?? 0) >= fr.meat && (S.vegWk ?? 0) >= fr.veg && (S.junkWk ?? 0) <= fr.junkMax : S.foodWk >= cfg.foodDays;
@@ -158,18 +173,19 @@ export class Engine {
       if (!before && fedOk()) completed.pet = true;
     }
     if (input.improve) monthly('O', cfg.impUnits, cfg.Mp / cfg.impUnits);
-    if (dd === 6 && input.dweek) { S.mu.D++; ev.push(['D', 'M', cfg.Mp / month.weeks.length]); }
+    if (dd === 6 && dweek) { S.mu.D++; ev.push(['D', 'M', cfg.Mp / month.weeks.length]); }
     if ((dd === 2 || dd === 6) && input.dcheck) ev.push(['D', 'M', cfg.Mp / (cfg.dchk * month.weeks.length)]);
 
     const lastWeekOfMonth = w === month.weeks[month.weeks.length - 1];
     if (dd === 6) {
       if (input.dcheck && lastWeekOfMonth) { addDone(S.mdone, 'D'); completed.monthly.push('D'); }
       if (lastWeekOfMonth && S.mu.D >= month.weeks.length) { addDone(S.mdone, 'D'); completed.monthly.push('D'); }
-      const anti = (input.anti ?? true) && S.gameWk <= 3 && !input.phone;
+      const anti = hoursMode ? gameOk : (input.anti ?? true) && S.gameWk <= 3 && !input.phone;
       if (S.wu.D >= 3 && anti) { addDone(S.wdone, 'D'); completed.weekly.push('D'); ev.unshift(['D', 'S', 0]); }
       else {
         S.wdone = S.wdone.filter(c => c !== 'D');
-        if (S.wu.D < 3 && !anti && cfg.discPen) { S.discPenN++; S.stat.D = Math.max(0, S.stat.D - 1); }
+        const pen = hoursMode ? (!grace && gameRatio > 1.2 + 1e-9) : (S.wu.D < 3 && !anti);
+        if (pen && cfg.discPen) { S.discPenN++; S.stat.D = Math.max(0, S.stat.D - 1); }
       }
       // mascota equipada
       const eq = S.equipped, maxXp = this.cum[this.cum.length - 1];

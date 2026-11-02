@@ -93,8 +93,8 @@ export async function runReminders(env: Env, origin: string, now = Date.now()) {
     await env.DB.prepare('INSERT OR IGNORE INTO notification_log (kind, date, sent_at) VALUES (?, ?, ?)').bind(kind, date, now).run();
     await pushAll(env, origin, title, body); sent.push(kind);
   };
-  if (dow === 0 && hour >= Number(st.feed_hour) && !(input && (input.feed || input.dform)))
-    await once('feed', 'Pure Discipline', 'Hoy cierra la semana: completá el cierre (Disciplina y celular).');
+  if (dow === 0 && hour >= Number(st.feed_hour) && !(input && (input.meals || input.feed)))
+    await once('feed', 'Pure Discipline', 'Hoy cierra la semana: cargá el veredicto de alimentación del día y revisá tus horas de videojuegos.');
   if (hour >= Number(st.reminder_hour) && isEmptyInput(row ? (row.input as string) : null))
     await once('daily', 'Pure Discipline', 'Todavía no registraste nada hoy. ¿Cómo te fue?');
   return sent;

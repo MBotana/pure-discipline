@@ -46,8 +46,11 @@ test('v1.3: el momento del mes en que se marca el libro y el arreglo no hace per
 
 test('v1.3: jugar con faltas termina más tarde que el juego perfecto', () => {
   const perfect = play().e.state.tower!;
+  // v1.5: con la compensación de fin de semana, faltar uno o dos días de lunes a viernes no cuesta XP si se recupera el sábado y el domingo
   const oneDay = play({ miss: d => d % 7 === 3 }).e.state.tower!;
-  assert.ok(oneDay > perfect, `falla 1 día por semana: ${oneDay} vs ${perfect}`);
+  assert.ok(oneDay <= perfect + 2, `falla 1 día por semana (compensado): ${oneDay} vs ${perfect}`);
+  const threeDays = play({ miss: d => [2, 3, 4].includes(d % 7) }).e.state.tower!;
+  assert.ok(threeDays === null || threeDays > perfect, `faltan 3 días por semana (Orden no llega a 5 ambientes): ${threeDays} vs ${perfect}`);
 });
 
 test('v1.3: el XP se suma el mismo día, pero el piso sube como máximo uno por día', () => {
@@ -75,7 +78,7 @@ test('v1.3: las diarias también se multiplican por la racha', () => {
 });
 
 test('v1.4: alimentación por tipo de comida (carne, verduras, basura)', () => {
-  const week = (days: DayInput[]) => { const e = new Engine(); let pet = false; for (let d = 0; d < 7; d++) pet = e.processDay(days[d] ?? {}).completed.pet || pet; return { e, pet }; };
+  const week = (days: DayInput[]) => { const e = new Engine({ foodRule: { meat: 3, veg: 3, junkMax: 3 }, gameCapH: undefined }); let pet = false; for (let d = 0; d < 7; d++) pet = e.processDay(days[d] ?? {}).completed.pet || pet; return { e, pet }; };
   const C = { meat: true }, V = { veg: true }, CV = { meat: true, veg: true }, B = { junk: true };
   // 3 de carne + 3 de verduras, sin basura → alimenta (+10 XP de mascota)
   let r = week([CV, CV, CV, {}, {}, {}, {}]); assert.equal(r.e.state.px.F, 10); assert.ok(r.pet);

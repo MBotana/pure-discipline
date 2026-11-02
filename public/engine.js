@@ -33,13 +33,13 @@ var DEFAULT_CONFIG = {
   r: 1.039,
   A: 605,
   weeklyBonus: [0, 0.2, 0.3, 0.4, 0.5],
-  gymM: 18,
+  gymM: 16,
   aeroM: 12,
   bookTramos: 10,
   impUnits: 6,
   dchk: 2,
   namb: 5,
-  foodDays: 4,
+  foodDays: 5,
   dripDays: 6,
   statPw: 1,
   statPen: 1,
@@ -54,7 +54,9 @@ var DEFAULT_CONFIG = {
   multMax: 3,
   dayFloorCap: 1,
   dailyMult: true,
-  foodRule: { meat: 3, veg: 3, junkMax: 3 },
+  weekendComp: true,
+  gameCapH: 15,
+  gameGraceWeeks: 2,
   discPen: true,
   petRatio: 0.1,
   petCosts: [10, 13, 17, 20, 30],
@@ -70,9 +72,14 @@ var LEGACY_CONFIG = {
   multStep: 1,
   multMax: Infinity,
   namb: 6,
+  gymM: 18,
+  foodDays: 4,
   dayFloorCap: 0,
   dailyMult: false,
-  foodRule: undefined
+  foodRule: undefined,
+  weekendComp: false,
+  gameCapH: undefined,
+  gameGraceWeeks: undefined
 };
 
 // engine/src/engine/types.ts
@@ -135,7 +142,9 @@ function initialState() {
     fl: 1,
     meatWk: 0,
     vegWk: 0,
-    junkWk: 0
+    junkWk: 0,
+    gameHWk: 0,
+    dpaid: zero()
   };
 }
 
@@ -224,6 +233,8 @@ class Engine {
       S.meatWk = 0;
       S.vegWk = 0;
       S.junkWk = 0;
+      S.gameHWk = 0;
+      S.dpaid = zero();
     }
     if (input.equip)
       S.equipped = input.equip;
@@ -254,34 +265,39 @@ class Engine {
         }
       }
     };
+    const dp = S.dpaid ?? (S.dpaid = zero());
+    const dailyPay = (cat) => {
+      if (wkday || cfg.weekendComp && dp[cat] < 5) {
+        dp[cat]++;
+        ev.push([cat, "D", cfg.d]);
+      }
+    };
     if (input.gym) {
-      if (wkday)
-        ev.push(["F", "D", cfg.d]);
+      dailyPay("F");
       weekly("F", 3);
       monthly("F", cfg.gymM, cfg.Mp / cfg.gymM);
     }
     if (input.read) {
-      if (wkday)
-        ev.push(["I", "D", cfg.d]);
+      dailyPay("I");
       weekly("I", 3);
     }
     if (input.bookTramo)
       monthly("I", cfg.bookTramos, cfg.Mp / cfg.bookTramos);
     if (input.aero) {
-      if (wkday)
-        ev.push(["V", "D", cfg.d]);
+      dailyPay("V");
       weekly("V", 3);
       monthly("V", cfg.aeroM, cfg.Mp / cfg.aeroM);
     }
-    if (input.clean) {
-      if (wkday)
-        ev.push(["O", "D", cfg.d]);
-      const rm = input.room;
-      if (!rm || !S.roomsWk.includes(rm)) {
-        if (rm)
-          S.roomsWk.push(rm);
+    const rooms = input.rooms?.length ? input.rooms : input.room ? [input.room] : [];
+    if (input.clean || rooms.length) {
+      dailyPay("O");
+      if (!rooms.length)
         weekly("O", cfg.namb);
-      }
+      for (const rm of rooms)
+        if (!S.roomsWk.includes(rm)) {
+          S.roomsWk.push(rm);
+          weekly("O", cfg.namb);
+        }
     }
     const mark = (cat) => {
       if (S.mu[cat] >= 1)
@@ -291,7 +307,7 @@ class Engine {
       completed.monthly.push(cat);
       S.drips.push({ cat, base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
     };
-    if (input.book)
+    if (input.book || input.books?.length)
       mark("I");
     if (input.repair)
       mark("O");
@@ -300,11 +316,18 @@ class Engine {
       d.left--;
     }
     S.drips = S.drips.filter((d) => d.left > 0);
+    const hoursMode = cfg.gameCapH !== undefined;
+    if (input.gameH)
+      S.gameHWk = (S.gameHWk ?? 0) + input.gameH;
+    const grace = hoursMode && w < (cfg.gameGraceWeeks ?? 0);
+    const gameRatio = hoursMode ? (S.gameHWk ?? 0) / cfg.gameCapH : 0;
+    const gameOk = hoursMode && dd === 6 && (grace || gameRatio <= 1 + 0.000000001);
+    const dweek = hoursMode ? gameOk : !!input.dweek;
     if (input.dwork && S.wu.D < 3) {
       S.wu.D++;
       ev.push(["D", "W", cfg.W / 3]);
     }
-    if (input.dweek)
+    if (dweek)
       while (S.wu.D < 3) {
         S.wu.D++;
         ev.push(["D", "W", cfg.W / 3]);
@@ -328,7 +351,7 @@ class Engine {
     }
     if (input.improve)
       monthly("O", cfg.impUnits, cfg.Mp / cfg.impUnits);
-    if (dd === 6 && input.dweek) {
+    if (dd === 6 && dweek) {
       S.mu.D++;
       ev.push(["D", "M", cfg.Mp / month.weeks.length]);
     }
@@ -344,14 +367,15 @@ class Engine {
         addDone(S.mdone, "D");
         completed.monthly.push("D");
       }
-      const anti = (input.anti ?? true) && S.gameWk <= 3 && !input.phone;
+      const anti = hoursMode ? gameOk : (input.anti ?? true) && S.gameWk <= 3 && !input.phone;
       if (S.wu.D >= 3 && anti) {
         addDone(S.wdone, "D");
         completed.weekly.push("D");
         ev.unshift(["D", "S", 0]);
       } else {
         S.wdone = S.wdone.filter((c) => c !== "D");
-        if (S.wu.D < 3 && !anti && cfg.discPen) {
+        const pen = hoursMode ? !grace && gameRatio > 1.2 + 0.000000001 : S.wu.D < 3 && !anti;
+        if (pen && cfg.discPen) {
           S.discPenN++;
           S.stat.D = Math.max(0, S.stat.D - 1);
         }

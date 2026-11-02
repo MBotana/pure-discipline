@@ -41,3 +41,16 @@ Las pruebas de paridad con el simulador v7 usan `LEGACY_CONFIG` (balance v1.2).
 - **Semanal:** 3 o más días con carne, 3 o más con verduras y hasta 3 con basura (`foodRule`); 4 días con basura la hacen fallar. Al cierre del domingo alimenta a la mascota equipada (+10 XP de mascota); la penalidad por semanas falladas no cambia. No da XP de torre ni puntos de estadística.
 - **Registro obligatorio:** si un día ya terminado quedó sin registrar, al abrir la app aparece un cartel que no se puede cerrar hasta registrar y confirmar ese día (de a uno, empezando por el más viejo).
 - El campo `food` de la v1.1 sigue aceptándose como día aprobado (compatibilidad).
+
+## v1.5 — Mediciones nuevas (fase 1: la app)
+
+**Curva de XP sin cambios.** Simulación del juego perfecto (5 días por semana): el piso 100 se abre el 28-dic-2027 (día 421), 0 XP perdido, sin bloqueos. Con 4 gimnasios por semana termina el 3-ene-2028; con 3, el 19-ene-2028.
+
+- **Compensación de fin de semana** (Fuerza, Vitalidad, Inteligencia, Orden): sábado y domingo pagan la diaria solo si faltó un día de lunes a viernes; máximo 5 diarias pagadas por semana y categoría. Nunca hay XP extra.
+- **Fuerza:** semanal ≥ 3 sesiones; mensual 16 sesiones (promedio de 4 por semana). La detección por ubicación (≥ 40 min en el gimnasio) llega en la fase 2; por ahora es manual.
+- **Orden:** 6 ambientes, se pueden marcar varios por día, alcanza con 5 de 6 por semana.
+- **Disciplina:** solo horas de videojuegos por semana. Tope 15 h; avisos al 80 % y 95 %; hasta 100 % suma el punto (300 XP el domingo); entre 100 % y 120 % no suma; más de 120 % resta 1 de Disciplina. Las 2 primeras semanas se miden sin premio ni castigo. Se elimina el formulario del domingo, los objetivos de trabajo y el antiobjetivo del celular.
+- **Inteligencia:** los libros se cargan en Estadísticas › Libros; el primero del mes cumple la misión al instante (el XP se reparte en 6 días).
+- **Alimentación** (pestaña nueva, con Hoy · Semana · Mascotas): comidas por foto (guardadas en el teléfono hasta enviarlas) o texto; el veredicto de Claude se pega a mano. «Parcial» es un consejo; solo aprobado / no aprobado cierra el día. Un día sin veredicto bloquea la app al día siguiente. Supuesto a confirmar: la semana alimenta a la mascota con **5 días aprobados de 7**. No da XP de torre. La consigna para Claude es un primer borrador.
+- **Estadísticas:** subpestañas Stats · Récords · Logros · Libros. Récords: esta semana vs. histórico (mejor y total) para gimnasio, aeróbico, lectura, ambientes, horas de juego (menos es mejor) y XP; calorías, distancia y pasos quedan para cuando se conecte el reloj.
+- **Pendiente (fase 2+):** gimnasio por ubicación (Atajos de iPhone), Steam, datos del reloj (IMILAB KW66 → GloryFit → Salud), meta diaria de Vitalidad, modo viaje/enfermedad/lesión. Las fotos y el registro de comidas son locales (no se sincronizan).
