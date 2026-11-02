@@ -341,9 +341,11 @@ function bestZoom(el, avail) {
 }
 /** Zoom único de la senda y de la torre: el mismo tamaño en todas las pestañas. */
 function zs() {
-  const app = document.getElementById('app'), cs = getComputedStyle(app), HH = 22;
-  const inner = app.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-  return Math.max(0.5, Math.min(2, (app.clientWidth - 16) / 240, (inner - HH - 4) / (428 + HH)));
+  // Se mide hasta la barra de solapas (no hasta la franja), así el zoom no cambia según la pestaña.
+  const app = document.getElementById('app'), cs = getComputedStyle(app), HH = 22, tabs = document.getElementById('tabs');
+  const top = tabs ? tabs.getBoundingClientRect().top : innerHeight;
+  const inner = top - parseFloat(cs.paddingTop);
+  return Math.max(0.5, Math.min(2, (app.clientWidth - 16) / 240, (inner - 4) / (428 + HH)));
 }
 function fit() {
   if (fitting) return; fitting = true;
@@ -365,7 +367,7 @@ function fit() {
       f.style.zoom = z.toFixed(3);
       // El suelo de abajo se estira hasta llenar lo que queda de pantalla (en unidades de escena).
       const g = f.querySelector('.tvground');
-      if (g) g.style.height = Math.max(0, (avail - 4) / z - 428 - HH).toFixed(1) + 'px';
+      if (g) g.style.height = '0px';  // sin relleno: la escena tiene el mismo tamaño que la senda de las otras pestañas
       app.style.overflowY = 'hidden';
       return;
     }
