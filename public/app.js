@@ -1,10 +1,8 @@
-import { Engine, levelOf, cumXp, buildGates } from '/engine.js';
-import { gateSVG, flagSVG, zoneOf, ZONES } from '/art.js';
-import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, heroBase, petTag, petFace, petSprite, petArenaW, bossSprite, bgName, bgLayer, towerLayer, runFrames, petRunFrames, heroImgTag, scrollLayers, iconTag, PETS, BOSSES, gaitFor, GAIT_MS, preloadHero, zoneTowerSrc } from '/assets.js';
+import { Engine, cumXp, buildGates } from '/engine.js';
+import { zoneOf } from '/art.js';
+import { ROOMS, roomTile, onAssets, exists, has, url, heroSrc, heroSprite, petFace, petSprite, petArenaW, bossSprite, towerLayer, runFrames, petRunFrames, heroImgTag, scrollLayers, iconTag, PETS, BOSSES, gaitFor, GAIT_MS, preloadHero, zoneTowerSrc } from '/assets.js';
 import { px, setReadyHandler } from '/px.js';
 const IMG = (svg, w, h, k, cls = '') => `<img class="px ${cls}" alt="" src="${px(svg, w, h)}" width="${w * k}" height="${h * k}">`;
-const gateImg = (open, k = 2) => IMG(gateSVG(open), 32, 40, k);
-const flagImg = (k = 1) => IMG(flagSVG(), 16, 20, k, 'flag');
 
 const NAMES = { F: 'Fuerza', I: 'Inteligencia', V: 'Vitalidad', D: 'Disciplina', O: 'Orden' };
 const CATS = ['F', 'I', 'V', 'D', 'O'];
@@ -196,7 +194,6 @@ function viewHoy() {
   return h;
 }
 
-let mapAct = 0, mapSel = 0;
 /** Escena de la torre (240 px de ancho, 2× para el terreno y la aguja; 1× para la escena de carrera).
  *  El terreno va arriba; la escena de carrera (loop) va abajo y la torre se apoya en su mismo suelo, sin moverse.
  *  La aguja sigue por encima del loop hacia el cielo. El punto dorado marca el piso: 1 en la base, 100 en la punta. */
@@ -209,10 +206,9 @@ function torreScene(floor, o, top) {
   const tower = has('torre_base') ? `<img class="px tvt" alt="" src="${url('torre_base')}" style="top:${G - TV.th}px">` : '';
   return `<div class="torrescene">${top ? `<div class="tvtop">${top}</div>` : ''}<div class="tvwrap"><img class="px tvg" alt="" src="${zoneTowerSrc(o.hz)}"></div><div class="tvfloor">${arenaHTML(o, true)}</div><div class="tvground" style="--gr:${zoneOf(o.hz).gr};--gr2:${zoneOf(o.hz).gr2}"></div>${tower}<i class="tvd" title="Piso ${f}" style="left:${xc}px;top:${yc}px"></i></div>`;
 }
-const z0 = f => { const z = zoneOf(f), act = Math.min(10, Math.ceil(f / 10)); return `${z.n} · ${act}-${((f - 1) % 10) + 1}`; };
 function viewTorre() {
   if (!S.startDate) return `<div class="card mute">Disponibles al ingresar.</div>`;
-  if (dayIdx(todayISO()) < 0) return torreFull(1, arenaState(), '');
+  if (dayIdx(todayISO()) < 0) return torreFull(1, arenaState(), '', current().e);
   const { e } = compute(dayIdx(todayISO())), st = e.state, L = e.floor(), gates = buildGates(e.cfg);
   const nums = Object.keys(gates).map(Number).sort((a, b) => a - b);
   const nextG = nums.find(g => g >= L && !st.cleared.includes(g));
@@ -224,10 +220,17 @@ function viewTorre() {
     lines.unshift(`Próxima puerta piso ${nextG}`);
     info = `<div class="gatenums">${lines.map(x => `<span>${x}</span>`).join('')}</div>`;
   }
-  return torreFull(L, arenaState(), info);
+  return torreFull(L, arenaState(), info, e);
 }
-/** Escena completa: el terreno, el personaje caminando abajo y la torre. Sin títulos ni tarjetas. */
-function torreFull(floor, o, info) { const sc = torreScene(floor, o, '').replace(/<\/div>$/, `${info}</div>`); return `<div class="torrehead"><h1>Torre</h1><small>${zoneOf(floor).n} · Piso ${floor}</small></div><!--fit--><div class="torrefull" data-torre="1">${sc}</div>`; }
+/** Barra de XP hasta el piso siguiente. */
+function xpBar(e) {
+  const f = e.floor(), c0 = cumXp(f, e.cfg.A, e.cfg.r), cost = cumXp(f + 1, e.cfg.A, e.cfg.r) - c0, into = e.state.xp - c0;
+  const pct = Math.min(100, Math.max(0, into / cost * 100));
+  const right = e.state.tower !== null ? 'torre completa' : e.state.blocked !== null ? 'detenido en la puerta' : into >= cost ? 'completo · el piso sube mañana' : `${fmt(into)} / ${fmt(cost)} XP`;
+  return `<div class="xpbar"><div class="xprow"><span>Piso ${f} → ${f + 1}</span><span>${right}</span></div><div class="bar gold"><i style="width:${pct.toFixed(1)}%"></i></div></div>`;
+}
+/** Torre: título, barra de XP y la escena (terreno, senda con el personaje y la torre). */
+function torreFull(floor, o, info, e) { const sc = torreScene(floor, o, '').replace(/<\/div>$/, `${info}</div>`); return `<div class="torrehead"><h1>Torre</h1><small>${zoneOf(floor).n} · Piso ${floor}</small></div>${xpBar(e)}<!--fit--><div class="torrefull" data-torre="1">${sc}</div>`; }
 
 function viewStats() {
   if (!S.startDate) return `<h1>Estadísticas</h1><div class="card mute">Disponibles al ingresar.</div>`;
@@ -346,7 +349,7 @@ function sinkFeet() {
     if (!img.complete || img.naturalWidth < 8 || !w || (img.classList.contains('pet') && /calc\(14 /.test(img.getAttribute('style') || ''))) return;
     img.style.bottom = `calc(${(5 - bottomGap(img) * w / img.naturalWidth).toFixed(2)} * 100cqw / 240)`;
   });
-  document.querySelectorAll('.dockrow img.px:not(.ico), .stand img.hero').forEach(img => {
+  document.querySelectorAll('.stand img.hero').forEach(img => {
     if (!img.complete || !img.naturalHeight) return;
     const g = bottomGap(img);
     img.style.marginBottom = g ? `-${(g * (parseFloat(img.getAttribute('height')) / img.naturalHeight)).toFixed(2)}px` : '';
@@ -371,7 +374,7 @@ function zs() {
   // Se mide hasta la barra de solapas (no hasta la franja), así el zoom no cambia según la pestaña.
   const app = document.getElementById('app'), cs = getComputedStyle(app), HH = 22, tabs = document.getElementById('tabs');
   const top = tabs ? tabs.getBoundingClientRect().top : innerHeight;
-  const inner = top - parseFloat(cs.paddingTop) - 48;  // 48: alto del título TORRE (igual en todas las pestañas)
+  const inner = top - parseFloat(cs.paddingTop) - 92;  // 92: título TORRE y barra de XP (igual en todas las pestañas)
   return Math.max(0.5, Math.min(2, (app.clientWidth - 16) / 240, (inner - 4) / (428 + HH)));
 }
 function fit() {
@@ -428,7 +431,7 @@ document.fonts?.ready.then(fit);
 
 // ---------- franja de batalla ----------
 // Lienzo lógico de 240×64: todo se posiciona en unidades de ese lienzo (cqw) para que escale parejo en cualquier pantalla.
-let dockOpen = false, runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
+let runTimer = 0, stripKey = '', readyN = 0, opening = false, phase = '';
 const U = v => `calc(${v} * 100cqw / 240)`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function arenaState() {
@@ -477,15 +480,9 @@ function renderStrip0() {
   if (idx >= 0 && !S.opened && !opening) { startOpening(); return; }
   if (tab === 'torre') { el.innerHTML = ''; stripKey = ''; startAnim(); return; }
   const o = arenaState(), { e, st } = o, floor = o.floor;
-  const into = st.xp - cumXp(floor, e.cfg.A, e.cfg.r), cost = e.cfg.A * Math.pow(e.cfg.r, floor - 1);
-  const pct = o.pre ? 0 : Math.round(Math.min(100, into / cost * 100));
-  const open = true;  // siempre expandido: el personaje camina en Misiones igual que en Torre
-  const key = JSON.stringify({ o: [o.pre, floor, o.eq, o.pl, o.running, o.boss, o.done, o.speed, o.gait, o.hf, o.hz], pct, phase, open, readyN, tab: tab === 'hoy' });
+  const key = JSON.stringify({ o: [o.pre, floor, o.eq, o.pl, o.running, o.boss, o.done, o.speed, o.gait, o.hf, o.hz], phase, readyN, tab: tab === 'hoy' });
   if (key === stripKey) return; stripKey = key;
-  const z = zoneOf(floor), act = Math.min(10, Math.ceil(floor / 10)), stage = ((floor - 1) % 10) + 1;
-  const title = `${z.n} · ${act}-${stage}`;
-  if (open) el.innerHTML = `<div class="strip ${!o.running && !o.pre ? 'blocked' : ''}">${arenaHTML(o)}</div>`;
-  else el.innerHTML = `<div class="strip dock" data-act="dock"><div class="dockrow" style="--gr:${z.gr};--gr2:${z.gr2}">${petTag(o.eq, o.pl, 1, 'pet idle')}${heroImgTag(floor, 1, o.done, 'idle')}<div class="dockinfo"><b>Piso ${floor}</b><small>${z.n}</small><span class="hp"><i style="width:${pct}%"></i></span><small>Tocá para ver la carrera</small></div></div></div>`;
+  el.innerHTML = `<div class="strip ${!o.running && !o.pre ? 'blocked' : ''}">${arenaHTML(o)}</div>`;
   startAnim();
   if (phase === 'fade') requestAnimationFrame(() => requestAnimationFrame(() => el.querySelector('.door')?.classList.add('gone')));
 }
@@ -499,7 +496,7 @@ async function startOpening() {
 }
 /** Festejo del héroe (1 s diaria, 1,5 s semanal, 2,5 s mensual) y texto de XP ganada. */
 function fx(delta, pose = 'diaria') {
-  const s = document.querySelector('.arena') || document.querySelector('.dock') || document.querySelector('.statshero') || document.body;
+  const s = document.querySelector('.arena') || document.querySelector('.statshero') || document.body;
   const hero = document.querySelector('.hero');
   if (hero) {
     const { e } = current(), r = heroSrc(e.floor(), pose), base = hero.src, ms = { diaria: 1000, semanal: 1500, mensual: 2500, mueca: 1500 }[pose];
@@ -540,7 +537,6 @@ document.addEventListener('click', async ev => {
   const a = el.dataset.act;
   if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); }
   else if (a === 'sub') { SUB[el.dataset.k] = el.dataset.v; render(); }
-  else if (a === 'dock') { dockOpen = !dockOpen; stripKey = ''; renderStrip(); }
   else if (a === 't') {
     const k = el.dataset.k, now = Date.now();
     if (lastTap.k === k && now - lastTap.t < 450) { lastTap = { k: '', t: 0 }; toggle(viewDate, k); }
@@ -581,8 +577,6 @@ document.addEventListener('click', async ev => {
   else if (a === 'next') { if (viewDate < todayISO()) { viewDate = addDays(viewDate, 1); render(); } }
   else if (a === 'today') { ev.preventDefault(); viewDate = todayISO(); render(); }
   else if (a === 'equip') { if (dayIdx(todayISO()) < 0) { S.preEquip = el.dataset.c; save(); stripKey = ''; render(); } else setInput(todayISO(), i => { i.equip = el.dataset.c; }); }
-  else if (a === 'map') { mapAct = +el.dataset.a; mapSel = 0; render(); }
-  else if (a === 'node') { mapSel = +el.dataset.f; render(); }
   else if (a === 'day') { viewDate = el.dataset.d; render(); }
   else if (a === 'mtab') { mtab = el.dataset.v; render(); }
   else if (a === 'theme') { S.theme = el.dataset.v; save(); applyTheme(); render(); }

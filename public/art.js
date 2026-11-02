@@ -18,26 +18,6 @@ const ZSTART = [1, 11, 25, 26, 36, 50, 51, 61, 75, 76, 86, 100];
 export const zone12 = floor => { let z = 1; ZSTART.forEach((s, k) => { if (floor >= s) z = k + 1; }); return z; };
 export const zoneOf = floor => ZONES[zone12(floor) - 1];
 
-export function heroSVG(frame = 'a', crown = false, pose = '') {
-  const lift = pose === 'run1' ? [4, 0] : pose === 'run2' ? [0, 4] : [0, 0];
-  const atk = false;
-  const cel = pose === 'diaria' || pose === 'semanal' || pose === 'mensual';
-  const up = cel ? `<g><rect x="44" y="6" width="6" height="30" rx="3" fill="#5865f2" stroke="${INK}" stroke-width="2.4" transform="rotate(14 47 36)"/><circle cx="50" cy="6" r="5.4" fill="#ffd9b8" stroke="${INK}" stroke-width="2.4"/></g>` : '';
-  const up2 = cel && (pose === 'semanal' || pose === 'mensual') ? `<g><rect x="12" y="6" width="6" height="30" rx="3" fill="#5865f2" stroke="${INK}" stroke-width="2.4" transform="rotate(-14 15 36)"/><circle cx="12" cy="6" r="5.4" fill="#ffd9b8" stroke="${INK}" stroke-width="2.4"/></g>` : '';
-  return `<svg viewBox="0 -8 64 80" width="64" height="80" xmlns="http://www.w3.org/2000/svg">
-  <ellipse cx="30" cy="68" rx="15" ry="3.2" fill="#000" opacity=".3"/>
-  <rect x="22" y="53" width="8" height="${14 - lift[0]}" rx="3.5" fill="#3b3f73" stroke="${INK}" stroke-width="2.6"/><rect x="32" y="53" width="8" height="${14 - lift[1]}" rx="3.5" fill="#4a4f8c" stroke="${INK}" stroke-width="2.6"/>
-  <g transform="translate(${atk ? 4 : 0} 0)"><path d="M18 56c-2-14 2-28 13-28s15 14 12 28c-8 3-17 3-25 0z" fill="#5865f2" stroke="${INK}" stroke-width="2.8" stroke-linejoin="round"/>
-  <path d="M24 46c4 3 11 3 15 0" stroke="#fff" stroke-opacity=".4" stroke-width="2.6" fill="none" stroke-linecap="round"/>
-  <rect x="26" y="49" width="12" height="4" rx="2" fill="#ffc442" stroke="${INK}" stroke-width="1.8"/>
-  <circle cx="31" cy="20" r="11" fill="#ffd9b8" stroke="${INK}" stroke-width="2.8"/>
-  <path d="M19 21c-1-12 7-17 13-17s13 5 12 16c-4-5-9-7-13-7s-9 2-12 8z" fill="#3f4bd0" stroke="${INK}" stroke-width="2.8" stroke-linejoin="round"/>
-  <circle cx="35" cy="22" r="2" fill="${INK}"/><circle cx="28" cy="22" r="2" fill="${INK}"/>
-  ${pose === 'mueca' ? `<path d="M29 29.5c1.2-1.6 3.4-1.6 4.6 0" stroke="${INK}" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M24.5 17.5l5 2.4M37 17.5l-5 2.4" stroke="${INK}" stroke-width="1.8" stroke-linecap="round"/>` : `<path d="M30 27c1.2 1 2.4 1 3.6 0" stroke="${INK}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`}
-  ${crown ? `<path d="M24 8l3-6 4 4 4-4 3 6z" fill="#ffc442" stroke="${INK}" stroke-width="2" stroke-linejoin="round"/>` : ''}
-  ${up}${up2}
-  <g transform="${atk ? 'rotate(42 48 50)' : ''}" ${cel ? 'opacity="0"' : ''}><rect x="46" y="20" width="5" height="28" rx="2" fill="#e8ecff" stroke="${INK}" stroke-width="2.4"/><rect x="42" y="46" width="13" height="5" rx="2" fill="#ffc442" stroke="${INK}" stroke-width="2.2"/><rect x="46" y="51" width="5" height="8" rx="2" fill="#7a4a2a" stroke="${INK}" stroke-width="2.2"/></g></g></svg>`;
-}
 
 const PET = {
   F: { c: '#e2574c', c2: '#ff8f84', name: 'Oso' }, I: { c: '#6a5cf0', c2: '#a69cff', name: 'Búho' },
@@ -83,25 +63,6 @@ export function enemySVG(z) {
   <circle cx="20" cy="29" r="3" fill="#fff" stroke="${INK}" stroke-width="1.8"/><circle cx="36" cy="29" r="3" fill="#fff" stroke="${INK}" stroke-width="1.8"/><circle cx="21" cy="30" r="1.3" fill="${INK}"/><circle cx="37" cy="30" r="1.3" fill="${INK}"/>
   <path d="M22 37c4-2 8-2 12 0" stroke="${INK}" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
 }
-export function gateSVG(open) {
-  return `<svg viewBox="0 0 64 80" width="64" height="80" xmlns="http://www.w3.org/2000/svg"><path d="M6 78V32C6 14 18 4 32 4s26 10 26 28v46z" fill="#6b7280" stroke="${INK}" stroke-width="2.6"/>
-  <path d="M14 78V34c0-12 8-20 18-20s18 8 18 20v44z" fill="${open ? '#ffd36b' : '#2b2f55'}" stroke="${INK}" stroke-width="2.2"/>
-  ${open ? '' : `<rect x="23" y="44" width="18" height="16" rx="3" fill="#ffc442" stroke="${INK}" stroke-width="2"/><path d="M27 44v-5a5 5 0 0110 0v5" stroke="${INK}" stroke-width="2.4" fill="none"/>`}</svg>`;
-}
-
-/** Escena tipo "franja de héroe": zona según el piso, héroe caminando con su mascota; enemigo, o la puerta si estás bloqueado. */
-export function sceneHTML({ floor, equipped, petLevel, blocked, done, tall = false }) {
-  const z = zoneOf(floor);
-  const style = `--sky1:${z.sky[0]};--sky2:${z.sky[1]};--far:${z.far};--gr:${z.gr};--gr2:${z.gr2}`;
-  return `<div class="scene ${tall ? 'tall' : ''} ${blocked ? 'is-blocked' : ''}" style="${style}" role="img" aria-label="Zona ${z.n}, piso ${floor}">
-  <svg class="hills" viewBox="0 0 400 80" preserveAspectRatio="none" aria-hidden="true"><path d="M0 80V50c40-26 70-26 110-4s70 20 110-6 80-18 110 0 50 6 70-6v46z" fill="var(--far)" opacity=".75"/></svg>
-  <div class="zone-tag">${z.n} · piso ${floor}</div>
-  <div class="ground"></div>
-  <div class="actors"><div class="pet-wrap">${petSVG(equipped, petLevel, 46)}</div><div class="hero-wrap">${heroSVG(done)}</div></div>
-  <div class="foe">${blocked ? gateSVG(false) : done ? gateSVG(true) : enemySVG(z)}</div></div>`;
-}
-
-export const flagSVG = () => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 40" width="32" height="40"><rect x="4" y="4" width="4" height="34" fill="#8a5a2b" stroke="${INK}" stroke-width="2"/><path d="M8 5h20l-6 7 6 7H8z" fill="#d63a2f" stroke="${INK}" stroke-width="2.4" stroke-linejoin="round"/></svg>`;
 
 // ---- provisorios para el período previo al inicio ----
 /** Escena 240×64: torre abajo a la izquierda, cerrada o abierta. */
@@ -120,8 +81,6 @@ const ICON = {
   O: `<path d="M12 1l1.4 1.4-6 6" stroke="#8a5a2b" stroke-width="1.6" fill="none"/><path d="M4 8l5 1 1 5H3z" fill="#2fb5a0"/><path d="M5 11h4" stroke="#8fe6d6" stroke-width="1"/>`,
 };
 export const iconSVG = c => `<svg viewBox="0 0 16 16" width="16" height="16" xmlns="http://www.w3.org/2000/svg">${ICON[c]}</svg>`;
-/** Mete un SVG de otra proporción dentro de un lienzo w×h centrado abajo. */
-export const fitSVG = (inner, iw, ih, w, h) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><svg x="${(w - iw) / 2}" y="${h - ih}" width="${iw}" height="${ih}" viewBox="0 0 ${iw} ${ih}">${inner.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '')}</svg></svg>`;
 
 /** Provisorios del fondo en movimiento: capa lejana (cielo y colinas) y capa cercana (suelo). Ambas se repiten sin cortes cada 240 px. */
 export function farSVG(z) {
@@ -135,7 +94,6 @@ export function nearSVG(z) {
   for (const x of [50, 170]) s += `<path d="M${x} 52l3-6 3 6z" fill="${z.gr2}"/>`;
   return s + '</svg>';
 }
-
 
 /** Imagen provisoria de la zona con la torre (240×96): cielo, montañas, suelo y la torre con una marca en el piso actual. */
 export function towerSceneSVG(z, floor = 1) {

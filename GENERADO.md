@@ -140,3 +140,6 @@ Descartados: v1 (adulto `de6cc3db-…`, joven `a0cbb195-…`, cachorro `19dbabf0
 
 Pendiente: cuadros de caminar de n3-n5. Los personajes pro_flash admiten `walk-4/6/8-frames`; las versiones finales salieron de `edit_image` (son imágenes sueltas), así que para animarlas hay que crear el personaje a partir de cada imagen.
 Saldo: 1573 → 1405 generaciones (168 en total; esta ronda 116). Cachorro: caminatas descartadas del v2a (8) + tres cachorros bully (22) → ~1373.
+
+## Limpieza (2026-11-02)
+Se borraron de `public/img/gen/` las hojas de revisión, los terrenos duplicados (`terreno_zona_01..03`, iguales a `torre_zona_01..03`) y las torres candidatas no elegidas (`torre_aguja_*`, `torre_chica_*` — la C ya está como `torre_base.png` —, `torre_diseno_*`). Quedan solo `gen/fondo_01..03.png`, pendientes de aprobación.

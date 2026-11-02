@@ -1,7 +1,7 @@
 // Imágenes del juego. Cada una se busca en /img/<nombre>.png; si el archivo no existe se usa un dibujo provisorio.
 // Para reemplazar un dibujo basta con subir el archivo con el nombre exacto (ver img/LEEME.md).
 import { px } from '/px.js';
-import { heroSVG, petSVG, enemySVG, iconSVG, towerSVG, towerSceneSVG, farSVG, nearSVG, zoneOf, zone12, ZONES } from '/art.js';
+import { petSVG, enemySVG, iconSVG, towerSVG, towerSceneSVG, farSVG, nearSVG, zoneOf, zone12, ZONES } from '/art.js';
 export { zone12 };
 
 const state = new Map(); let notify = () => {};
@@ -100,10 +100,6 @@ export function petRunFrames(c, lv) {
   for (let i = 1; i <= 8; i++) { if (has(`${n}_correr_${i}`)) real.push(url(`${n}_correr_${i}`)); else break; }
   return real.length >= 2 ? real : null;
 }
-export const petRunner = (c, lv, style, k = 1) => { const fr = petRunFrames(c, lv); if (!fr) return petSprite(c, lv, style, k).replace('class="px sp pet"', 'class="px sp pet running"');
-  return `<img class="px sp pet running framed" alt="" src="${fr[0]}" data-frames='${JSON.stringify(fr)}' style="--w:${petW(c, lv, k)};${lift(c, style)}">`; };
-export const heroRunner = (floor, style, crown, k = 1, gait = 'caminar') => { const rf = runFrames(floor, crown, gait);
-  return `<img class="px sp hero running ${rf.bob ? 'bob' : ''} ${rf.w > 32 ? 'wide' : ''}" alt="" src="${rf.frames[0]}" data-frames='${JSON.stringify(rf.frames)}' style="--w:${rf.w * k};${style}">`; };
 // ---- jefes: 48×48 ----
 export const bossName = floor => `jefe_${floor}`;
 export const bossSprite = (floor, style, k = 1) => sp(bossName(floor), () => px(enemySVG(Z12[zone12(floor) - 1]).replace('viewBox="0 0 56 48"', 'viewBox="0 -4 56 56"'), 48, 48), 48 * k, style, 'boss');
