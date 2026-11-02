@@ -454,6 +454,7 @@ function viewAjustes() {
   if (SUB.ajustes === 'gen') h += `<div class="card"><h2>Apariencia</h2><div class="themes">${THEMES.map(t => `<button class="theme ${(S.theme || 'gladiador') === t[0] ? 'on' : ''}" data-act="theme" data-v="${t[0]}"><i style="background:${t[2]}"></i>${t[1]}</button>`).join('')}</div></div>`;
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   if (SUB.ajustes === 'gen') h += `<div class="card"><h2>Sincronización</h2><div class="row"><span>${pending() ? pending() + ' día(s) pendientes' : 'Todo sincronizado'}</span><button class="btn sm" data-act="sync" ${syncing ? 'disabled' : ''}>${syncing ? 'Sincronizando…' : 'Sincronizar'}</button></div><div class="mute">${S.lastSync ? 'Última vez: ' + new Date(S.lastSync).toLocaleString('es-AR') : 'Nunca'}</div><div class="err">${esc(syncMsg)}</div></div>`;
+  if (SUB.ajustes === 'gen') h += `<div class="card"><h2>Dirección de la app</h2><div class="mute" style="word-break:break-all;user-select:all">${esc(location.origin)}</div><div class="row" style="margin-top:8px"><button class="btn sm" data-act="copyurl">Copiar dirección</button></div><p class="mute">Para los atajos: pegala y agregá <b>/api/gym</b> al final.</p></div>`;
   const st = S.settings || {};
   if (SUB.ajustes === 'notif') {
   h += `<div class="card"><h2>Notificaciones</h2>`;
@@ -738,6 +739,7 @@ document.addEventListener('click', async ev => {
   else if (a === 'txopen') { txOpen = true; errMeal = ''; render(); }
   else if (a === 'txcancel') { txOpen = false; txDraft = ''; pendBlob = null; if (pendURL) URL.revokeObjectURL(pendURL); pendURL = ''; render(); }
   else if (a === 'mealsend') { const tx = (document.getElementById('txin')?.value || '').trim(); if (!pendBlob && !tx) { hint('Agregá una foto o escribí qué comiste'); return; } mealSend(pendBlob, tx); }
+  else if (a === 'copyurl') { try { await navigator.clipboard.writeText(location.origin); hint('Dirección copiada'); } catch { hint('Mantené apretada la dirección para copiarla'); } }
   else if (a === 'mealclose') mealClose(el.dataset.d);
   else if (a === 'mvok' || a === 'mvno') { const d = el.dataset.d, tx = (document.getElementById('mvtx')?.value || '').trim(); modal = null; setVerdict(d, a === 'mvok' ? 'ok' : 'no', tx); }
   else if (a === 'bookadd') {
