@@ -205,7 +205,7 @@ function viewTorre() {
   return torreFull(L, arenaState(), info);
 }
 /** Escena completa: el terreno, el personaje caminando abajo y la torre. Sin títulos ni tarjetas. */
-function torreFull(floor, o, info) { return `<div class="torrefull" data-torre="1"><div class="tvhead">${zoneOf(floor).n} · Piso ${floor}</div>${torreScene(floor, o, '')}${info}</div>`; }
+function torreFull(floor, o, info) { const sc = torreScene(floor, o, '').replace(/<\/div>$/, `${info}</div>`); return `<div class="torrefull" data-torre="1"><div class="tvhead">${zoneOf(floor).n} · Piso ${floor}</div>${sc}</div>`; }
 
 function viewStats() {
   if (!S.startDate) return `<h1>Estadísticas</h1><div class="card mute">Disponibles al ingresar.</div>`;

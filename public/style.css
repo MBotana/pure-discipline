@@ -260,7 +260,7 @@ img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:
 
 /* Torre: solo escena (terreno, personaje y torre) y los números de la próxima puerta arriba */
 .torrefull{position:relative;display:flex;flex-direction:column;align-items:center}
-.gatenums{position:absolute;top:28px;right:6px;display:flex;flex-direction:column;align-items:flex-end;gap:0;font-family:var(--fd,'Cinzel',serif);font-weight:900;font-size:10px;letter-spacing:.04em;color:#fff6dc;text-shadow:0 0 2px #000,0 0 4px #000,0 1px 0 #000;line-height:1.25;pointer-events:none;z-index:4}
+.gatenums{position:absolute;top:6px;right:6px;display:flex;flex-direction:column;align-items:flex-end;gap:0;font-family:var(--fd,'Cinzel',serif);font-weight:900;font-size:10px;letter-spacing:.04em;color:#fff6dc;text-shadow:0 0 2px #000,0 0 4px #000,0 1px 0 #000;line-height:1.25;pointer-events:none;z-index:4}
 .torrescene{position:relative;width:240px;max-width:100%;margin:0 auto}
 .torrescene{box-shadow:0 0 0 2px #2a170a,0 0 0 3px var(--gold,#c9a24a)}
 
