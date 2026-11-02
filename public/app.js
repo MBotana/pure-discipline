@@ -186,47 +186,26 @@ function torreScene(floor, o, top) {
   const yc = yBottom - 2 - (f - 1) / 99 * (TV.th - 4);        // centro del punto (1 px de la aguja = 2 px de pantalla)
   const xc = TV.tx + TV.tw / 2 + 6 * Math.sin((f - 1) / 10 * 2 * Math.PI);  // espiral: una vuelta cada 10 pisos
   const tower = has('torre_base') ? `<img class="px tvt" alt="" src="${url('torre_base')}">` : '';
-  return `<div class="strip scene zoneimg"><div class="top">${top}</div><div class="tvwrap"><img class="px tvg" alt="" src="${zoneTowerSrc(o.hz)}"><div class="tvfloor">${arenaHTML(o, true)}</div>${tower}<i class="tvd" title="Piso ${f}" style="left:${xc / TV.W * 100}%;top:${yc / TV.H * 100}%"></i></div></div>`;
+  return `<div class="torrescene">${top ? `<div class="tvtop">${top}</div>` : ''}<div class="tvwrap"><img class="px tvg" alt="" src="${zoneTowerSrc(o.hz)}"><div class="tvfloor">${arenaHTML(o, true)}</div>${tower}<i class="tvd" title="Piso ${f}" style="left:${xc / TV.W * 100}%;top:${yc / TV.H * 100}%"></i></div></div>`;
 }
 const z0 = f => { const z = zoneOf(f), act = Math.min(10, Math.ceil(f / 10)); return `${z.n} · ${act}-${((f - 1) % 10) + 1}`; };
 function viewTorre() {
-  if (!S.startDate || dayIdx(todayISO()) < 0) return `<h1>Torre</h1><!--fit-->${S.startDate ? torreScene(1, arenaState(), `<span>${zoneOf(1).n}</span><span>Vista previa</span>`) : ''}`;
-  const { e } = compute(dayIdx(todayISO())), st = e.state, cfg = e.cfg, L = e.floor();
-  const into = st.xp - cumXp(L, cfg.A, cfg.r), cost = cfg.A * Math.pow(cfg.r, L - 1);
-  const gates = buildGates(cfg), nums = Object.keys(gates).map(Number).sort((a, b) => a - b);
-  const curAct = Math.min(10, Math.ceil(L / 10)), act = mapAct || curAct, z = zoneOf(act * 10 - 5), sel = mapSel || L;
-  const reqLines = (g) => { const d = gates[g], parts = [];
-    if (d.stats) parts.push(d.stats.map(c => `${NAMES[c]} ${st.stat[c]}/${d.req}`).join(' + '));
-    if (d.streak !== undefined) parts.push(`racha de ${d.streak} meses (tenés ${st.s})`);
-    return parts.join('<br>'); };
-  const o = arenaState(), nextG = nums.find(g => g >= L && !st.cleared.includes(g));
-  let h = `<h1>Torre</h1>` + subtabs('torre', [['res', 'Resumen'], ['mapa', 'Mapa'], ['puertas', 'Puertas']]) + '<!--fit-->';
-  if (SUB.torre === 'res') h += torreScene(L, o, `<span>${z0(L)}</span><span>Piso ${L}</span>`);
-  if (SUB.torre === 'res') h += `<div class="card"><div class="row"><div><div class="mute">Piso actual</div><div class="big">${L}</div></div><div style="text-align:right"><div class="mute">XP total</div><b>${fmt(st.xp)}</b></div></div>`;
-  if (SUB.torre === 'res') h += st.tower !== null ? `<div class="banner ok">🏆 ¡Torre completada!</div>` : `<div class="bar"><i style="width:${Math.min(100, into / cost * 100)}%"></i></div><div class="mute">${fmt(into)} / ${fmt(cost)} XP para el piso ${L + 1}</div>`;
-  if (SUB.torre === 'res') h += `<div class="mute">Racha mensual activa: <b>${st.s}</b> ${st.s === 1 ? 'mes' : 'meses'}</div></div>`;
-  if (SUB.torre === 'res' && nextG && st.tower === null) h += `<div class="card slim"><h2>Próxima puerta · piso ${nextG}${BOSSES.includes(nextG) ? ' · jefe' : ''}</h2><div class="row"><div>${reqLines(nextG)}</div><span class="pill ${st.blocked === nextG ? 'bad' : ''}">${st.blocked === nextG ? 'bloqueada' : 'pendiente'}</span></div></div>`;
-  if (SUB.torre === 'mapa') {
-  h += `<div class="acts">${Array.from({ length: 10 }, (_, i) => i + 1).map(a => `<button class="${a === act ? 'on' : ''} ${a > curAct ? 'lock' : ''}" data-act="map" data-a="${a}">${a}</button>`).join('')}</div>`;
-  const pts = Array.from({ length: 10 }, (_, i) => [50 + 27 * Math.sin(i * 1.05 + (act % 2) * 1.6), 88 - i * 8, (act - 1) * 10 + i + 1]);
-  h += `<div class="map ${act > curAct ? 'dim' : ''}" style="--sky1:${z.sky[0]};--sky2:${z.sky[1]};--gr:${z.gr}"><div class="ribbon">Acto ${act} · ${z.n}</div>`;
-  h += `<svg class="path" viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}" fill="none" stroke="rgba(50,30,15,.75)" stroke-width="4" stroke-dasharray="6 6" vector-effect="non-scaling-stroke"/></svg>`;
-  pts.forEach(([x, y, f], i) => {
-    const gate = !!gates[f], cleared = st.cleared.includes(f), cur = f === L && st.tower === null;
-    h += `<button class="node ${L >= f ? '' : 'future'} ${cur ? 'cur' : ''} ${sel === f ? 'sel' : ''}" style="left:${x}%;top:${y}%" data-act="node" data-f="${f}" aria-label="Piso ${f}">${gate ? gateImg(cleared, 1) : '<span class="dot"></span>'}${cur ? flagImg(2) : ''}<b>[${act}-${i + 1}]</b></button>`;
-  });
-  h += `</div>`;
-  const gd = gates[sel], selAct = Math.ceil(sel / 10), selStage = ((sel - 1) % 10) + 1;
-  h += `<div class="card" style="margin-top:12px"><h2>Piso ${sel} · ${selAct}-${selStage}</h2>`;
-  h += gd ? `<div class="row"><div>${reqLines(sel)}</div><span class="pill ${st.cleared.includes(sel) ? 'ok' : st.blocked === sel ? 'bad' : ''}">${st.cleared.includes(sel) ? 'abierta' : st.blocked === sel ? 'bloqueada' : 'pendiente'}</span></div>` : `<div class="mute">Piso sin puerta: solo suma XP.</div>`;
-  h += `</div>`;
-  } else if (SUB.torre === 'puertas') {
-  h += `<div class="card"><h2>Todas las puertas</h2>`;
-  for (const g of nums) h += `<div class="gate"><div style="width:44px;font-weight:800">${g}</div><div style="flex:1">${reqLines(g)}</div><span class="pill ${st.cleared.includes(g) ? 'ok' : st.blocked === g ? 'bad' : ''}">${st.cleared.includes(g) ? 'abierta' : st.blocked === g ? 'bloqueada' : 'pendiente'}</span></div>`;
-  h += `</div>`;
+  if (!S.startDate) return `<div class="card mute">Disponibles al ingresar.</div>`;
+  if (dayIdx(todayISO()) < 0) return torreFull(1, arenaState(), '');
+  const { e } = compute(dayIdx(todayISO())), st = e.state, L = e.floor(), gates = buildGates(e.cfg);
+  const nums = Object.keys(gates).map(Number).sort((a, b) => a - b);
+  const nextG = nums.find(g => g >= L && !st.cleared.includes(g));
+  let info = '';
+  if (nextG && st.tower === null) {
+    const d = gates[nextG], lines = [];
+    if (d.stats) for (const c of d.stats) lines.push(`${NAMES[c]} ${st.stat[c]}/${d.req}`);
+    if (d.streak !== undefined) lines.push(`Racha ${st.s}/${d.streak}`);
+    info = `<div class="gatenums">${lines.map(x => `<span>${x}</span>`).join('')}</div>`;
   }
-  return h;
+  return torreFull(L, arenaState(), info);
 }
+/** Escena completa: el terreno, el personaje caminando abajo y la torre. Sin títulos ni tarjetas. */
+function torreFull(floor, o, info) { return `<div class="torrefull" data-torre="1">${info}${torreScene(floor, o, '')}</div>`; }
 
 function viewStats() {
   if (!S.startDate) return `<h1>Estadísticas</h1><div class="card mute">Disponibles al ingresar.</div>`;
@@ -347,7 +326,6 @@ function sinkFeet() {
 }
 function variants() {
   if (tab === 'hoy' && S.startDate) return { get: () => mtab, set: v => { mtab = v; }, list: ['dia', 'sem', 'mes'] };
-  if (tab === 'torre' && S.startDate && dayIdx(todayISO()) >= 0) return { get: () => SUB.torre, set: v => { SUB.torre = v; }, list: ['res', 'mapa', 'puertas'] };
   if (tab === 'ajustes' && S.token) return { get: () => SUB.ajustes, set: v => { SUB.ajustes = v; }, list: ['gen', 'notif'] };
   return null;
 }
@@ -372,6 +350,14 @@ function fit() {
     f.style.zoom = 1;
     const geo = `left:${f.offsetLeft}px;top:${f.offsetTop}px;right:${app.clientWidth - f.offsetLeft - f.offsetWidth}px`;
     let z = bestZoom(f, avail);
+    const scene = f.querySelector('.torrescene');
+    if (scene) {
+      // Torre: la escena llena el ancho y el alto disponibles (240 px de escena, 360 de terreno + 60 de suelo)
+      const s = Math.min((app.clientWidth - 16) / 240, (avail - 4) / 372);
+      f.style.zoom = Math.max(0.5, Math.min(2, s)).toFixed(3);
+      app.style.overflowY = 'hidden';
+      return;
+    }
     // Las subpestañas de una misma solapa comparten el zoom (el menor), así el texto no cambia de tamaño al cambiar de pestaña.
     const vs = variants();
     if (vs) {

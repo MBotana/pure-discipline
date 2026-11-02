@@ -257,3 +257,9 @@ img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:
 .tvfloor .arena{width:240px;height:64px;aspect-ratio:auto;max-width:none;border:0}
 .tvwrap>img.tvt{position:absolute;left:200px;bottom:6px;width:36px;height:130px;z-index:2}
 .tvwrap>i.tvd{position:absolute;width:3.6px;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);z-index:3;animation:tvt 1.4s ease-in-out infinite}
+
+/* Torre: solo escena (terreno, personaje y torre) y los números de la próxima puerta arriba */
+.torrefull{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px}
+.gatenums{align-self:stretch;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:var(--fd,'Cinzel',serif);font-weight:900;font-size:15px;letter-spacing:.06em;color:#fff6dc;text-shadow:0 0 3px #000,0 0 6px #000,0 1px 0 #000;text-align:center;padding-top:2px}
+.torrescene{position:relative}
+.tvwrap{box-shadow:0 0 0 2px #2a170a,0 0 0 3px var(--gold,#c9a24a)}
