@@ -12,7 +12,7 @@ Fondo transparente en los sprites, sin suavizado (pixel art puro). La app los mu
 | `mascota_esfinge_n0..n5.png` | n0 32 · n1–n2 24 · n3–n4 40 · n5 64 | Inteligencia |
 | `mascota_fenix_n0..n5.png` | n0 32 · n1–n2 24 · n3–n4 40 · n5 64 | Vitalidad |
 | `mascota_grifo_n0..n5.png` | n0 32 · n1–n2 24 · n3–n4 40 · n5 64 | Disciplina |
-| `mascota_qilin_n0..n5.png` | n0 32 · n1–n2 24 · n3–n4 40 · n5 64 | Orden |
+| `mascota_qilin_n0..n5.png` | n0 32 · n1–n2 32 · n3–n4 40 · n5 64 | Orden (terrestre: sus cuadros de correr deben ser caminando, no volando) |
 | `icono_fuerza.png`, `icono_inteligencia.png`, `icono_vitalidad.png`, `icono_disciplina.png`, `icono_orden.png` | 16×16 | Íconos de estadísticas |
 | `torre_cerrada.png`, `torre_abierta.png` | 240×64 | Escena de la torre con la puerta cerrada / abierta (antes del inicio) |
 | `torre_apertura_1.png` … `_6.png` (opcionales) | 240×64 | Cuadros intermedios de la puerta abriéndose (se usan los que existan, ~0,5 s cada uno) |
@@ -28,6 +28,6 @@ Para ver un cambio en el iPhone, cerrá y abrí la app dos veces (usa caché).
 | `heroe_tX_eY_correr_1.png` … (hasta 12) | 48×40 | Marcha con racha de 1-2 meses (mismo formato que caminar) |
 | `heroe_tX_eY_sprint_1.png` … (hasta 12) | 48×40 | Marcha con racha de 3 meses o más (mismo formato). Si falta una marcha se usa la más cercana |
 | `heroe_tX_eY_respirar_1.png` … (hasta 12) | 32×40 | Respiración de frente para las vistas del personaje (franja chica, Estadísticas). Si falta, el sprite quieto sube y baja |
-| `mascota_<nombre>_nN_correr_1.png` … `_4.png` (N = 1 a 5, 2 a 8 cuadros; Fénix y Qilin vuelan) | mismo tamaño que su versión quieta | Mascota **corriendo** (franja expandida y Torre). Si faltan, se usa la quieta con saltitos. El huevo (n0) no corre |
+| `mascota_<nombre>_nN_correr_1.png` … `_4.png` (N = 1 a 5, 2 a 8 cuadros; solo el Fénix vuela; el Qilin camina en el suelo) | mismo tamaño que su versión quieta | Mascota **corriendo** (franja expandida y Torre). Si faltan, se usa la quieta con saltitos. El huevo (n0) no corre |
 | `torre_zona_01.png` … `torre_zona_12.png` | 120×180 (vertical) | Solo el terreno y el cielo de la zona, **sin torre**. Se muestra en la pestaña Torre. |
 | `torre_base.png` | 18×65 | La aguja gótica sola, con borde (transparente). La app la pega abajo a la derecha (píxeles 100-118, 109-173 de la vista) y dibuja encima el punto dorado del piso actual |

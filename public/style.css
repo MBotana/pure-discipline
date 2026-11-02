@@ -251,4 +251,5 @@ img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:
 .tv{position:relative;width:100%;aspect-ratio:120/180;background:#000}
 .tv>img.tvg{position:absolute;inset:0;width:100%;height:100%}
 .tv>img.tvt{position:absolute;left:83.333%;top:60.556%;width:15%;height:36.111%}
-.tv>i.tvd{position:absolute;width:2.5%;aspect-ratio:1;background:#ffd36b;transform:translate(-50%,-50%);box-shadow:0 0 0 1px #0e0c12,0 0 6px rgba(255,211,107,.8)}
+.tv>i.tvd{position:absolute;width:1.5%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);animation:tvt 1.4s ease-in-out infinite}
+@keyframes tvt{0%{background:#fffbe6;box-shadow:0 0 0 1px #0e0c12,0 0 4px 1px rgba(255,246,200,.9)}50%{background:#ffd36b;box-shadow:0 0 0 1px #0e0c12,0 0 3px 1px rgba(255,211,107,.7)}100%{background:#fff8d8;box-shadow:0 0 0 1px #0e0c12,0 0 5px 2px rgba(255,250,220,.95)}}

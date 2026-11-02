@@ -178,10 +178,12 @@ function viewHoy() {
 let mapAct = 0, mapSel = 0;
 /** Torre sobre el terreno de la zona: la aguja va pegada a la derecha (píxeles 100-118, 109-173 de 120×180) y el punto dorado marca el piso (1 en la base, 100 en la punta). */
 const TOWER = { x: 100, y: 109, w: 18, h: 65, cx: 109, yb: 173, yt: 109 };
+/** La subida es en espiral: una vuelta cada 10 pisos (un acto), con 3 px de radio alrededor del eje de la aguja. */
 const towerView = floor => {
   const f = Math.min(100, Math.max(1, floor)), yc = TOWER.yb - (f - 1) / 99 * (TOWER.yb - TOWER.yt) + 0.5;
+  const xc = TOWER.cx + 0.5 + 3 * Math.sin((f - 1) / 10 * 2 * Math.PI);
   const tower = has('torre_base') ? `<img class="px tvt" alt="" src="${url('torre_base')}">` : '';
-  return `<div class="tv"><img class="px tvg" alt="" src="${zoneTowerSrc(floor)}">${tower}<i class="tvd" title="Piso ${f}" style="left:${(TOWER.cx + 0.5) / 120 * 100}%;top:${yc / 180 * 100}%"></i></div>`;
+  return `<div class="tv"><img class="px tvg" alt="" src="${zoneTowerSrc(floor)}">${tower}<i class="tvd" title="Piso ${f}" style="left:${xc / 120 * 100}%;top:${yc / 180 * 100}%"></i></div>`;
 };
 const zoneImg = floor => `<div class="strip scene zoneimg"><div class="top"><span>${zoneOf(floor).n}</span><span>Torre</span></div>${towerView(floor)}</div>`;
 const z0 = f => { const z = zoneOf(f), act = Math.min(10, Math.ceil(f / 10)); return `${z.n} · ${act}-${((f - 1) % 10) + 1}`; };

@@ -77,7 +77,7 @@ export const petName = (c, lv) => `mascota_${PETS[c].key}_n${lv}`;
 const PET_PX = { 0: 32, 1: 32, 2: 32, 3: 40, 4: 40, 5: 64 };
 /** Ancho mostrado en la escena de 240 (la de 64 px se reduce para entrar en la franja). */
 const PET_ARENA = { 0: 32, 1: 28, 2: 28, 3: 38, 4: 38, 5: 52 };
-const FLYERS = ['fenix', 'qilin'];
+const FLYERS = ['fenix'];
 /** Píxeles reales del archivo (32 si todavía es el dibujo provisorio). */
 export const petPx = (c, lv) => has(petName(c, lv)) ? (PET_PX[lv] || 32) : 32;
 export const petArenaW = (c, lv) => has(petName(c, lv)) ? (PET_ARENA[lv] || 32) : 32;
