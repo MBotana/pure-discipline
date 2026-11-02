@@ -40,11 +40,11 @@ a{color:var(--gold)}
 .err{color:var(--bad);font-size:13px;min-height:18px}
 .nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .nav button{background:var(--btn);border:2px solid var(--bronze);color:var(--ink);width:44px;height:44px;font-size:18px;cursor:pointer}.nav button:disabled{opacity:.3}
-#tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--deep);box-shadow:0 120px 0 0 var(--deep);border-top:3px solid var(--bronze);padding:5px 4px calc(5px + env(safe-area-inset-bottom));z-index:6}
+#tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--deep);box-shadow:0 120px 0 0 var(--deep);border-top:3px solid var(--bronze);padding:5px 4px 5px;z-index:6}
 #tabs button{flex:1;background:none;border:0;padding:5px 2px;font-size:10px;color:var(--mute);display:flex;flex-direction:column;align-items:center;gap:2px;min-height:48px;cursor:pointer;text-transform:uppercase}
 #tabs button span{font-size:20px;line-height:1}#tabs button.on{color:var(--h2)}#tabs button.on span{filter:drop-shadow(0 0 4px var(--gold))}
 /* ---- franja de batalla permanente ---- */
-#strip{position:fixed;left:0;right:0;bottom:calc(62px + env(safe-area-inset-bottom));z-index:5;max-width:560px;margin:0 auto;padding:0 8px}
+#strip{position:fixed;left:0;right:0;bottom:62px;z-index:5;max-width:560px;margin:0 auto;padding:0 8px}
 #strip:empty{display:none}
 .strip{border:3px solid var(--bronze);background:var(--deep);box-shadow:0 -4px 0 var(--deep)}
 .strip .top{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:3px 8px;font-size:11px;background:linear-gradient(var(--top1),var(--accent-d));text-transform:uppercase;color:var(--accent-ink)}
