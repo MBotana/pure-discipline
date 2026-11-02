@@ -205,7 +205,7 @@ function viewTorre() {
   return torreFull(L, arenaState(), info);
 }
 /** Escena completa: el terreno, el personaje caminando abajo y la torre. Sin títulos ni tarjetas. */
-function torreFull(floor, o, info) { return `<div class="torrefull" data-torre="1">${info}${torreScene(floor, o, '')}</div>`; }
+function torreFull(floor, o, info) { return `<div class="torrefull" data-torre="1">${torreScene(floor, o, '')}${info}</div>`; }
 
 function viewStats() {
   if (!S.startDate) return `<h1>Estadísticas</h1><div class="card mute">Disponibles al ingresar.</div>`;
@@ -440,12 +440,12 @@ function renderStrip0() {
   const o = arenaState(), { e, st } = o, floor = o.floor;
   const into = st.xp - cumXp(floor, e.cfg.A, e.cfg.r), cost = e.cfg.A * Math.pow(e.cfg.r, floor - 1);
   const pct = o.pre ? 0 : Math.round(Math.min(100, into / cost * 100));
-  const open = dockOpen || o.pre || !!phase;
+  const open = true;  // siempre expandido: el personaje camina en Misiones igual que en Torre
   const key = JSON.stringify({ o: [o.pre, floor, o.eq, o.pl, o.running, o.boss, o.done, o.speed, o.gait, o.hf, o.hz], pct, phase, open, readyN, tab: tab === 'hoy' });
   if (key === stripKey) return; stripKey = key;
   const z = zoneOf(floor), act = Math.min(10, Math.ceil(floor / 10)), stage = ((floor - 1) % 10) + 1;
   const title = `${z.n} · ${act}-${stage}`;
-  if (open) el.innerHTML = `<div class="strip ${!o.running && !o.pre ? 'blocked' : ''}" ${o.pre || phase ? '' : 'data-act="dock"'}><div class="top"><span>${title}</span>${o.pre ? '' : `<span class="hp" title="Avance al próximo piso"><i style="width:${pct}%"></i></span>`}</div>${arenaHTML(o)}</div>`;
+  if (open) el.innerHTML = `<div class="strip ${!o.running && !o.pre ? 'blocked' : ''}">${arenaHTML(o)}</div>`;
   else el.innerHTML = `<div class="strip dock" data-act="dock"><div class="dockrow" style="--gr:${z.gr};--gr2:${z.gr2}">${petTag(o.eq, o.pl, 1, 'pet idle')}${heroImgTag(floor, 1, o.done, 'idle')}<div class="dockinfo"><b>Piso ${floor}</b><small>${z.n}</small><span class="hp"><i style="width:${pct}%"></i></span><small>Tocá para ver la carrera</small></div></div></div>`;
   startAnim();
   if (phase === 'fade') requestAnimationFrame(() => requestAnimationFrame(() => el.querySelector('.door')?.classList.add('gone')));
