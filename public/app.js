@@ -205,7 +205,7 @@ function viewTorre() {
   return torreFull(L, arenaState(), info);
 }
 /** Escena completa: el terreno, el personaje caminando abajo y la torre. Sin títulos ni tarjetas. */
-function torreFull(floor, o, info) { return `<div class="torrefull" data-torre="1">${torreScene(floor, o, '')}${info}</div>`; }
+function torreFull(floor, o, info) { return `<div class="torrefull" data-torre="1"><div class="tvhead">${zoneOf(floor).n} · Piso ${floor}</div>${torreScene(floor, o, '')}${info}</div>`; }
 
 function viewStats() {
   if (!S.startDate) return `<h1>Estadísticas</h1><div class="card mute">Disponibles al ingresar.</div>`;
@@ -353,12 +353,12 @@ function fit() {
     const scene = f.querySelector('.torrescene');
     if (scene) {
       // Torre: la escena llena el ancho y el alto disponibles (240 px de escena, 360 de terreno + 60 de suelo)
-      const s = Math.min((app.clientWidth - 16) / 240, (avail - 4) / 428);
+      const HH = 22, s = Math.min((app.clientWidth - 16) / 240, (avail - 4) / (428 + HH));
       const z = Math.max(0.5, Math.min(2, s));
       f.style.zoom = z.toFixed(3);
       // El suelo de abajo se estira hasta llenar lo que queda de pantalla (en unidades de escena).
       const g = f.querySelector('.tvground');
-      if (g) g.style.height = Math.max(0, (avail - 4) / z - 428).toFixed(1) + 'px';
+      if (g) g.style.height = Math.max(0, (avail - 4) / z - 428 - HH).toFixed(1) + 'px';
       app.style.overflowY = 'hidden';
       return;
     }
