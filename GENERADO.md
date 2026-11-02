@@ -59,3 +59,36 @@ Lecciones:
 - pixminimax con `custom_start_frame_url` (un cuadro ya en movimiento) y `keep_first_frame=false` evita los cuadros de arranque.
 
 Nota: `tools/ajustar.py` alinea con el borde inferior del lienzo y corta filas de la cabeza. Recorté con ventana fija por animación, pies 2 px sobre el borde.
+
+## Tanda 3: crías de Esfinge, Grifo, Fénix y Qilin (2026-11-01, pendiente de aprobación)
+Postura del cachorro de Behemot (caminando, patas traseras un poco más cortas). El Fénix vuela; el Qilin camina.
+Primero se probó `create_character_pro_flash` 32×32 (con el cachorro como `style_image`): la vista east salía sentada o enredada. Se rehízo con `edit_image` **sobre el cachorro de Behemot** (conserva la pose) usando como referencia de aspecto esa vista east.
+
+| Archivo (n1 y n2 iguales, 32×32) | Origen | Notas |
+|---|---|---|
+| `mascota_esfinge_n1/n2.png` | `edit_image` modo referencia `30d32632-…`, seed 42 (ref: imagen del usuario, esfinge cría con nemes, cuernos dorados y alas) | Versión A, elegida por el usuario. Reemplaza a `44bce480-…`. Descartada la B (seed 7 `182aaff4-…`). Subido 1 px |
+| `mascota_grifo_n1/n2.png` | `edit_image` modo referencia `f9a544dc-…` (ref: east de `b90ee60d-…`) | Cabeza de águila, garras amarillas. Bajado 1 px |
+| `mascota_qilin_n1/n2.png` | `edit_image` modo referencia `ede64198-…`, seed 42 (ref: imagen del usuario, qilin verde oliva con astas y llamas doradas) | Versión A, elegida por el usuario. Reemplaza a `f4bc7f22-…` y `1d836a2f-…`. Descartada la B (seed 7 `e4cdb471-…`). Subido 2 px: las astas tocan el borde superior sin cortarse |
+| `mascota_fenix_n1/n2.png` | `edit_image` modo texto `06a07571-…` sobre la east de `b97f7a64-…` | Volando, alas arriba. Sin bajar (flota) |
+
+Caminatas (pixminimax, 8 cuadros, east/side, seed 42, igual que Behemot; pies ya a 2 px, sin retoques), guardadas como `mascota_<clave>_n1_correr_1..8` y `n2_correr_1..8`: esfinge `210cbdbf-04d2-4edc-b2fc-9a7c0e6dbe33`, grifo `705155f8-379b-41d8-9c04-b6123b7ad9a1`, qilin `95ef254c-7a87-488f-9991-10abceb5f86a`.
+Fénix (vuelo, 8 cuadros porque pixminimax pide múltiplos de 4): A `9cefff6b-…` (alas poco visibles, se endereza) y B `20970bf2-6ade-4558-ba6d-c03d965a873b` seed 7 (aleteo amplio). **Elegida la B** por el usuario, guardada como `mascota_fenix_n1_correr_1..8` y `n2_correr_1..8` (vuela: sin alinear pies).
+
+Personajes pro_flash de prueba (solo sirvieron de referencia): crías `c5d1ad4c-…`, `b90ee60d-…`, `b97f7a64-…`, `1dfbb912-…`; adultos 64×64 lanzados antes del cambio de pedido: `67b7da29-…` (esfinge), `7957481e-…` (grifo), `90c116a7-…` (fénix), `d5bbabe2-…` (qilin), sin usar.
+
+## Tanda 2: mascotas — Behemot (2026-11-01, pendiente de aprobación)
+Tamaños definidos por el usuario: n0 huevo 32×32 · n1-n2 chica 24×24 · n3-n4 intermedia 40×40 · n5 grande 64×64 (el `LEEME.md` y la app todavía usan 32×32 para todas).
+Todas de perfil mirando a la derecha, en pose de caminar, pies a 2 px del borde inferior. Recorte con `tools/ajustar.py ... pies` y luego ajuste de altura por código.
+
+| Archivo | Origen | Notas |
+|---|---|---|
+| `mascota_behemot_n5.png` (64×64) | `edit_image` job `70e4e879-…` sobre el adulto v1 (`de6cc3db-…`) | Más morado, patas delanteras más macizas, cola completa levantada, caminando. Por código: saturación del violeta ×0,5 y luz ×0,95 (había salido demasiado morado), corrido 2 px a la derecha (la cola tocaba el borde) y bajado 4 px |
+| `mascota_behemot_n3.png`, `n4.png` (40×40, iguales) | `edit_image` job `f315c052-…` sobre el n5 centrado en un lienzo de 76×76 | Joven más tranquilo, mismo diseño. Toca los bordes laterales sin cortarse. Subido 1 px |
+| `mascota_behemot_n1.png`, `n2.png` (32×32, iguales) | combinación por código: cuerpo de `c85e5ce3-7745-4144-86e8-362538276239` (create_character modo pro, perro, con la foto de un bully como concepto) + cabeza de `ef93fd2b-52f5-465f-9b10-caadd5012f6a` (pro_flash, plantilla dog) | Cachorro estilo bully, elegido por el usuario. Por código: contorno oscuro agregado a la cabeza, cola levantada dibujada (6 px) en lugar del muñón, pies a 2 px. Lienzo 32×32 (el contenido mide 30×28). Al ser una combinación no es un personaje de PixelLab: para animarlo hay que crear uno a partir de esta imagen |
+
+Técnica que funcionó: `edit_image` respeta la composición de la entrada, así que para achicar se pone el adulto con aire alrededor en un lienzo grande y se pide la salida en el tamaño final. Pedirle "que entre en N píxeles" no funciona (llena el lienzo).
+Descartados: v1 (adulto `de6cc3db-…`, joven `a0cbb195-…`, cachorro `19dbabf0-…`, reemplazados), pro_flash `8294e4c2-…` y `5bd1ab9b-…` (adulto), `443bfcb8-…`, `f2e476ad-…` (joven sin cuernos / hocico de caballo), `0d2b1846-…`, `caba191a-…` (cachorros de 26 px), ediciones `b6a74b46-…`, `d4760c23-…` (cortadas en los bordes), `3bdba873-…`, `301079c3-…`, `3ddd3f3a-…` (cachorros demasiado anchos).
+| `mascota_behemot_n1_correr_1..8`, `n2_correr_1..8` (32×32, iguales) | `animate_image_pixminimax` job `90ef5fbe-b021-4c23-bdd8-e0cf103890f5` sobre `mascota_behemot_n1.png` (subido), east/side, seed 42 | Caminata A, elegida por el usuario. Sin retoques: pies ya a 2 px. Alternativa B descartada: `animate_image` `0d1cc7ee-…` (pasos cortos). La app hoy lee hasta 4 cuadros |
+
+Pendiente: cuadros de caminar de n3-n5. Los personajes pro_flash admiten `walk-4/6/8-frames`; las versiones finales salieron de `edit_image` (son imágenes sueltas), así que para animarlas hay que crear el personaje a partir de cada imagen.
+Saldo: 1573 → 1405 generaciones (168 en total; esta ronda 116). Cachorro: caminatas descartadas del v2a (8) + tres cachorros bully (22) → ~1373.
