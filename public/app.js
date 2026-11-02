@@ -179,7 +179,7 @@ let mapAct = 0, mapSel = 0;
 /** Escena de la torre (240 px de ancho, 2× para el terreno y la aguja; 1× para la escena de carrera).
  *  El terreno va arriba; la escena de carrera (loop) va abajo y la torre se apoya en su mismo suelo, sin moverse.
  *  La aguja sigue por encima del loop hacia el cielo. El punto dorado marca el piso: 1 en la base, 100 en la punta. */
-const TV = { W: 240, H: 360, gnd: 6, tx: 200, tw: 36, th: 130 };
+const TV = { W: 240, H: 424, gnd: 6, tx: 200, tw: 36, th: 130 };  // terreno 360 arriba + franja de caminata 64 abajo
 function torreScene(floor, o, top) {
   const f = Math.min(100, Math.max(1, floor));
   const yBottom = TV.H - TV.gnd;                              // base de la aguja, sobre el suelo del loop
@@ -353,7 +353,7 @@ function fit() {
     const scene = f.querySelector('.torrescene');
     if (scene) {
       // Torre: la escena llena el ancho y el alto disponibles (240 px de escena, 360 de terreno + 60 de suelo)
-      const s = Math.min((app.clientWidth - 16) / 240, (avail - 4) / 372);
+      const s = Math.min((app.clientWidth - 16) / 240, (avail - 4) / 428);
       f.style.zoom = Math.max(0.5, Math.min(2, s)).toFixed(3);
       app.style.overflowY = 'hidden';
       return;
