@@ -93,11 +93,12 @@ async function gemini(env: Env, system: string, parts: unknown[], temperature = 
   }
   throw Object.assign(new Error('La IA no respondió (' + last + ')'), { status: 502 });
 }
-const DESCRIBE_SYSTEM = `Sos un nutricionista que describe comidas. Describí en español, en 2 a 4 líneas, qué contiene la comida: cada alimento, porción aproximada y cocción. Cerrá siempre con estas cuatro etiquetas, en una línea cada una:
+const DESCRIBE_SYSTEM = `Sos un nutricionista que describe comidas. Describí en español, en 2 a 4 líneas, qué contiene la comida: cada alimento, porción aproximada y cocción. Cerrá siempre con estas cinco etiquetas, en una línea cada una:
 Proteína: (sí/no y cuál)
 Verduras o frutas: (sí/no y cuáles)
 Ultraprocesado, frito o comida rápida: (sí/no y cuál)
 Bebida: (cuál, o ninguna visible)
+Macros aproximados: proteína X g · carbohidratos X g · grasas X g · ~X kcal
 No evalúes el día ni des consejos. Si la imagen no es comida, respondé solo "No parece comida". No inventes lo que no se ve; si algo no se puede saber (aceite, azúcar, salsas), decilo.`;
 const RUBRIC = `Rúbrica fija para evaluar el día de alimentación (aplicala siempre igual):
 1. Proteína presente en el almuerzo y en la cena, y en general a lo largo del día.
@@ -134,8 +135,8 @@ async function judgeDay(env: Env, date: string, final: boolean) {
   const meals = await listMeals(env, date);
   const list = meals.map(m => `${m.t} ${mealName(m.t)}: ${m.descr}`).join('\n');
   const how = final
-    ? 'El día terminó. Primera línea: solo APROBADO o NO APROBADO, según TODO el día junto. Después, una línea por cada punto de la rúbrica (cumple / no cumple y por qué). Sin markdown.'
-    : 'El día sigue. Primera línea: solo PARCIAL. Después tres líneas: "Va bien: ...", "Falta: ..." (lo que todavía haría falta comer para aprobar) y "Si cerraras ahora: APROBADO o NO APROBADO". Sin markdown.';
+    ? 'El día terminó. Primera línea: solo APROBADO o NO APROBADO, según TODO el día junto. Después: "Macros del día (aprox.): proteína X g · carbohidratos X g · grasas X g · ~X kcal". Después, si es NO APROBADO, una sección "Qué faltó:" con cada punto de la rúbrica que no se cumplió y qué habría que haber comido para cumplirlo; si es APROBADO, una línea de por qué. Sin markdown.'
+    : 'El día sigue. Respondé con estas cuatro líneas, sin encabezado de veredicto y sin markdown: "Comida de ahora: qué comí (la última comida listada)", "Macros de esa comida (aprox.): proteína X g · carbohidratos X g · grasas X g · ~X kcal", "Macros del día hasta ahora (aprox.): sumando todas las comidas", "Te falta para una buena alimentación: lo que todavía haría falta comer o evitar hoy según la rúbrica".';
   return gemini(env, 'Sos un evaluador consistente de la alimentación diaria de un adulto que entrena. Respondés en español rioplatense, breve y concreto.\n' + RUBRIC, [{ text: `${how}\n\nComidas del día:\n${list}` }]);
 }
 
@@ -265,18 +266,6 @@ export async function handle(req: Request, env: Env): Promise<Response> {
       await saveVerdict(env, b.date, analysis, false);
       return json({ ok: true, id, descr, text: analysis, meals: await listMeals(env, b.date) });
     } catch (e: any) { return json({ error: e.message }, e.status ?? 500); }
-  }
-  if (path === '/api/meal/delete' && m === 'POST') {
-    await ensureMeals(env);
-    const b: any = await req.json().catch(() => ({}));
-    if (!validDate(b.date) || typeof b.id !== 'string') return json({ error: 'datos inválidos' }, 400);
-    await env.DB.prepare('DELETE FROM meals WHERE id = ? AND date = ?').bind(b.id, b.date).run();
-    try {
-      const left = await listMeals(env, b.date);
-      const analysis = left.length ? await judgeDay(env, b.date, false) : '';
-      await saveVerdict(env, b.date, analysis, false);
-      return json({ ok: true, text: analysis, meals: left });
-    } catch (e: any) { return json({ error: e.message, meals: await listMeals(env, b.date) }, e.status ?? 500); }
   }
   if (path === '/api/meal/close' && m === 'POST') {
     await ensureMeals(env);

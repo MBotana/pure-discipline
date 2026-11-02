@@ -115,12 +115,12 @@ test('alimentación con IA: describe cada comida, acumula el día y cierra con e
     const body = JSON.parse(init.body); const parts = body.contents[0].parts; prompts.push(parts.map((p: any) => p.text ?? '[imagen]').join('|'));
     assert.equal(init.headers['x-goog-api-key'], 'k');
     const isJudge = /Comidas del día/.test(parts[0].text);
-    const out = !isJudge ? 'Pollo con arroz.\nProteína: sí, pollo' : /El día terminó/.test(parts[0].text) ? 'NO APROBADO\nFalta verdura.' : 'PARCIAL\nVa bien: proteína\nFalta: verduras\nSi cerraras ahora: NO APROBADO';
+    const out = !isJudge ? 'Pollo con arroz.\nProteína: sí, pollo' : /El día terminó/.test(parts[0].text) ? 'NO APROBADO\nFalta verdura.' : 'Comida de ahora: pollo.\nTe falta para una buena alimentación: verduras';
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: out }] } }] }), { status: 200 });
   }) as any;
   try {
     let r: any = await call(e, 'POST', '/api/meal', { date: '2026-11-04', t: '13:10', image: 'AAAA', mime: 'image/jpeg' }, T).then(x => x.json());
-    assert.equal(r.ok, true); assert.match(r.descr, /Pollo/); assert.match(r.text, /^PARCIAL/);
+    assert.equal(r.ok, true); assert.match(r.descr, /Pollo/); assert.doesNotMatch(r.text, /^APROBADO|^NO APROBADO/);
     assert.ok(prompts.some(p => p.includes('[imagen]')), 'la foto viaja a la IA');
     r = await call(e, 'POST', '/api/meal', { date: '2026-11-04', t: '21:00', text: 'sopa de zapallo' }, T).then(x => x.json());
     assert.equal(r.meals.length, 2);
@@ -133,8 +133,6 @@ test('alimentación con IA: describe cada comida, acumula el día y cierra con e
     assert.deepEqual([s.days['2026-11-04'].input.meals, s.days['2026-11-04'].input.food], [true, undefined]);
     const g: any = await call(e, 'GET', '/api/meals?date=2026-11-04', undefined, T).then(x => x.json());
     assert.equal(g.meals.length, 2); assert.match(g.text, /Falta verdura/);
-    r = await call(e, 'POST', '/api/meal/delete', { date: '2026-11-04', id: g.meals[0].id }, T).then(x => x.json());
-    assert.equal(r.meals.length, 1);
     assert.equal((await call(e, 'POST', '/api/meal/close', { date: '2026-11-05' }, T)).status, 400, 'sin comidas no se cierra');
   } finally { globalThis.fetch = real; }
 });
