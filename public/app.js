@@ -121,7 +121,7 @@ function viewHoy() {
   const w = c => st.wu[c], m = c => st.mu[c];
   const gained = r.events.reduce((a, x) => a + x.paid, 0), lost = r.events.filter(x => x.outcome !== 'paid').reduce((a, x) => a + x.amount - x.paid, 0);
   const tick = k => !!inp[k];
-  const ic = c => c === 'P' ? petFace(st.equipped, plv(st.equipped, e.petLevel(st.equipped)), 1) : iconTag(c, 2);
+  const ic = c => c === 'P' ? petFace(st.equipped, e.petLevel(st.equipped), 1) : iconTag(c, 2);
   const doneRows = [];
   const row = (k, cat, label, meta) => { if (tick(k)) { doneRows.push([k, cat, label]); return ''; } return `<button class="mrow" ${pre ? 'disabled' : `data-act="t" data-k="${k}"`}><span class="mic">${ic(cat)}</span><span class="mtx"><b>${label}</b><small>${meta}</small></span>${pre ? '' : '<span class="dbl">2×</span>'}</button>`; };
   const pips = (n, max) => `<span class="pips">${Array.from({ length: max }, (_, q) => `<i class="${q < n ? 'f' : ''}"></i>`).join('')}</span>`;
@@ -133,7 +133,7 @@ function viewHoy() {
   h += `<div class="sum"><span><small>XP del día</small><b>+${fmt(gained)}</b></span><span><small>Piso</small><b>${r.floor}</b></span><span><small>Racha</small><b>${st.s} ${st.s === 1 ? 'mes' : 'meses'}</b></span><span><small>Multiplicador</small><b>×${st.s >= 1 ? st.s + 1 : 1}</b></span></div>${lost > 0 ? `<div class="mute" style="margin:-6px 0 10px">No cobrada por bloqueo: ${fmt(lost)}</div>` : ''}`;
   h += `<div class="seg">${sections.map(([k, l]) => `<button class="${mtab === k ? 'on' : ''}" data-act="mtab" data-v="${k}">${l}</button>`).join('')}</div><!--fit-->`;
   const wi = pre ? { n: 1, of: 4 } : e.weekInfo(idx), games = st.gameWk, today0 = inp.gaming || 0;
-  const petIc = c => petFace(c, plv(c, e.petLevel(c)), 1);
+  const petIc = c => petFace(c, e.petLevel(c), 1);
   if (mtab === 'dia') {
     const wk = dd < 5 ? '+50 XP' : 'solo suma a la semana', n = DK.filter(tick).length;
     h += `<div class="card slim"><div class="row"><h2>Misiones del día</h2><span class="pill ${n === 5 ? 'ok' : ''}">${n} / 5</span></div><div class="bar gold"><i style="width:${n * 20}%"></i></div>`;
@@ -176,19 +176,21 @@ function viewHoy() {
 }
 
 let mapAct = 0, mapSel = 0;
-/** Torre sobre el terreno de la zona: la aguja va pegada a la derecha (píxeles 100-118, 109-173 de 120×180) y el punto dorado marca el piso (1 en la base, 100 en la punta). */
-const TOWER = { x: 100, y: 109, w: 18, h: 65, cx: 109, yb: 173, yt: 109 };
-/** La subida es en espiral: una vuelta cada 10 pisos (un acto), con 3 px de radio alrededor del eje de la aguja. */
-const towerView = floor => {
-  const f = Math.min(100, Math.max(1, floor)), yc = TOWER.yb - (f - 1) / 99 * (TOWER.yb - TOWER.yt) + 0.5;
-  const xc = TOWER.cx + 0.5 + 3 * Math.sin((f - 1) / 10 * 2 * Math.PI);
+/** Escena de la torre (240 px de ancho, 2× para el terreno y la aguja; 1× para la escena de carrera).
+ *  El terreno va arriba; la escena de carrera (loop) va abajo y la torre se apoya en su mismo suelo, sin moverse.
+ *  La aguja sigue por encima del loop hacia el cielo. El punto dorado marca el piso: 1 en la base, 100 en la punta. */
+const TV = { W: 240, H: 360, gnd: 6, tx: 200, tw: 36, th: 130 };
+function torreScene(floor, o, top) {
+  const f = Math.min(100, Math.max(1, floor));
+  const yBottom = TV.H - TV.gnd;                              // base de la aguja, sobre el suelo del loop
+  const yc = yBottom - 2 - (f - 1) / 99 * (TV.th - 4);        // centro del punto (1 px de la aguja = 2 px de pantalla)
+  const xc = TV.tx + TV.tw / 2 + 6 * Math.sin((f - 1) / 10 * 2 * Math.PI);  // espiral: una vuelta cada 10 pisos
   const tower = has('torre_base') ? `<img class="px tvt" alt="" src="${url('torre_base')}">` : '';
-  return `<div class="tv"><img class="px tvg" alt="" src="${zoneTowerSrc(floor)}">${tower}<i class="tvd" title="Piso ${f}" style="left:${xc / 120 * 100}%;top:${yc / 180 * 100}%"></i></div>`;
-};
-const zoneImg = floor => `<div class="strip scene zoneimg"><div class="top"><span>${zoneOf(floor).n}</span><span>Torre</span></div>${towerView(floor)}</div>`;
+  return `<div class="strip scene zoneimg"><div class="top">${top}</div><div class="tvwrap"><img class="px tvg" alt="" src="${zoneTowerSrc(o.hz)}"><div class="tvfloor">${arenaHTML(o, true)}</div>${tower}<i class="tvd" title="Piso ${f}" style="left:${xc / TV.W * 100}%;top:${yc / TV.H * 100}%"></i></div></div>`;
+}
 const z0 = f => { const z = zoneOf(f), act = Math.min(10, Math.ceil(f / 10)); return `${z.n} · ${act}-${((f - 1) % 10) + 1}`; };
 function viewTorre() {
-  if (!S.startDate || dayIdx(todayISO()) < 0) return `<h1>Torre</h1><!--fit-->${S.startDate ? `${zoneImg(1)}<div class="strip scene"><div class="top"><span>Vista previa</span></div>${arenaHTML(arenaState(), true)}</div>` : ''}`;
+  if (!S.startDate || dayIdx(todayISO()) < 0) return `<h1>Torre</h1><!--fit-->${S.startDate ? torreScene(1, arenaState(), `<span>${zoneOf(1).n}</span><span>Vista previa</span>`) : ''}`;
   const { e } = compute(dayIdx(todayISO())), st = e.state, cfg = e.cfg, L = e.floor();
   const into = st.xp - cumXp(L, cfg.A, cfg.r), cost = cfg.A * Math.pow(cfg.r, L - 1);
   const gates = buildGates(cfg), nums = Object.keys(gates).map(Number).sort((a, b) => a - b);
@@ -199,7 +201,7 @@ function viewTorre() {
     return parts.join('<br>'); };
   const o = arenaState(), nextG = nums.find(g => g >= L && !st.cleared.includes(g));
   let h = `<h1>Torre</h1>` + subtabs('torre', [['res', 'Resumen'], ['mapa', 'Mapa'], ['puertas', 'Puertas']]) + '<!--fit-->';
-  if (SUB.torre === 'res') h += `${zoneImg(L)}<div class="strip scene"><div class="top"><span>${z0(L)}</span><span>Piso ${L}</span></div>${arenaHTML(o, true)}</div>`;
+  if (SUB.torre === 'res') h += torreScene(L, o, `<span>${z0(L)}</span><span>Piso ${L}</span>`);
   if (SUB.torre === 'res') h += `<div class="card"><div class="row"><div><div class="mute">Piso actual</div><div class="big">${L}</div></div><div style="text-align:right"><div class="mute">XP total</div><b>${fmt(st.xp)}</b></div></div>`;
   if (SUB.torre === 'res') h += st.tower !== null ? `<div class="banner ok">🏆 ¡Torre completada!</div>` : `<div class="bar"><i style="width:${Math.min(100, into / cost * 100)}%"></i></div><div class="mute">${fmt(into)} / ${fmt(cost)} XP para el piso ${L + 1}</div>`;
   if (SUB.torre === 'res') h += `<div class="mute">Racha mensual activa: <b>${st.s}</b> ${st.s === 1 ? 'mes' : 'meses'}</div></div>`;
@@ -240,22 +242,19 @@ function viewStats() {
 
 function viewMascotas() {
   if (!S.startDate) return `<h1>Mascotas</h1><div class="card mute">Disponibles al ingresar.</div>`;
-  const { e, st } = current(), lv = Object.fromEntries(Object.entries(e.petLevels()).map(([c, v]) => [c, plv(c, v)]));
+  const { e, st } = current(), lv = e.petLevels();
   const cum = [0]; for (const x of e.cfg.petCosts) cum.push(cum[cum.length - 1] + x);
   let h = `<h1>Mascotas</h1><!--fit-->`;
   if (st.feedStreak >= 1) h += `<div class="banner">Semanas sin alimentar seguidas: <b>${st.feedStreak}</b>. ${st.feedStreak >= 2 ? 'La mascota equipada pierde 1 nivel por cada semana fallada.' : 'Con la próxima semana fallada baja 1 nivel.'}</div>`;
   h += `<div class="pgrid">`;
   for (const c of CATS) {
     const l = lv[c], max = l >= 5, eq = st.equipped === c, pct = max ? 100 : (st.px[c] - cum[l]) / e.cfg.petCosts[l] * 100;
-    h += `<div class="card pcard"><div class="phead"><div class="pface-wrap" ${S.testMode ? `data-act="testlv" data-c="${c}"` : ''}>${petFace(c, l, 2)}</div><div><b>${PETS[c].name}</b><small class="mute"> ${NAMES[c]}</small><div class="mute">Nivel ${l} / 5${S.testMode ? ' · prueba' : ''}</div></div></div><div class="bar gold"><i style="width:${pct}%"></i></div><div class="row mute"><span>${S.testMode ? '—' : max ? 'máximo' : `${st.px[c] - cum[l]} / ${e.cfg.petCosts[l]} XP`}</span>${eq ? '<span class="pill gold">equipada</span>' : `<button class="btn sm ghost" data-act="equip" data-c="${c}">Equipar</button>`}</div></div>`;
+    h += `<div class="card pcard"><div class="phead"><div class="pface-wrap">${petFace(c, l, 2)}</div><div><b>${PETS[c].name}</b><small class="mute"> ${NAMES[c]}</small><div class="mute">Nivel ${l} / 5</div></div></div><div class="bar gold"><i style="width:${pct}%"></i></div><div class="row mute"><span>${max ? 'máximo' : `${st.px[c] - cum[l]} / ${e.cfg.petCosts[l]} XP`}</span>${eq ? '<span class="pill gold">equipada</span>' : `<button class="btn sm ghost" data-act="equip" data-c="${c}">Equipar</button>`}</div></div>`;
   }
   h += `</div>`;
   return h + `<p class="mute">Solo la mascota equipada aporta puntos en una puerta de estadísticas y solo a su propia estadística. Cada semana de alimentación perfecta le da 10 XP.</p>`;
 }
 
-/** Modo de prueba (Ajustes): permite ver cada mascota en cualquier nivel sin cambiar tu progreso. */
-const testLv = {};
-const plv = (c, real) => S.testMode && testLv[c] !== undefined ? testLv[c] : real;
 const SUB = { torre: 'res', ajustes: 'gen' };
 const subtabs = (k, items) => `<div class="seg">${items.map(([v, l]) => `<button class="${SUB[k] === v ? 'on' : ''}" data-act="sub" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
 function viewAjustes() {
@@ -278,7 +277,7 @@ function viewAjustes() {
   if (!standalone) h += `<div class="banner">En el iPhone: abrí esta página en Safari, tocá Compartir → <b>Agregar a pantalla de inicio</b> y abrila desde ahí. Sin eso iOS no permite notificaciones.</div>`;
   h += `<div class="row"><button class="btn sm" data-act="push">Activar</button><button class="btn sm ghost" data-act="pushtest">Probar</button></div><div class="err" id="pushmsg">${esc(errMsg)}</div>`;
   h += `<label>Recordatorio diario (hora local)<input id="rh" type="number" min="0" max="23" value="${esc(st.reminder_hour ?? 21)}"></label><label>Aviso de alimentación del domingo (hora)<input id="fh" type="number" min="0" max="23" value="${esc(st.feed_hour ?? 18)}"></label><button class="btn sm ghost" data-act="saveset">Guardar horarios</button></div>`;
-  } else h += `<div class="card"><h2>Modo de prueba</h2><div class="row"><span class="mute">Ver las mascotas en cualquier nivel (tocá su cara en Mascotas)</span><button class="btn sm ${S.testMode ? '' : 'ghost'}" data-act="testmode">${S.testMode ? 'Activado' : 'Activar'}</button></div></div><div class="card"><h2>Datos</h2><div class="mute">Primer día: ${S.startDate ? pretty(S.startDate) : '—'}</div><div class="row" style="margin-top:8px"><button class="btn sm ghost" data-act="export">Descargar respaldo</button><button class="btn sm ghost" data-act="logout">Cerrar sesión</button></div></div>`;
+  } else h += `<div class="card"><h2>Datos</h2><div class="mute">Primer día: ${S.startDate ? pretty(S.startDate) : '—'}</div><div class="row" style="margin-top:8px"><button class="btn sm ghost" data-act="export">Descargar respaldo</button><button class="btn sm ghost" data-act="logout">Cerrar sesión</button></div></div>`;
   return h;
 }
 
@@ -412,7 +411,7 @@ function arenaState() {
   const running = !phase && ((!pre && st.tower === null && st.blocked === null && !boss) || pre);
   if (pre && previewIdx < 0) previewIdx = 0;
   const stp = previewIdx >= 0 ? STEPS[previewIdx] : null;
-  return { e, st, pre, floor, hf: stp ? stp.hs : floor, hz: stp ? stp.f : floor, step: stp, boss, running, eq: st.equipped, pl: plv(st.equipped, e.petLevel(st.equipped)), done: st.tower !== null, speed: stp ? { caminar: 1, correr: 1.5, sprint: 2.5 }[stp.g] : 1 + 0.5 * st.s, gait: stp ? stp.g : gaitFor(st.s) };
+  return { e, st, pre, floor, hf: stp ? stp.hs : floor, hz: stp ? stp.f : floor, step: stp, boss, running, eq: st.equipped, pl: e.petLevel(st.equipped), done: st.tower !== null, speed: stp ? { caminar: 1, correr: 1.5, sprint: 2.5 }[stp.g] : 1 + 0.5 * st.s, gait: stp ? stp.g : gaitFor(st.s) };
 }
 /** Escena de 240×64: fondo en movimiento, héroe y mascota (corriendo o quietos), jefe y puerta. */
 function arenaHTML(o, big) {
@@ -515,8 +514,6 @@ document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act;
   if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); }
-  else if (a === 'testmode') { S.testMode = !S.testMode; for (const k in testLv) delete testLv[k]; save(); stripKey = ''; render(); }
-  else if (a === 'testlv') { const c = el.dataset.c, cur = plv(c, current().e.petLevel(c)); testLv[c] = (cur + 1) % 6; stripKey = ''; render(); }
   else if (a === 'sub') { SUB[el.dataset.k] = el.dataset.v; render(); }
   else if (a === 'gait') { previewIdx = previewIdx + 1 >= STEPS.length ? (current().pre ? 0 : -1) : previewIdx + 1; stripKey = ''; render(); }
   else if (a === 'statstage') { const f = current().e.floor(), real = f < 10 ? 0 : f < 20 ? 1 : f < 25 ? 2 : -1; statsStage = ((statsStage < 0 ? real : statsStage) + 1) % 3; render(); }
