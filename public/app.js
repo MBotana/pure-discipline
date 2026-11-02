@@ -345,7 +345,7 @@ function zs() {
   // Se mide hasta la barra de solapas (no hasta la franja), así el zoom no cambia según la pestaña.
   const app = document.getElementById('app'), cs = getComputedStyle(app), HH = 22, tabs = document.getElementById('tabs');
   const top = tabs ? tabs.getBoundingClientRect().top : innerHeight;
-  const inner = top - parseFloat(cs.paddingTop) - 64;  // 64: franja de título de la Torre (igual en todas las pestañas)
+  const inner = top - parseFloat(cs.paddingTop) - 48;  // 48: alto del título TORRE (igual en todas las pestañas)
   return Math.max(0.5, Math.min(2, (app.clientWidth - 16) / 240, (inner - 4) / (428 + HH)));
 }
 function fit() {
