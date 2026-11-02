@@ -2,12 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Engine } from '../src/engine/engine.ts';
+import { LEGACY_CONFIG } from '../src/engine/config.ts';
 import type { DayInput } from '../src/engine/types.ts';
 
 const G = JSON.parse(readFileSync(new URL('./golden.json', import.meta.url), 'utf8'));
 
 function run(sc: any) {
-  const e = new Engine({ ...G.config });
+  const e = new Engine({ ...LEGACY_CONFIG, ...G.config });
   const floors: number[] = [], xps: number[] = []; let multi = 0, prev = 1;
   for (const inp of sc.inputs as DayInput[]) {
     const r = e.processDay(inp); floors.push(r.floor); xps.push(r.xp);
@@ -42,9 +43,9 @@ test('nunca más de un piso por día y el perfecto abre el día 364', () => {
 });
 
 test('estado serializable: guardar/restaurar a mitad de camino da el mismo resultado', () => {
-  const sc = G.scenarios[0]; const a = new Engine(G.config); const half = 200;
+  const sc = G.scenarios[0]; const a = new Engine({ ...LEGACY_CONFIG, ...G.config }); const half = 200;
   for (let i = 0; i < half; i++) a.processDay(sc.inputs[i]);
-  const b = new Engine(G.config, JSON.parse(JSON.stringify(a.state)));
+  const b = new Engine({ ...LEGACY_CONFIG, ...G.config }, JSON.parse(JSON.stringify(a.state)));
   for (let i = half; i < sc.inputs.length; i++) { a.processDay(sc.inputs[i]); b.processDay(sc.inputs[i]); }
   assert.deepEqual(a.state, b.state);
 });

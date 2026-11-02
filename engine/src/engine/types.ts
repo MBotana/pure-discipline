@@ -26,13 +26,14 @@ export interface DayInput {
   equip?: Cat;          // cambiar mascota equipada equipada (se aplica al inicio del día)
 }
 
-export type EventKind = 'D' | 'W' | 'M'; // diaria, semanal, mensual
+export type EventKind = 'D' | 'W' | 'M' | 'C'; // diaria, semanal, mensual, diferido (sobrante de un día que ya subió un piso)
 export type Outcome = 'paid' | 'lost_block' | 'lost_clamp';
 
 export interface AuditEvent {
   day: number; cat: Cat; kind: EventKind;
   base: number; mult: number; amount: number;
   outcome: Outcome; paid: number; gate?: number;
+  deferred?: number;   // XP que no entró hoy por el límite de pisos por día; se cobra al día siguiente
 }
 
 export interface BlockLog { gate: number; start: number; end: number | null; streak: boolean; stats: boolean }
@@ -47,6 +48,10 @@ export interface Config {
   hingeEvery: number;
   combos: [Cat, Cat][];
   streakGates: Record<number, number>;
+  statReq?: Record<number, number>;   // requisito explícito por visagra (si falta, se usa reqScale·statScale·piso)
+  multStep?: number;                  // multiplicador por mes de racha: 1 + multStep·s (por defecto 1)
+  multMax?: number;                   // tope del multiplicador (por defecto sin tope)
+  dayFloorCap?: number;               // máximo de pisos por día; el sobrante pasa al día siguiente (0 o ausente = sin límite)
   discPen: boolean;
   petRatio: number; petCosts: number[]; petWeek: number;
   /** true = solo la mascota equipada aporta a la puerta (regla del diseño). false = paridad con el simulador. */
@@ -77,4 +82,5 @@ export interface State {
   blocks: BlockLog[];
   tower: number | null;
   lostBlock: number; lostClamp: number; statWasted: number; discPenN: number;
+  carry?: Record<Cat, number>;   // XP diferido al día siguiente por el límite de pisos por día
 }

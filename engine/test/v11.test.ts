@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Engine, cumXp } from '../src/engine/engine.ts';
+import { LEGACY_CONFIG } from '../src/engine/config.ts';
 import type { DayInput } from '../src/engine/types.ts';
 const G = JSON.parse(readFileSync(new URL('./golden.json', import.meta.url), 'utf8'));
 
@@ -16,7 +17,7 @@ function toV11(inputs: DayInput[]): DayInput[] {
   return out;
 }
 function peak(inputs: DayInput[]) {
-  const e = new Engine({ ...G.config }); let worst = 0, multi = 0, prev = 1;
+  const e = new Engine({ ...LEGACY_CONFIG, ...G.config }); let worst = 0, multi = 0, prev = 1;
   for (const inp of inputs) {
     const before = e.state.xp, L = e.floor(), r = e.processDay(inp);
     const cost = e.cfg.A * Math.pow(e.cfg.r, L - 1);
@@ -38,27 +39,27 @@ test('v1.1: año perfecto con formulario del domingo y comida diaria da el mismo
 });
 
 test('v1.1: más de 3 sesiones de videojuegos o celular > 5 h violan el antiobjetivo', () => {
-  const mk = (extra: DayInput) => { const e = new Engine({ ...G.config });
+  const mk = (extra: DayInput) => { const e = new Engine({ ...LEGACY_CONFIG, ...G.config });
     for (let i = 0; i < 7; i++) e.processDay({ ...(i === 0 ? { gaming: 4 } : {}), ...(i === 6 ? { dweek: true, ...extra } : {}) });
     return e.state.stat.D; };
   assert.equal(mk({}), 0, 'más de 3 sesiones: sin punto');
-  const ok = new Engine({ ...G.config }); for (let i = 0; i < 7; i++) ok.processDay({ ...(i === 0 ? { gaming: 3 } : {}), ...(i === 6 ? { dweek: true } : {}) });
+  const ok = new Engine({ ...LEGACY_CONFIG, ...G.config }); for (let i = 0; i < 7; i++) ok.processDay({ ...(i === 0 ? { gaming: 3 } : {}), ...(i === 6 ? { dweek: true } : {}) });
   assert.equal(ok.state.stat.D, 1);
-  const ph = new Engine({ ...G.config }); for (let i = 0; i < 7; i++) ph.processDay(i === 6 ? { dweek: true, phone: true } : {});
+  const ph = new Engine({ ...LEGACY_CONFIG, ...G.config }); for (let i = 0; i < 7; i++) ph.processDay(i === 6 ? { dweek: true, phone: true } : {});
   assert.equal(ph.state.stat.D, 0);
 });
 
 test('v1.1: 4 días de comida alimentan a la mascota equipada', () => {
-  const e = new Engine({ ...G.config });
+  const e = new Engine({ ...LEGACY_CONFIG, ...G.config });
   for (let i = 0; i < 7; i++) e.processDay(i < 4 ? { food: true } : {});
   assert.equal(e.state.px.F, e.cfg.petWeek);
-  const f = new Engine({ ...G.config }); for (let i = 0; i < 7; i++) f.processDay(i < 3 ? { food: true } : {});
+  const f = new Engine({ ...LEGACY_CONFIG, ...G.config }); for (let i = 0; i < 7; i++) f.processDay(i < 3 ? { food: true } : {});
   assert.equal(f.state.px.F, 0);
 });
 
 test('v1.2: libro terminado y arreglo en la casa (un solo pago mensual) + ambientes distintos: año perfecto', () => {
   const sc = G.scenarios.find((s: any) => s.name === 'perfecto');
-  const probe = new Engine({ ...G.config });
+  const probe = new Engine({ ...LEGACY_CONFIG, ...G.config });
   const base = toV11(sc.inputs).map((i: any, d: number) => {
     const { bookTramo, improve, ...rest } = i as any; const o: any = rest;
     const wi = probe.weekInfo(d);

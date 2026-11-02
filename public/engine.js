@@ -24,13 +24,14 @@ function buildCalendar(startDate, weeks = 520) {
 }
 
 // engine/src/engine/config.ts
+var COMBOS = [["F", "I"], ["I", "O"], ["O", "D"], ["D", "V"], ["V", "F"], ["F", "O"], ["I", "D"], ["O", "V"], ["D", "F"], ["F", "I"]];
 var DEFAULT_CONFIG = {
   startDate: "2026-11-02",
   d: 50,
   W: 300,
   Mp: 1500,
-  r: 1.015,
-  A: 5000,
+  r: 1.036,
+  A: 638,
   weeklyBonus: [0, 0.2, 0.3, 0.4, 0.5],
   gymM: 18,
   aeroM: 12,
@@ -46,13 +47,27 @@ var DEFAULT_CONFIG = {
   reqScale: 0.9,
   freezeDays: 14,
   hingeEvery: 10,
-  combos: [["F", "I"], ["I", "O"], ["O", "D"], ["D", "V"], ["V", "F"], ["F", "O"], ["I", "D"], ["O", "V"], ["D", "F"], ["F", "I"]],
-  streakGates: { 25: 2, 50: 4, 75: 6, 100: 8 },
+  combos: COMBOS,
+  statReq: { 10: 1, 20: 2, 30: 4, 40: 8, 50: 12, 60: 16, 70: 22, 80: 30, 90: 40, 100: 45 },
+  streakGates: { 25: 1, 50: 2, 75: 5, 100: 8 },
+  multStep: 0.5,
+  multMax: 3,
+  dayFloorCap: 1,
   discPen: true,
   petRatio: 0.1,
   petCosts: [10, 13, 17, 20, 30],
   petWeek: 10,
   petsMustBeEquipped: true
+};
+var LEGACY_CONFIG = {
+  ...DEFAULT_CONFIG,
+  r: 1.015,
+  A: 5000,
+  statReq: undefined,
+  streakGates: { 25: 2, 50: 4, 75: 6, 100: 8 },
+  multStep: 1,
+  multMax: Infinity,
+  dayFloorCap: 0
 };
 
 // engine/src/engine/types.ts
@@ -70,7 +85,8 @@ function buildGates(cfg) {
   if (cfg.hingeEvery) {
     let k = 0;
     for (let g = cfg.hingeEvery;g <= 100; g += cfg.hingeEvery, k++) {
-      G[g] = { stats: cfg.combos[k % cfg.combos.length], req: Math.floor(cfg.reqScale * cfg.statScale * g + 0.000000001) };
+      const req = cfg.statReq?.[g] ?? Math.floor(cfg.reqScale * cfg.statScale * g + 0.000000001);
+      G[g] = { stats: cfg.combos[k % cfg.combos.length], req };
     }
   }
   for (const [g, need] of Object.entries(cfg.streakGates)) {
@@ -110,7 +126,8 @@ function initialState() {
     lostBlock: 0,
     lostClamp: 0,
     statWasted: 0,
-    discPenN: 0
+    discPenN: 0,
+    carry: zero()
   };
 }
 
@@ -181,7 +198,7 @@ class Engine {
     const completed = { weekly: [], monthly: [], pet: false };
     if (dd === 0) {
       if (w === month.weeks[0]) {
-        S.multM = S.s >= 1 ? 1 + S.s : 1;
+        S.multM = S.s >= 1 ? Math.min(cfg.multMax ?? Infinity, 1 + (cfg.multStep ?? 1) * S.s) : 1;
         S.mu = zero();
         S.mdone = [];
         S.bd = 0;
@@ -197,6 +214,15 @@ class Engine {
     if (input.equip)
       S.equipped = input.equip;
     const ev = [];
+    const L0 = this.floor();
+    const dayLim = cfg.dayFloorCap ? cumXp(L0 + cfg.dayFloorCap + 1, cfg.A, cfg.r) - 0.001 : Infinity;
+    if (!S.carry)
+      S.carry = zero();
+    for (const c of CATS)
+      if (S.carry[c] > 0.000000001) {
+        ev.push([c, "C", S.carry[c]]);
+        S.carry[c] = 0;
+      }
     const wkday = dd < 5;
     const addDone = (arr, c) => {
       if (!arr.includes(c))
@@ -346,7 +372,7 @@ class Engine {
       }
       tryUnblock();
       let mult = kind === "D" || kind === "W" ? S.bonusW : S.multM;
-      if (kind === "D")
+      if (kind === "D" || kind === "C")
         mult = 1;
       if (kind === "M" && S.s === 0)
         mult = 1;
@@ -362,20 +388,35 @@ class Engine {
         continue;
       }
       let rem = amt;
-      while (rem > 0) {
+      const defer = () => {
+        S.carry[cat] += rem;
+        rec.deferred = (rec.deferred ?? 0) + rem;
+        rem = 0;
+      };
+      while (rem > 0.000000001) {
         const pend = Object.keys(this.gates).map(Number).sort((a, b) => a - b).filter((g) => !S.cleared.includes(g));
-        if (!pend.length) {
+        const G = pend.length ? pend[0] : null, cap = G === null ? Infinity : cumXp(G, cfg.A, cfg.r);
+        if (S.xp >= dayLim - 0.000000001) {
+          defer();
+          break;
+        }
+        if (S.xp + rem < Math.min(cap, dayLim) - 0.000000001) {
           S.xp += rem;
           rec.paid += rem;
           rem = 0;
           break;
         }
-        const G = pend[0], cap = cumXp(G, cfg.A, cfg.r);
-        if (S.xp + rem < cap - 0.000000001) {
-          S.xp += rem;
-          rec.paid += rem;
-          rem = 0;
-        } else {
+        if (dayLim < cap - 0.000000001) {
+          const used = Math.max(dayLim - S.xp, 0);
+          S.xp += used;
+          rec.paid += used;
+          rem -= used;
+          defer();
+          break;
+        }
+        if (G === null)
+          break;
+        {
           const used = Math.max(cap - S.xp, 0);
           S.xp = cap;
           rem -= used;

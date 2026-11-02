@@ -33,7 +33,7 @@ export function preloadHero() {
 // ---- nombres y reglas ----
 export const STAT = { F: 'fuerza', I: 'inteligencia', V: 'vitalidad', D: 'disciplina', O: 'orden' };
 export const PETS = { F: { key: 'behemot', name: 'Behemot' }, I: { key: 'esfinge', name: 'Esfinge' }, V: { key: 'fenix', name: 'Fénix' }, D: { key: 'grifo', name: 'Grifo' }, O: { key: 'qilin', name: 'Qilin' } };
-const STARTS = [1, 10, 20, 25, 35, 45, 50, 60, 70, 75, 85, 95];
+const STARTS = [1, 10, 20, 26, 35, 45, 51, 60, 70, 76, 85, 95];
 /** Armadura (1-4) y etapa (1-3) según el piso. */
 export function heroLook(floor) { let i = 0; STARTS.forEach((s, k) => { if (floor >= s) i = k; }); return { t: Math.floor(i / 3) + 1, e: (i % 3) + 1 }; }
 export const Z12 = ZONES;
