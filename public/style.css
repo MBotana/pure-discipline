@@ -5,7 +5,7 @@
 html,body{margin:0;background:var(--bg);color:var(--ink);font:700 15px/1.4 ui-monospace,"SF Mono",Menlo,Consolas,monospace}
 body{background:radial-gradient(120% 60% at 50% 0,var(--bg2) 0,var(--bg) 70%) fixed}
 img.px{image-rendering:pixelated;image-rendering:crisp-edges;display:block}
-#app{position:fixed;left:0;right:0;top:0;bottom:var(--bot,60px);overflow:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:calc(env(safe-area-inset-top) + 8px) max(14px,calc((100vw - 560px)/2 + 14px)) 6px}
+#app{position:fixed;left:0;right:0;top:0;bottom:var(--bot,60px);overflow:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:calc(env(safe-area-inset-top) + 22px) max(14px,calc((100vw - 560px)/2 + 14px)) 6px}
 #app::-webkit-scrollbar{display:none}
 html,body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:manipulation;-webkit-text-size-adjust:100%;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 input{-webkit-user-select:text;user-select:text;font-size:16px}
