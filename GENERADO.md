@@ -20,6 +20,8 @@ El usuario descartó la plataforma al 70 %: la composición de las vistas ya no 
 ### Aprobado: torre C sobre las zonas 01-03
 El usuario eligió `gen/torre_chica_C.png` (candidata 14). Se pegó por código sobre `gen/torre_zona_01..03.png` en (100, 109): pegada a la derecha con 2 px de margen y la base a 6 px del borde inferior. Resultado en los nombres finales `public/img/torre_zona_01.png`, `_02.png`, `_03.png` (120×180, nuevos). `LEEME.md` actualizado al tamaño nuevo. Los `gen/fondo_01..03.png` siguen sin pasar a `public/img/` (ya existen fondos con esos nombres).
 
+Copias sin cambios: `gen/terreno_zona_01..03.png` = vistas sin la aguja (idénticas a `gen/torre_zona_01..03.png`); `public/img/torre_base.png` = `gen/torre_chica_C.png` (18×65).
+
 ### Diseño de la torre v3: chica, clara y delineada
 Pedido: un tercio del tamaño de la v2 (≈11×58), color más claro, bordes delineados. `create_image_pro` job `a1f0b0a4-1303-4e7d-94b0-6f05cab81591`, 16×64, transparente, `max_colors=12`, seed 42, referencia de forma `gen/torre_aguja_1.png`; 16 candidatas por 10 generaciones (saldo 1105 → 1095).
 El contorno oscuro casi no se veía: se agregó por código un borde de 1 px (#0e0c12) alrededor de la silueta → 18×65.
