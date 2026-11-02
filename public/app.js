@@ -109,12 +109,13 @@ const fmt = n => Math.round(n).toLocaleString('es-AR');
 function viewHoy() {
   if (!S.startDate) return '';
   const today = todayISO(), idx = dayIdx(viewDate);
+  const title = '<h1>Misiones</h1>';
   const dow = (new Date(toUTC(viewDate)).getUTCDay() + 6) % 7, wkStart = addDays(viewDate, -dow), DK = ['gym', 'read', 'aero', 'clean', 'food'];
   const strip = Array.from({ length: 7 }, (_, i) => { const d = addDays(wkStart, i), inp = S.days[d]?.input ?? {}, n = DK.filter(k => inp[k]).length, off = d > today;
     return `<button class="wd ${d === viewDate ? 'sel' : ''} ${d === today ? 'tod' : ''} ${n === 5 ? 'full' : n ? 'some' : ''}" ${off ? 'disabled' : `data-act="day" data-d="${d}"`}><span>${'LMXJVSD'[i]}</span><b>${+d.slice(8)}</b><i></i></button>`; }).join('');
   const nav = `<div class="wk">${strip}</div><div class="daytitle">${viewDate === today ? 'Hoy' : 'Editando'} · ${pretty(viewDate)}${viewDate !== today ? ' · <a href="#" data-act="today">volver a hoy</a>' : ''}</div>`;
   const pre = dayIdx(today) < 0;
-  if (idx < 0 && !pre) return `${nav}<div class="card mute">Este día es anterior al inicio de tu torre.</div>`;
+  if (idx < 0 && !pre) return `${title}${nav}<div class="card mute">Este día es anterior al inicio de tu torre.</div>`;
   const cur = pre ? current() : null, { e, results } = pre ? { e: cur.e, results: [{ floor: 1, events: [] }] } : compute(idx), st = e.state, r = results[pre ? 0 : idx], cfg = e.cfg;
   const dd = pre ? 0 : idx % 7, inp = pre ? {} : S.days[viewDate]?.input ?? {};
   const on = k => !!inp[k];
@@ -128,7 +129,7 @@ function viewHoy() {
   const info = (cat, label, meta, right, done) => `<div class="mrow static ${done ? 'on' : ''}"><span class="mic">${ic(cat)}</span><span class="mtx"><b>${label}</b><small>${meta}</small></span>${right}<span class="chk">${done ? '✓' : ''}</span></div>`;
   const bar = (n, max) => `<span class="mini"><i style="width:${Math.min(100, n / max * 100)}%"></i></span>`;
   const sections = [['dia', 'Diarias'], ['sem', 'Semanales'], ['mes', 'Mensuales']];
-  let h = nav;
+  let h = title + nav;
   if (st.blocked !== null && viewDate === today) h += `<div class="banner">🔒 <b>Bloqueado en el piso ${st.blocked}.</b> No sumás XP hasta cumplir la puerta (mirá la pestaña Torre).</div>`;
   h += `<div class="sum"><span><small>XP del día</small><b>+${fmt(gained)}</b></span><span><small>Piso</small><b>${r.floor}</b></span><span><small>Racha</small><b>${st.s} ${st.s === 1 ? 'mes' : 'meses'}</b></span><span><small>Multiplicador</small><b>×${st.s >= 1 ? st.s + 1 : 1}</b></span></div>${lost > 0 ? `<div class="mute" style="margin:-6px 0 10px">No cobrada por bloqueo: ${fmt(lost)}</div>` : ''}`;
   h += `<div class="seg">${sections.map(([k, l]) => `<button class="${mtab === k ? 'on' : ''}" data-act="mtab" data-v="${k}">${l}</button>`).join('')}</div><!--fit-->`;
@@ -260,7 +261,7 @@ function viewAjustes() {
   return h;
 }
 
-const TABS = [['hoy', '✅', 'Misiones', viewHoy], ['torre', '🏰', 'Torre', viewTorre], ['stats', '📊', 'Stats', viewStats], ['mascotas', '🐾', 'Mascotas', viewMascotas], ['ajustes', '⚙️', 'Ajustes', viewAjustes]];
+const TABS = [['hoy', '✅', 'Misiones', viewHoy], ['torre', '🏰', 'Torre', viewTorre], ['stats', '📊', 'Estadísticas', viewStats], ['mascotas', '🐾', 'Mascotas', viewMascotas], ['ajustes', '⚙️', 'Ajustes', viewAjustes]];
 function modalHTML() {
   if (!modal || !S.startDate) return '';
   const i = dayIdx(modal.date), { e, results } = compute(i), st = e.state;
@@ -338,9 +339,16 @@ function bestZoom(el, avail) {
   for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (h(m) <= avail + 0.5) lo = m; else hi = m; }
   return lo;
 }
+/** Zoom único de la senda y de la torre: el mismo tamaño en todas las pestañas. */
+function zs() {
+  const app = document.getElementById('app'), cs = getComputedStyle(app), HH = 22;
+  const inner = app.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  return Math.max(0.5, Math.min(2, (app.clientWidth - 16) / 240, (inner - HH - 4) / (428 + HH)));
+}
 function fit() {
   if (fitting) return; fitting = true;
   try {
+    document.documentElement.style.setProperty('--zs', zs().toFixed(3));
     const app = document.getElementById('app'), f = document.getElementById('fit'), strip = document.getElementById('strip'), tabs = document.getElementById('tabs');
     if (!f) return;
     sinkFeet();
@@ -353,8 +361,7 @@ function fit() {
     const scene = f.querySelector('.torrescene');
     if (scene) {
       // Torre: la escena llena el ancho y el alto disponibles (240 px de escena, 360 de terreno + 60 de suelo)
-      const HH = 22, s = Math.min((app.clientWidth - 16) / 240, (avail - 4) / (428 + HH));
-      const z = Math.max(0.5, Math.min(2, s));
+      const HH = 22, z = zs();
       f.style.zoom = z.toFixed(3);
       // El suelo de abajo se estira hasta llenar lo que queda de pantalla (en unidades de escena).
       const g = f.querySelector('.tvground');
@@ -435,7 +442,7 @@ function renderStrip0() {
   const idx = S.startDate ? dayIdx(todayISO()) : -1;
   if (!S.token || !S.startDate) { el.innerHTML = ''; stripKey = ''; return; }
   if (idx >= 0 && !S.opened && !opening) { startOpening(); return; }
-  if (tab === 'torre' || tab === 'stats') { el.innerHTML = ''; stripKey = ''; startAnim(); return; }
+  if (tab === 'torre') { el.innerHTML = ''; stripKey = ''; startAnim(); return; }
   const o = arenaState(), { e, st } = o, floor = o.floor;
   const into = st.xp - cumXp(floor, e.cfg.A, e.cfg.r), cost = e.cfg.A * Math.pow(e.cfg.r, floor - 1);
   const pct = o.pre ? 0 : Math.round(Math.min(100, into / cost * 100));
