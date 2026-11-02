@@ -265,3 +265,4 @@ img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:
 .torrescene{box-shadow:0 0 0 2px #2a170a,0 0 0 3px var(--gold,#c9a24a)}
 
 .tvground{width:240px;max-width:100%;margin:0 auto;height:0;background:linear-gradient(var(--gr2,#6a5a3a) 0 2px,var(--gr,#8a7a4a) 2px)}
+.tvfloor .arena .sp{width:calc(var(--w) * 0.67 * 100cqw / 240)}
