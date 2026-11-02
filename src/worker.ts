@@ -29,8 +29,8 @@ async function authed(req: Request, env: Env): Promise<boolean> {
   return tok.length > 0 && (await sha256hex(tok)) === stored;
 }
 
-const PUBLIC_SETTINGS = ['start_date', 'tz_offset', 'reminder_hour', 'feed_hour', 'reminders_on'] as const;
-const DEFAULTS: Record<string, string> = { tz_offset: '-180', reminder_hour: '21', feed_hour: '18', reminders_on: '1' };
+const PUBLIC_SETTINGS = ['start_date', 'tz_offset', 'reminder_hour', 'feed_hour', 'reminders_on', 'gym_notify'] as const;
+const DEFAULTS: Record<string, string> = { tz_offset: '-180', reminder_hour: '21', feed_hour: '18', reminders_on: '1', gym_notify: '1' };
 
 async function readSettings(env: Env) {
   const out: Record<string, string> = {};
@@ -208,21 +208,23 @@ export async function handle(req: Request, env: Env): Promise<Response> {
   // Atajos del iPhone: entrada y salida del gimnasio. La sesión cuenta si estuviste al menos 40 minutos.
   if (path === '/api/gym' && m === 'POST') {
     const b: any = await req.json().catch(() => ({}));
-    const now = Date.now();
-    if (b.event === 'arrive') { await putSetting(env, 'gym_arrive', String(now)); return json({ ok: true, event: 'arrive' }); }
+    const now = Date.now(), tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset);
+    const hhmm = (ms: number) => new Date(ms + tz * 60000).toISOString().slice(11, 16);
+    const notify = async (body: string) => { if ((await getSetting(env, 'gym_notify')) !== '0') await pushAll(env, url.origin, 'Gimnasio', body); };
+    if (b.event === 'arrive') { await putSetting(env, 'gym_arrive', String(now)); await notify(`Llegaste al gimnasio · ${hhmm(now)}`); return json({ ok: true, event: 'arrive' }); }
     if (b.event !== 'leave') return json({ error: 'event debe ser arrive o leave' }, 400);
     const arr = Number(await getSetting(env, 'gym_arrive') ?? 0);
-    if (!arr) return json({ ok: true, counted: false, reason: 'sin entrada registrada' });
+    if (!arr) { await notify(`Saliste del gimnasio · ${hhmm(now)} (no había una llegada registrada)`); return json({ ok: true, counted: false, reason: 'sin entrada registrada' }); }
     await putSetting(env, 'gym_arrive', '0');
     const minutes = Math.round((now - arr) / 60000);
-    if (minutes < 40) return json({ ok: true, counted: false, minutes });
-    const tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset);
+    if (minutes < 40) { await notify(`Saliste del gimnasio · ${hhmm(now)} · ${minutes} min: menos de 40, no cuenta`); return json({ ok: true, counted: false, minutes }); }
     const date = new Date(arr + tz * 60000).toISOString().slice(0, 10);
     const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
     const input = row ? JSON.parse(row.input as string) : {};
     input.gym = true; input.gymMin = Math.max(Number(input.gymMin ?? 0), minutes);
     await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
       .bind(date, JSON.stringify(input), now, 'atajo-gimnasio').run();
+    await notify(`Saliste del gimnasio · ${hhmm(now)} · ${minutes} min: sesión contada ✔`);
     return json({ ok: true, counted: true, minutes, date });
   }
   // Atajo "Evaluar comida": devuelve el análisis acumulado de hoy (para que el modelo lo tenga en cuenta).
