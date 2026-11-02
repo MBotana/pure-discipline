@@ -1,7 +1,7 @@
 /* Pure Discipline — servidor (Cloudflare Worker + D1). Un solo usuario.
  * Autenticación: la primera vez se define una clave (/api/setup); después todo exige Authorization: Bearer <clave>. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export interface Env { DB: any; ASSETS: any }
+export interface Env { DB: any; ASSETS: any; GEMINI_KEY?: string; GEMINI_MODEL?: string }
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
@@ -71,6 +71,72 @@ async function pushAll(env: Env, origin: string, title: string, body: string): P
     } catch { /* se reintenta en la próxima corrida */ }
   }
   return ok;
+}
+
+// ---------- Alimentación con IA (Gemini) ----------
+const MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.8-flash'];
+async function gemini(env: Env, system: string, parts: unknown[], temperature = 0.2): Promise<string> {
+  if (!env.GEMINI_KEY) throw Object.assign(new Error('Falta la clave GEMINI_KEY en Cloudflare'), { status: 503 });
+  let last = 'sin respuesta';
+  for (const m of [...new Set([env.GEMINI_MODEL, ...MODELS].filter(Boolean) as string[])]) {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': env.GEMINI_KEY },
+      body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts }], generationConfig: { temperature } }),
+    }).catch(() => null);
+    if (!r) { last = m + ': sin conexión'; continue; }
+    if (r.ok) {
+      const j: any = await r.json().catch(() => ({}));
+      const t = (j.candidates?.[0]?.content?.parts ?? []).map((q: any) => q.text ?? '').join('').trim();
+      if (t) return t; last = m + ': respuesta vacía'; continue;
+    }
+    last = `${m}: ${r.status}`; if (![404, 429, 500, 503].includes(r.status)) break;
+  }
+  throw Object.assign(new Error('La IA no respondió (' + last + ')'), { status: 502 });
+}
+const DESCRIBE_SYSTEM = `Sos un nutricionista que describe comidas. Describí en español, en 2 a 4 líneas, qué contiene la comida: cada alimento, porción aproximada y cocción. Cerrá siempre con estas cuatro etiquetas, en una línea cada una:
+Proteína: (sí/no y cuál)
+Verduras o frutas: (sí/no y cuáles)
+Ultraprocesado, frito o comida rápida: (sí/no y cuál)
+Bebida: (cuál, o ninguna visible)
+No evalúes el día ni des consejos. Si la imagen no es comida, respondé solo "No parece comida". No inventes lo que no se ve; si algo no se puede saber (aceite, azúcar, salsas), decilo.`;
+const RUBRIC = `Rúbrica fija para evaluar el día de alimentación (aplicala siempre igual):
+1. Proteína presente en el almuerzo y en la cena, y en general a lo largo del día.
+2. Verduras o frutas presentes durante el día, idealmente en almuerzo y cena.
+3. Como máximo una comida ultraprocesada, frita o de comida rápida en el día.
+4. Sin gaseosas ni bebidas azucaradas, y sin exceso de alcohol.
+5. Porciones razonables, sin excesos evidentes.
+El día se aprueba si se cumplen los cinco puntos mirando el día completo: lo que faltó en una comida cuenta como cumplido solo si se compensó en otra. Si falta algún punto y no se compensó, no se aprueba. Si falta información para juzgar un punto, no lo penalices. Usá solo las comidas listadas; no inventes otras.`;
+const mealName = (t: string) => { const h = +t.slice(0, 2); return h < 11 ? 'Desayuno' : h < 16 ? 'Almuerzo' : h < 20 ? 'Merienda' : 'Cena'; };
+const normFirst = (text: string) => text.split('\n').find(l => l.trim())?.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') ?? '';
+const parseStatus = (text: string) => { const f = normFirst(text); return /NO\s+APROBAD|DESAPROBAD/.test(f) ? 'no' : /APROBAD/.test(f) ? 'ok' : /PARCIAL/.test(f) ? 'parcial' : 'none'; };
+const validDate = (d: unknown): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
+const dowOf = (date: string) => new Date(date + 'T00:00:00Z').getUTCDay();
+const mealsReady = new WeakSet<object>();
+async function ensureMeals(env: Env) {
+  if (mealsReady.has(env.DB)) return;
+  await env.DB.prepare('CREATE TABLE IF NOT EXISTS meals (id TEXT PRIMARY KEY, date TEXT NOT NULL, t TEXT NOT NULL, kind TEXT NOT NULL, descr TEXT NOT NULL, created_at INTEGER NOT NULL)').run();
+  mealsReady.add(env.DB);
+}
+const listMeals = async (env: Env, date: string) =>
+  ((await env.DB.prepare('SELECT id, t, kind, descr FROM meals WHERE date = ? ORDER BY t, created_at').bind(date).all()).results as { id: string; t: string; kind: string; descr: string }[]);
+/** Guarda el análisis del día en la entrada del día; con final cierra el día (solo lunes a viernes) si la primera línea trae el veredicto. */
+async function saveVerdict(env: Env, date: string, text: string, fin: boolean) {
+  const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
+  const input = row ? JSON.parse(row.input as string) : {}, status = parseStatus(text), weekday = dowOf(date) >= 1 && dowOf(date) <= 5;
+  if (text) input.verdictTx = text; else delete input.verdictTx;
+  const closed = fin && weekday && (status === 'ok' || status === 'no');
+  if (closed) { input.meals = true; if (status === 'ok') input.food = true; else { delete input.food; delete input.meat; delete input.veg; } }
+  await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
+    .bind(date, JSON.stringify(input), Date.now(), 'ia-comida').run();
+  return { status, closed };
+}
+async function judgeDay(env: Env, date: string, final: boolean) {
+  const meals = await listMeals(env, date);
+  const list = meals.map(m => `${m.t} ${mealName(m.t)}: ${m.descr}`).join('\n');
+  const how = final
+    ? 'El día terminó. Primera línea: solo APROBADO o NO APROBADO, según TODO el día junto. Después, una línea por cada punto de la rúbrica (cumple / no cumple y por qué). Sin markdown.'
+    : 'El día sigue. Primera línea: solo PARCIAL. Después tres líneas: "Va bien: ...", "Falta: ..." (lo que todavía haría falta comer para aprobar) y "Si cerraras ahora: APROBADO o NO APROBADO". Sin markdown.';
+  return gemini(env, 'Sos un evaluador consistente de la alimentación diaria de un adulto que entrena. Respondés en español rioplatense, breve y concreto.\n' + RUBRIC, [{ text: `${how}\n\nComidas del día:\n${list}` }]);
 }
 
 const isEmptyInput = (raw: string | null) => {
@@ -164,26 +230,63 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
     return json({ date, text: row ? (JSON.parse(row.input as string).verdictTx ?? '') : '' });
   }
-  // Guarda la respuesta completa del día. Solo cierra el día (lunes a viernes) si final es verdadero y la primera línea trae el veredicto.
+  // Guarda una respuesta de texto del día (atajos). Solo cierra el día si final es verdadero y la primera línea trae el veredicto.
   if (path === '/api/verdict' && m === 'POST') {
     const b: any = await req.json().catch(() => ({}));
     const text = typeof b.text === 'string' ? b.text.trim().slice(0, 4000) : '';
     if (!text) return json({ error: 'falta text' }, 400);
-    const now = Date.now(), tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset);
-    const local = new Date(now + tz * 60000), date = local.toISOString().slice(0, 10), dow = local.getUTCDay();
-    const first = text.split('\n').find(l => l.trim())?.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') ?? '';
-    const status = /NO\s+APROBAD|DESAPROBAD/.test(first) ? 'no' : /APROBAD/.test(first) ? 'ok' : /PARCIAL/.test(first) ? 'parcial' : 'none';
+    const tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset), date = new Date(Date.now() + tz * 60000).toISOString().slice(0, 10);
+    const r = await saveVerdict(env, date, text, b.final === true || /^(si|sí|true|1)$/i.test(String(b.final ?? '')));
+    return json({ ok: true, date, status: r.status, closed: r.closed });
+  }
+  // ----- Alimentación con IA: cada comida se describe, se guarda y se rehace el análisis de todo el día -----
+  if (path === '/api/meals' && m === 'GET') {
+    await ensureMeals(env); const date = url.searchParams.get('date') ?? '';
+    if (!validDate(date)) return json({ error: 'fecha inválida' }, 400);
     const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
-    const input = row ? JSON.parse(row.input as string) : {};
-    input.verdictTx = text;
-    const fin = b.final === true || /^(si|sí|true|1)$/i.test(String(b.final ?? ''));
-    if (fin && dow >= 1 && dow <= 5) {
-      if (status === 'ok') { input.meals = true; input.food = true; }
-      else if (status === 'no') { input.meals = true; delete input.food; delete input.meat; delete input.veg; }
-    }
-    await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
-      .bind(date, JSON.stringify(input), now, 'atajo-comida').run();
-    return json({ ok: true, date, status, closed: fin && dow >= 1 && dow <= 5 && (status === 'ok' || status === 'no') });
+    return json({ date, meals: await listMeals(env, date), text: row ? (JSON.parse(row.input as string).verdictTx ?? '') : '' });
+  }
+  if (path === '/api/meal' && m === 'POST') {
+    await ensureMeals(env);
+    const b: any = await req.json().catch(() => ({}));
+    const text = typeof b.text === 'string' ? b.text.trim().slice(0, 1500) : '', image = typeof b.image === 'string' ? b.image : '';
+    if (!validDate(b.date)) return json({ error: 'fecha inválida' }, 400);
+    if (!image && !text) return json({ error: 'falta la foto o el texto' }, 400);
+    if (image.length > 3_000_000) return json({ error: 'la foto es demasiado grande' }, 413);
+    if (!env.GEMINI_KEY) return json({ error: 'Falta la clave GEMINI_KEY en Cloudflare' }, 503);
+    const t = /^\d{2}:\d{2}$/.test(b.t ?? '') ? b.t : '12:00';
+    try {
+      const descr = image
+        ? await gemini(env, DESCRIBE_SYSTEM, [{ text: 'Describí esta comida.' + (text ? ' Nota de quien la comió: ' + text : '') }, { inline_data: { mime_type: typeof b.mime === 'string' ? b.mime : 'image/jpeg', data: image } }], 0.1)
+        : text;
+      const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      await env.DB.prepare('INSERT INTO meals (id, date, t, kind, descr, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(id, b.date, t, image ? 'photo' : 'text', descr, Date.now()).run();
+      const analysis = await judgeDay(env, b.date, false);
+      await saveVerdict(env, b.date, analysis, false);
+      return json({ ok: true, id, descr, text: analysis, meals: await listMeals(env, b.date) });
+    } catch (e: any) { return json({ error: e.message }, e.status ?? 500); }
+  }
+  if (path === '/api/meal/delete' && m === 'POST') {
+    await ensureMeals(env);
+    const b: any = await req.json().catch(() => ({}));
+    if (!validDate(b.date) || typeof b.id !== 'string') return json({ error: 'datos inválidos' }, 400);
+    await env.DB.prepare('DELETE FROM meals WHERE id = ? AND date = ?').bind(b.id, b.date).run();
+    try {
+      const left = await listMeals(env, b.date);
+      const analysis = left.length ? await judgeDay(env, b.date, false) : '';
+      await saveVerdict(env, b.date, analysis, false);
+      return json({ ok: true, text: analysis, meals: left });
+    } catch (e: any) { return json({ error: e.message, meals: await listMeals(env, b.date) }, e.status ?? 500); }
+  }
+  if (path === '/api/meal/close' && m === 'POST') {
+    await ensureMeals(env);
+    const b: any = await req.json().catch(() => ({}));
+    if (!validDate(b.date)) return json({ error: 'fecha inválida' }, 400);
+    if (!(await listMeals(env, b.date)).length) return json({ error: 'No hay comidas cargadas ese día' }, 400);
+    try {
+      const analysis = await judgeDay(env, b.date, true), r = await saveVerdict(env, b.date, analysis, true);
+      return json({ ok: true, text: analysis, status: r.status, closed: r.closed, meals: await listMeals(env, b.date) });
+    } catch (e: any) { return json({ error: e.message }, e.status ?? 500); }
   }
   if (path === '/api/vapid' && m === 'GET') return json({ publicKey: (await vapid(env)).pub });
   if (path === '/api/push/subscribe' && m === 'POST') {

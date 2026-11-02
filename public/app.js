@@ -116,12 +116,6 @@ const entries = date => S.log[date] || [];
 const hhmm = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const mealName = t => { const h = +t.slice(0, 2); return h < 11 ? 'Desayuno' : h < 16 ? 'Almuerzo' : h < 20 ? 'Merienda' : 'Cena'; };
 let txOpen = false, txDraft = '', vDraft = '', bkDraft = { t: '', a: '', d: '' };
-const RUBRICA = `Esta conversación es solo para evaluar mi alimentación. Cada vez te voy a mandar fotos y descripciones de las comidas de un día de lunes a viernes (de a una o todas juntas; los fines de semana son libres y no los evalúo). Evaluá la jornada completa con esta rúbrica:
-- APROBADO: la mayoría de las comidas tienen proteína y verduras o frutas; como máximo una comida ultraprocesada o de comida rápida; sin gaseosas ni bebidas azucaradas; sin alcohol en exceso; porciones razonables.
-- PARCIAL: el día todavía no terminó y hasta ahora va bien; decime qué me falta comer o evitar.
-- NO APROBADO: no cumple lo anterior.
-Respondé siempre así: primera línea APROBADO, NO APROBADO o PARCIAL; después una línea por comida; al final el motivo principal en una frase. Si te mando más comidas del mismo día, sumalas a las anteriores y evaluá de nuevo todo el día. Cada mensaje trae la fecha del día que estoy evaluando.`;
-
 // Fotos: se guardan en el teléfono (IndexedDB) hasta que las mandás; en el estado solo queda la hora y el texto.
 let dbp = null;
 const idb = () => dbp || (dbp = new Promise((res, rej) => { try { const r = indexedDB.open('pd-fotos', 1); r.onupgradeneeded = () => r.result.createObjectStore('f'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } }));
@@ -142,21 +136,34 @@ async function hydratePhotos() {
     try { if (!phURL.has(id)) { const b = await fotoGet(id); if (b) phURL.set(id, URL.createObjectURL(b)); } if (phURL.get(id)) img.src = phURL.get(id); } catch { /* sin foto */ }
   }
 }
-/** Manda a Claude (hoja de compartir) las comidas del día que todavía no se enviaron; la consigna queda copiada para pegarla en el chat. */
-async function shareDay(date) {
-  const list = entries(date), todo = list.filter(e => !e.sent);
-  if (!todo.length) { hint('No hay comidas nuevas para enviar'); return; }
-  const first = !S.rubricSent, txt = todo.filter(e => e.k === 'text').map(e => `${e.t} ${mealName(e.t)}: ${e.tx}`).join('\n');
-  const text = (first ? RUBRICA + '\n\n' : '') + `Comidas del ${pretty(date)}` + (list.some(e => e.sent) ? ' (sumalas a las que ya te mandé de ese día y evaluá de nuevo todo el día):' : ':') + (txt ? '\n\nComidas descritas:\n' + txt : '');
-  try { await navigator.clipboard?.writeText(text); } catch { /* sin portapapeles */ }
-  const files = [];
-  for (const e of todo) if (e.k === 'photo') { const b = await fotoGet(e.id).catch(() => null); if (b) files.push(new File([b], `${e.t.replace(':', '')}-${mealName(e.t)}.jpg`, { type: 'image/jpeg' })); }
-  try {
-    if (files.length && navigator.canShare?.({ files })) await navigator.share({ files, text });
-    else if (!files.length && navigator.share) await navigator.share({ text });
-    else { hint('Consigna copiada: pegala en Claude y adjuntá las fotos'); return; }
-  } catch (err) { if (err.name !== 'AbortError') hint('No se pudo compartir'); return; }
-  todo.forEach(e => { e.sent = true; }); S.rubricSent = true; save(); render();
+/** Alimentación con IA: el servidor describe cada comida, guarda la lista del día y rehace el análisis completo. */
+let busy = '', errMeal = '';
+S.mc = S.mc || {};
+const mealsOf = date => S.mc[date]?.meals ?? [];
+const blobB64 = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
+async function aiRun(label, fn) {
+  if (busy) return; busy = label; errMeal = ''; render();
+  try { await sync(); await fn(); save(); await sync(); }
+  catch (e) { errMeal = e.message || 'No se pudo completar'; }
+  busy = ''; render();
+}
+const mealSend = (blob, text) => aiRun('Analizando la comida…', async () => {
+  const date = todayISO(), r = await api('/api/meal', 'POST', { date, t: hhmm(), image: blob ? await blobB64(blob) : undefined, mime: 'image/jpeg', text: text || undefined });
+  if (blob) await fotoPut(r.id, blob).catch(() => {});
+  S.mc[date] = { meals: r.meals }; txOpen = false; txDraft = '';
+});
+const mealClose = date => aiRun('Armando el veredicto del día…', async () => {
+  const r = await api('/api/meal/close', 'POST', { date }); S.mc[date] = { meals: r.meals };
+  if (!r.closed) errMeal = 'La IA no dio un veredicto claro: marcalo a mano o volvé a intentar.';
+  else if (modal?.kind === 'meals') modal = null;
+});
+const mealDel = (date, id) => aiRun('Actualizando el análisis…', async () => {
+  const r = await api('/api/meal/delete', 'POST', { date, id }); S.mc[date] = { meals: r.meals }; fotoDel(id).catch(() => {}); phURL.delete(id);
+});
+const fetched = new Set();
+async function loadMeals(date, force) {
+  if (!S.token || (fetched.has(date) && !force)) return; fetched.add(date);
+  try { const r = await api('/api/meals?date=' + date); S.mc[date] = { meals: r.meals }; save(); render(); } catch { fetched.delete(date); }
 }
 /** Veredicto del día: 'parcial' es un consejo; 'ok' y 'no' cierran el día (lo que cuenta para la semana). */
 function setVerdict(date, st, tx) {
@@ -387,22 +394,23 @@ function viewStats() {
 
 // ---------- Alimentación (Hoy · Semana · Mascotas) ----------
 function entryHTML(e, date) {
-  return `<div class="entry">${e.k === 'photo' ? `<img class="thumb" data-ph="${e.id}" alt="">` : '<span class="mic">✍️</span>'}<span class="mtx"><b>${e.t} · ${mealName(e.t)}</b><small>${e.k === 'text' ? esc(e.tx) : 'foto'}${e.sent ? ' · enviada' : ''}</small></span>${e.sent ? '' : `<button class="undo" data-act="entdel" data-d="${date}" data-id="${e.id}">Borrar</button>`}</div>`;
+  return `<div class="entry">${e.kind === 'photo' ? `<img class="thumb" data-ph="${e.id}" alt="">` : '<span class="mic">✍️</span>'}<span class="mtx"><b>${e.t} · ${mealName(e.t)}</b><small class="dsc">${esc(e.descr)}</small></span><button class="undo" data-act="mealdel" data-d="${date}" data-id="${e.id}" ${busy ? 'disabled' : ''}>Borrar</button></div>`;
 }
 function alimHoy() {
   const date = todayISO(), pre = dayIdx(date) < 0, inp = pre ? {} : S.days[date]?.input ?? {};
-  const { e, st } = current(), cfg = e.cfg, list = entries(date), v = S.verdict[date], ok = foodApproved(inp), closed = ok || !!inp.meals;
-  const state = closed ? (ok ? ['ok', '✅ Día aprobado'] : ['bad', '❌ Día no aprobado']) : v?.st === 'parcial' ? ['gold', '🕒 Parcial'] : ['', 'Sin evaluar'];
-  let h = `<div class="card slim"><div class="row"><h2>Hoy · ${pretty(date)}</h2><span class="pill ${state[0]}">${state[1]}</span></div>${inp.verdictTx || v?.tx ? `<p class="vnote">${esc(inp.verdictTx || v.tx)}</p>` : ''}<div class="mute">Semana: ${foodText(st, cfg)} · alimenta a ${PETS[st.equipped].name}</div></div>`;
-  h += `<div class="card slim"><div class="row"><h2>Comidas</h2><span class="pill">${list.length}</span></div>${list.length ? list.map(x => entryHTML(x, date)).join('') : '<p class="mute">Todavía no cargaste ninguna comida hoy.</p>'}`;
-  h += txOpen ? `<textarea id="txin" rows="3" placeholder="Qué comiste (ej.: 2 milanesas con ensalada y agua)">${esc(txDraft)}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="txcancel">Cancelar</button><button class="btn sm" data-act="txsave">Guardar</button></div>`
-    : `<div class="row" style="margin-top:10px"><button class="btn sm" ${pre ? 'disabled' : 'data-act="foto"'}>📷 Foto</button><button class="btn sm ghost" ${pre ? 'disabled' : 'data-act="txopen"'}>✍️ Escribir</button></div>`;
-  h += `</div>`;
+  const { e, st } = current(), cfg = e.cfg, list = mealsOf(date), v = S.verdict[date], ok = foodApproved(inp), closed = ok || !!inp.meals;
+  const state = closed ? (ok ? ['ok', '✅ Día aprobado'] : ['bad', '❌ Día no aprobado']) : inp.verdictTx || v?.tx ? ['gold', '🕒 Parcial'] : ['', 'Sin evaluar'];
+  let h = `<div class="card slim"><div class="row"><h2>Hoy · ${pretty(date)}</h2><span class="pill ${state[0]}">${state[1]}</span></div><div class="mute">Semana: ${foodText(st, cfg)} · alimenta a ${PETS[st.equipped].name}</div></div>`;
   if ((new Date(toUTC(date)).getUTCDay() + 6) % 7 >= 5) return `<div class="card slim"><h2>Hoy · ${pretty(date)}</h2><p class="mute">Fin de semana: tus permitidos. No se registra la comida; la semana de alimentación corre de lunes a viernes.</p><div class="mute">Semana: ${foodText(st, cfg)} · alimenta a ${PETS[st.equipped].name}</div></div>`;
-  const unsent = list.filter(x => !x.sent).length;
-  h += `<div class="card slim"><h2>Evaluar con Claude</h2><p class="mute">Mandá lo que llevás cuando quieras: te dice si vas bien o qué te falta. Para cerrar el día, la última respuesta tiene que ser aprobado o no aprobado. Usá siempre la misma conversación de Claude.</p><div class="row" style="margin-top:8px"><button class="btn sm" ${pre ? 'disabled' : 'data-act="share"'}>Enviar${unsent ? ` (${unsent})` : ''}</button><button class="btn sm ghost" data-act="copyrub">Copiar consigna</button></div><button class="btn sm" style="margin-top:8px;width:100%" ${pre ? 'disabled' : 'data-act="runsc"'}>⚡ Evaluar con el atajo</button>`;
-  h += closed ? `<div class="row" style="margin-top:10px"><span class="mute">Día cerrado.</span><button class="undo" data-act="reopen">Reabrir el día</button></div>`
-    : `<label>Respuesta de Claude (opcional)<textarea id="vtx" rows="3">${esc(vDraft)}</textarea></label><div class="row vbtns"><button class="btn sm ghost" data-act="vparcial">Parcial</button><button class="btn sm ghost" data-act="vno">No aprobado</button><button class="btn sm" data-act="vok">Aprobado</button></div>`;
+  const off = pre || !!busy || closed;
+  h += `<div class="card slim"><div class="row"><h2>Comidas</h2><span class="pill">${list.length}</span></div>${list.length ? list.map(x => entryHTML(x, date)).join('') : '<p class="mute">Todavía no cargaste ninguna comida hoy.</p>'}`;
+  h += txOpen ? `<textarea id="txin" rows="3" placeholder="Qué comiste (ej.: 2 milanesas con ensalada y agua)">${esc(txDraft)}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="txcancel" ${busy ? 'disabled' : ''}>Cancelar</button><button class="btn sm" data-act="txsave" ${busy ? 'disabled' : ''}>Enviar</button></div>`
+    : `<div class="row" style="margin-top:10px"><button class="btn sm" ${off ? 'disabled' : 'data-act="foto"'}>📷 Foto</button><button class="btn sm ghost" ${off ? 'disabled' : 'data-act="txopen"'}>✍️ Escribir</button></div>`;
+  h += `${busy ? `<p class="mute busy">⏳ ${busy}</p>` : ''}${errMeal ? `<p class="err">${esc(errMeal)}</p>` : ''}</div>`;
+  const tx = inp.verdictTx || v?.tx || '';
+  h += `<div class="card slim"><h2>Análisis del día</h2>${tx ? `<p class="vnote">${esc(tx)}</p>` : '<p class="mute">Cargá tu primera comida y la IA te dice cómo va el día. Cada comida nueva rehace el análisis con todo lo que comiste.</p>'}`;
+  h += closed ? `<div class="row" style="margin-top:10px"><span class="mute">Día cerrado.</span><button class="undo" data-act="reopen" ${busy ? 'disabled' : ''}>Reabrir el día</button></div>`
+    : `<button class="btn" style="margin-top:10px;width:100%" ${pre || busy || !list.length ? 'disabled' : 'data-act="mealclose" data-d="' + date + '"'}>Cerrar el día y obtener el veredicto</button><div class="row vbtns" style="margin-top:8px"><span class="mute" style="flex:none">A mano:</span><button class="btn sm ghost" data-act="vno">No aprobado</button><button class="btn sm ghost" data-act="vok">Aprobado</button></div>`;
   return h + `</div>`;
 }
 function alimSemana() {
@@ -430,7 +438,7 @@ function petsBody() {
 function viewAlim() {
   if (!S.startDate) return `<h1>Alimentación</h1><div class="card mute">Disponibles al ingresar.</div>`;
   const head = `<h1>Alimentación</h1>` + subtabs('alim', [['hoy', 'Hoy'], ['sem', 'Semana'], ['pet', 'Mascotas']]) + '<!--fit-->';
-  return head + (SUB.alim === 'sem' ? alimSemana() : SUB.alim === 'pet' ? petsBody() : alimHoy());
+  return head + (SUB.alim === 'sem' ? alimSemana() : SUB.alim === 'pet' ? petsBody() : `<div class="iscroll">${alimHoy()}</div>`);
 }
 
 const SUB = { torre: 'res', ajustes: 'gen', stats: 'est', alim: 'hoy' };
@@ -463,8 +471,8 @@ const TABS = [['hoy', '✅', 'Misiones', viewHoy], ['torre', '🏰', 'Torre', vi
 function modalHTML() {
   if (!modal || !S.startDate) return '';
   if (modal.kind === 'meals') {
-    const d = modal.date, list = entries(d), unsent = list.filter(x => !x.sent).length;
-    return `<div class="modal"><div class="card slim"><h2>Cerrá el ${pretty(d)}</h2><p class="mute">Ese día quedó sin veredicto. Para seguir, cargá la respuesta de Claude: aprobado o no aprobado.</p>${list.length ? list.map(x => entryHTML(x, d)).join('') : '<p class="mute">No cargaste comidas ese día.</p>'}<div class="row" style="margin-top:8px"><button class="btn sm" data-act="share" data-d="${d}">Enviar${unsent ? ` (${unsent})` : ''}</button><button class="btn sm ghost" data-act="copyrub">Copiar consigna</button></div><label>Respuesta de Claude (opcional)<textarea id="mvtx" rows="3">${esc(vDraft)}</textarea></label><div class="row vbtns" style="margin-top:8px"><button class="btn sm ghost" data-act="mvno" data-d="${d}">No aprobado</button><button class="btn sm" data-act="mvok" data-d="${d}">Aprobado</button></div></div></div>`;
+    const d = modal.date, list = mealsOf(d), tx = S.days[d]?.input?.verdictTx || '';
+    return `<div class="modal"><div class="card slim"><h2>Cerrá el ${pretty(d)}</h2><p class="mute">Ese día quedó sin veredicto. Para seguir, cerralo.</p>${list.length ? list.map(x => entryHTML(x, d)).join('') : '<p class="mute">No hay comidas cargadas ese día.</p>'}${tx ? `<p class="vnote">${esc(tx)}</p>` : ''}${busy ? `<p class="mute busy">⏳ ${busy}</p>` : ''}${errMeal ? `<p class="err">${esc(errMeal)}</p>` : ''}<button class="btn" style="margin-top:8px;width:100%" ${busy || !list.length ? 'disabled' : `data-act="mealclose" data-d="${d}"`}>Cerrar con la IA</button><label>O marcalo a mano (opcional: nota)<textarea id="mvtx" rows="2">${esc(vDraft)}</textarea></label><div class="row vbtns" style="margin-top:8px"><button class="btn sm ghost" data-act="mvno" data-d="${d}">No aprobado</button><button class="btn sm ghost" data-act="mvok" data-d="${d}">Aprobado</button></div></div></div>`;
   }
   if (modal.kind === 'room') {
     const { e } = compute(dayIdx(modal.date)), st = e.state, mine = roomsOf(S.days[modal.date]?.input ?? {}), taken = st.roomsWk.filter(r => !mine.includes(r)), sel = modal.sel;
@@ -479,12 +487,13 @@ function render() {
   if (!S.token && tab !== 'ajustes') { tab = 'ajustes'; return render(); }
   document.documentElement.classList.toggle('cf', has('marco'));
   // Registro de comidas obligatorio: si un día ya terminado quedó sin registrar, se pide antes que cualquier otra cosa.
-  if (!modal) { const pm = pendingMeals(); if (pm) modal = { kind: 'meals', date: pm }; }
+  if (!modal) { const pm = pendingMeals(); if (pm) { modal = { kind: 'meals', date: pm }; loadMeals(pm); } }
   const html = offline + view(), mk = html.indexOf('<!--fit-->');
   app.innerHTML = mk < 0 ? `<div id="fit">${html}</div>` : `${html.slice(0, mk)}<div id="fit">${html.slice(mk + 10)}</div>`; renderStrip();
   document.getElementById('modal').innerHTML = modalHTML();
   document.getElementById('tabs').innerHTML = TABS.map(t => `<button class="${t[0] === tab ? 'on' : ''}" data-act="tab" data-t="${t[0]}"><span>${t[1]}</span>${t[2]}</button>`).join('');
   if (tab === 'stats' && S.startDate && SUB.stats === 'est') statSeen();
+  if (tab === 'alim' && S.token) loadMeals(todayISO());
   hydratePhotos();
   if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
   fit();
@@ -708,7 +717,7 @@ async function enablePush() {
 document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   const a = el.dataset.act;
-  if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); }
+  if (a === 'tab') { tab = el.dataset.t; if (tab === 'ajustes') errMsg = ''; render(); if (tab === 'alim') loadMeals(todayISO(), true); }
   else if (a === 'sub') { SUB[el.dataset.k] = el.dataset.v; render(); }
   else if (a === 't') {
     const k = el.dataset.k, now = Date.now();
@@ -725,28 +734,15 @@ document.addEventListener('click', async ev => {
   else if (a === 'gotoalim') { tab = 'alim'; SUB.alim = 'hoy'; render(); }
   else if (a === 'gotobooks') { tab = 'stats'; SUB.stats = 'lib'; render(); }
   else if (a === 'foto') {
-    const pick = document.createElement('input'); pick.type = 'file'; pick.accept = 'image/*'; pick.multiple = true;
-    pick.onchange = async () => {
-      const date = todayISO();
-      for (const f of pick.files) { try { const id = 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); await fotoPut(id, await shrink(f)); (S.log[date] ||= []).push({ id, k: 'photo', t: hhmm() }); } catch { hint('No se pudo guardar la foto'); } }
-      save(); render();
-    };
+    const pick = document.createElement('input'); pick.type = 'file'; pick.accept = 'image/*';
+    pick.onchange = async () => { const f = pick.files[0]; if (!f) return; try { await mealSend(await shrink(f)); } catch { errMeal = 'No se pudo leer la foto'; render(); } };
     pick.click();
   }
   else if (a === 'txopen') { txOpen = true; render(); document.getElementById('txin')?.focus(); }
   else if (a === 'txcancel') { txOpen = false; txDraft = ''; render(); }
-  else if (a === 'txsave') {
-    const tx = (document.getElementById('txin')?.value || '').trim(); if (!tx) { hint('Escribí qué comiste'); return; }
-    (S.log[todayISO()] ||= []).push({ id: 't' + Date.now().toString(36), k: 'text', t: hhmm(), tx }); txOpen = false; txDraft = ''; save(); render();
-  }
-  else if (a === 'entdel') {
-    const d = el.dataset.d, id = el.dataset.id, x = entries(d).find(q => q.id === id);
-    if (x?.k === 'photo') { fotoDel(id).catch(() => {}); phURL.delete(id); }
-    S.log[d] = entries(d).filter(q => q.id !== id); save(); render();
-  }
-  else if (a === 'share') shareDay(el.dataset.d || todayISO());
-  else if (a === 'runsc') { location.href = 'shortcuts://run-shortcut?name=' + encodeURIComponent('Evaluar Comida'); }
-  else if (a === 'copyrub') { try { await navigator.clipboard.writeText(RUBRICA); hint('Consigna copiada'); } catch { hint('No se pudo copiar'); } }
+  else if (a === 'txsave') { const tx = (document.getElementById('txin')?.value || '').trim(); if (!tx) { hint('Escribí qué comiste'); return; } mealSend(null, tx); }
+  else if (a === 'mealdel') mealDel(el.dataset.d, el.dataset.id);
+  else if (a === 'mealclose') mealClose(el.dataset.d);
   else if (a === 'vok' || a === 'vno' || a === 'vparcial') setVerdict(todayISO(), a === 'vok' ? 'ok' : a === 'vno' ? 'no' : 'parcial', (document.getElementById('vtx')?.value || '').trim());
   else if (a === 'mvok' || a === 'mvno') { const d = el.dataset.d, tx = (document.getElementById('mvtx')?.value || '').trim(); modal = null; setVerdict(d, a === 'mvok' ? 'ok' : 'no', tx); }
   else if (a === 'reopen') { const d = todayISO(); delete S.verdict[d]; setInput(d, i => { i.meals = false; i.food = false; i.meat = false; i.veg = false; }); }
@@ -808,7 +804,7 @@ async function detectMode() {
 // ---------- arranque ----------
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 window.addEventListener('online', sync);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (viewDate > todayISO()) viewDate = todayISO(); sync(); render(); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (viewDate > todayISO()) viewDate = todayISO(); sync(); render(); if (tab === 'alim') loadMeals(todayISO(), true); } });
 setReadyHandler(() => { readyN++; render(); });
 onAssets(() => { readyN++; render(); });
 render(); detectMode(); sync();

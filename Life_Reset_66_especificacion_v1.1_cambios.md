@@ -59,3 +59,9 @@ Las pruebas de paridad con el simulador v7 usan `LEGACY_CONFIG` (balance v1.2).
 - Gimnasio por ubicación: `POST /api/gym` con `{ "event": "arrive" | "leave" }` (Atajos de iPhone). La salida cuenta como sesión si pasaron 40 minutos o más desde la entrada y marca el día de la entrada (`gym: true`, `gymMin`).
 - El aviso de alimentación del servidor pasa a lunes–viernes (antes: domingo).
 - Estadísticas: Récords, Logros y Libros tienen desplazamiento interno (título y solapas fijos); Stats muestra la próxima puerta.
+
+### v1.5c — Alimentación con IA (Gemini)
+- Todo dentro de la app: foto o texto → el servidor (`/api/meal`) describe la comida con Gemini, la guarda en la tabla `meals` y rehace el análisis de TODO el día (`PARCIAL` + qué falta + «si cerraras ahora»). `/api/meal/close` da el veredicto final con la lista completa; solo ese cierra el día (lunes a viernes).
+- Rúbrica fija en el servidor (proteína en almuerzo y cena, verduras/frutas, máximo un ultraprocesado, sin bebidas azucaradas, porciones razonables; lo que falta debe compensarse en otra comida).
+- Requiere el secreto `GEMINI_KEY` en Cloudflare (opcional `GEMINI_MODEL`). Modelos probados en orden: gemini-3.6-flash, 3.5-flash-lite, 3.8-flash.
+- Los atajos (`/api/verdict`) quedan como camino alternativo.

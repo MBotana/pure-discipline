@@ -252,3 +252,6 @@ input[type=text],input[type=date],input[type=password],input[type=number]{height
 input[type=date]{min-width:0;text-align:left}
 input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:1.2em}
 .rtab.rhead span:last-child{text-align:right}
+.entry small.dsc{white-space:pre-line;overflow:visible;text-overflow:clip;max-height:none}
+.busy{color:var(--gold)}
+.err:empty{display:none}
