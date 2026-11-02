@@ -420,7 +420,7 @@ function arenaHTML(o, big) {
   const tNear = +(9 / o.speed).toFixed(2);
   const bg = showDoor && o.pre ? '' : `<div class="scrollwrap ${o.running ? '' : 'paused'}">${scrollLayers(o.hz, tNear)}</div>`;
   const door = showDoor ? towerLayer(doorName, doorName !== 'torre_cerrada' && !doorName.startsWith('torre_apertura'), 'door ' + (phase === 'shake' ? 'shake' : phase === 'fade' ? 'fadeout' : '')) : '';
-  const idle = o.running ? '' : 'idle', hx = big ? 26 : (o.boss ? 60 : 56), pxx = Math.max(2, hx + 4 - petArenaW(o.eq, o.pl));
+  const idle = o.running ? '' : 'idle', hx = 26, pxx = Math.max(2, hx + 4 - petArenaW(o.eq, o.pl));
   ['diaria', 'semanal', 'mensual', 'mueca'].forEach(p => heroSrc(o.floor, p));
   const floorBand = showDoor && o.pre ? '' : `<div class="scrollwrap floorwrap ${o.running ? '' : 'paused'}"><div class="scroll floorband" style="--t:${tNear}s"><i></i><i></i></div></div>`;
   return `<div class="arena ${big ? 'big' : ''}" data-run="${o.running ? 1 : 0}" data-floor="${o.hf}" data-crown="${o.done ? 1 : 0}" data-eq="${o.eq}" data-pl="${o.pl}" data-speed="${o.speed}" data-gait="${o.gait}" style="${vars}">${bg}${floorBand}${door}${heroSprite(o.hf, `left:${U(hx)};bottom:${U(ground)}`, o.done)}${petSprite(o.eq, o.pl, `left:${U(pxx)};bottom:${U(ground)}`)}${o.boss ? bossSprite(o.floor, `right:${U(14)};bottom:${U(ground)}`) : ''}</div>`;

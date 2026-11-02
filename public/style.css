@@ -265,7 +265,7 @@ img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:
 .torrescene{box-shadow:0 0 0 2px #2a170a,0 0 0 3px var(--gold,#c9a24a)}
 
 .tvground{width:240px;max-width:100%;margin:0 auto;height:0;background:linear-gradient(var(--gr2,#6a5a3a) 0 2px,var(--gr,#8a7a4a) 2px)}
-.tvfloor .arena .sp{width:calc(var(--w) * 0.67 * 100cqw / 240)}
+.arena .sp{width:calc(var(--w) * 0.67 * 100cqw / 240)}
 .tvhead{width:240px;height:22px;line-height:22px;text-align:center;font-family:var(--fd,'Cinzel',serif);font-weight:900;font-size:12px;letter-spacing:.06em;color:var(--title,#f4d77a);text-shadow:0 0 2px #000,0 1px 0 #000;white-space:nowrap;overflow:hidden}
 
 #strip .strip{width:fit-content;margin:0 auto}
