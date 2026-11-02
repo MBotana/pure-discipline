@@ -63,18 +63,17 @@ test('v1.5: Disciplina por horas de videojuegos (100 % cumple, 100–120 % no su
   assert.equal(e2.state.gameHWk, 15.5);
 });
 
-test('v1.5: las dos primeras semanas se miden pero no se castigan', () => {
+test('v1.5: sin semanas de prueba: la primera semana ya cuenta', () => {
   const e = new Engine();
-  week([{ gameH: 40 }], {}, e); assert.ok(e.state.wdone.includes('D'), 'semana 1 de prueba: cuenta como cumplida');
-  assert.equal(e.state.discPenN, 0);
-  week([{ gameH: 40 }], {}, e); week([{ gameH: 40 }], {}, e);
-  assert.ok(!e.state.wdone.includes('D'), 'desde la semana 3 rige el tope'); assert.equal(e.state.discPenN, 1);
+  week([{ gameH: 40 }], {}, e); assert.ok(!e.state.wdone.includes('D'), 'semana 1: pasarse del tope no suma');
+  assert.equal(e.state.discPenN, 1, 'y más de 120 % resta');
 });
 
-test('v1.5: la semana de alimentación se cumple con 5 días aprobados de 7', () => {
+test('v1.5: la semana de alimentación se cumple con 4 de los 5 días de lunes a viernes; el fin de semana no cuenta', () => {
   const A: DayInput = { food: true, meals: true };
-  assert.equal(week([A, A, A, A, A]).e.state.px.F, 10, '5 aprobados: alimenta');
-  assert.equal(week([A, A, A, A, {}, {}, {}]).e.state.px.F, 0, '4 no alcanzan');
+  assert.equal(week([A, A, A, A]).e.state.px.F, 10, '4 aprobados: alimenta');
+  assert.equal(week([A, A, A]).e.state.px.F, 0, '3 no alcanzan');
+  assert.equal(week([A, A, A, {}, {}, A, A]).e.state.px.F, 0, 'sábado y domingo no cuentan');
   assert.equal(week([A, A, A, A, A, A, A], { gameCapH: undefined }).e.state.xp, 0, 'sin XP de torre (la comida nunca paga XP)');
 });
 

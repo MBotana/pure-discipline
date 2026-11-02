@@ -54,9 +54,28 @@ test('recordatorios: diario y alimentación, una sola vez por día, respetando h
   // sábado 22:00 local (01:00 UTC del 8): avisa 'daily'
   assert.deepEqual(await runReminders(e as any, 'https://x.test', utc('2026-11-08T00:30:00Z')), ['daily']);
   assert.deepEqual(await runReminders(e as any, 'https://x.test', utc('2026-11-08T01:30:00Z')), [], 'no repite');
-  // domingo 8-nov 18:00 local = 21:00 UTC: avisa alimentación
-  assert.deepEqual(await runReminders(e as any, 'https://x.test', utc('2026-11-08T21:00:00Z')), ['feed']);
+  // viernes 6-nov 18:00 local = 21:00 UTC: avisa alimentación
+  assert.deepEqual(await runReminders(e as any, 'https://x.test', utc('2026-11-06T21:00:00Z')), ['feed']);
+  // el domingo no (el fin de semana la comida es libre)
+  assert.ok(!(await runReminders(e as any, 'https://x.test', utc('2026-11-08T21:00:00Z'))).includes('feed'));
   // si ya registró el día y alimentó, no avisa
-  await call(e, 'POST', '/api/sync', { changes: [{ date: '2026-11-09', input: { gym: true }, updated_at: 1 }] }, T);
+  await call(e, 'POST', '/api/sync', { changes: [{ date: '2026-11-09', input: { gym: true, meals: true }, updated_at: 1 }] }, T);
   assert.deepEqual(await runReminders(e as any, 'https://x.test', utc('2026-11-10T00:30:00Z')), []);
+});
+
+test('gimnasio: la salida cuenta solo con 40 minutos o más y marca el día de la entrada', async () => {
+  const e = env(); const T = 'clave-larga-1';
+  await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-02' });
+  const real = Date.now; let t = Date.parse('2026-11-03T22:00:00Z'); Date.now = () => t;   // 19:00 locales
+  try {
+    assert.equal((await call(e, 'POST', '/api/gym', { event: 'leave' }, T).then(r => r.json()) as any).counted, false, 'sin entrada');
+    await call(e, 'POST', '/api/gym', { event: 'arrive' }, T); t += 10 * 60000;
+    assert.equal((await call(e, 'POST', '/api/gym', { event: 'leave' }, T).then(r => r.json()) as any).counted, false, 'pasó 10 minutos');
+    await call(e, 'POST', '/api/gym', { event: 'arrive' }, T); t += 75 * 60000;
+    const r: any = await call(e, 'POST', '/api/gym', { event: 'leave' }, T).then(x => x.json());
+    assert.equal(r.counted, true); assert.equal(r.date, '2026-11-03');
+    const s: any = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
+    assert.equal(s.days['2026-11-03'].input.gym, true); assert.equal(s.days['2026-11-03'].input.gymMin, 75);
+    assert.equal((await call(e, 'POST', '/api/gym', { event: 'x' }, T)).status, 400);
+  } finally { Date.now = real; }
 });

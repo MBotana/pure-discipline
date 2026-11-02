@@ -12,7 +12,7 @@ export const DEFAULT_CONFIG: Config = {
   d: 50, W: 300, Mp: 1500,
   r: 1.039, A: 605,                 // costo del piso n → n+1 = 605 · 1,039^(n−1): 605 XP el primero, ~26.000 el último
   weeklyBonus: [0, 0.2, 0.3, 0.4, 0.5],
-  gymM: 16, aeroM: 12, bookTramos: 10, impUnits: 6, dchk: 2, namb: 5, foodDays: 5, dripDays: 6,   // gimnasio: 16 sesiones al mes (4 por semana); comida: 5 días aprobados de 7
+  gymM: 16, aeroM: 12, bookTramos: 10, impUnits: 6, dchk: 2, namb: 5, foodDays: 4, dripDays: 6,   // gimnasio: 16 sesiones al mes (4 por semana); comida: 4 de los 5 días de lunes a viernes (el fin de semana es libre)
   statPw: 1, statPen: 1, statScale: 0.5, reqScale: 0.9, freezeDays: 14,
   hingeEvery: 10,
   combos: COMBOS,
@@ -23,7 +23,7 @@ export const DEFAULT_CONFIG: Config = {
   dayFloorCap: 1,                   // nunca más de un piso por día: el XP se suma igual y el piso lo alcanza en los días siguientes
   dailyMult: true,                  // las diarias también se multiplican por la racha
   weekendComp: true,                // v1.5: el fin de semana solo compensa días perdidos de lunes a viernes
-  gameCapH: 15, gameGraceWeeks: 2,  // v1.5: Disciplina por horas de videojuegos (≤100 % cumple · 100–120 % no suma · >120 % resta 1); 2 semanas de prueba
+  gameCapH: 15, gameGraceWeeks: 0,  // v1.5: Disciplina por horas de videojuegos (≤100 % cumple · 100–120 % no suma · >120 % resta 1); sin semanas de prueba
   discPen: true,
   petRatio: 0.1, petCosts: [10, 13, 17, 20, 30], petWeek: 10,
   petsMustBeEquipped: true,

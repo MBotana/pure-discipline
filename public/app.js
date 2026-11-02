@@ -106,6 +106,7 @@ const fmt = n => Math.round(n).toLocaleString('es-AR');
 // ---------- alimentación: comidas del día (foto o texto), evaluación y cierre ----------
 S.log = S.log || {}; S.verdict = S.verdict || {};
 const foodApproved = inp => !!(inp && (inp.food || inp.meat || inp.veg));
+const need = d => (new Date(toUTC(d)).getUTCDay() + 6) % 7 < 5 ? 5 : 4;   // el fin de semana la comida es libre
 const dailyDone = inp => ['gym', 'read', 'aero', 'clean'].filter(k => inp[k]).length + (foodApproved(inp) ? 1 : 0);
 const foodOk = (st, cfg) => cfg.foodRule ? (st.meatWk ?? 0) >= cfg.foodRule.meat && (st.vegWk ?? 0) >= cfg.foodRule.veg && (st.junkWk ?? 0) <= cfg.foodRule.junkMax : st.foodWk >= cfg.foodDays;
 const foodText = (st, cfg) => cfg.foodRule ? `carne ${st.meatWk ?? 0}/${cfg.foodRule.meat} · verduras ${st.vegWk ?? 0}/${cfg.foodRule.veg} · basura ${st.junkWk ?? 0} (máx. ${cfg.foodRule.junkMax})` : `${st.foodWk}/${cfg.foodDays} días aprobados`;
@@ -115,11 +116,11 @@ const entries = date => S.log[date] || [];
 const hhmm = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const mealName = t => { const h = +t.slice(0, 2); return h < 11 ? 'Desayuno' : h < 16 ? 'Almuerzo' : h < 20 ? 'Merienda' : 'Cena'; };
 let txOpen = false, txDraft = '', vDraft = '', bkDraft = { t: '', a: '', d: '' };
-const RUBRICA = `Sos mi evaluador de alimentación. Te voy a mandar fotos y descripciones de mis comidas del día (de a una o todas juntas). Evaluá la jornada completa con esta rúbrica:
+const RUBRICA = `Esta conversación es solo para evaluar mi alimentación. Cada vez te voy a mandar fotos y descripciones de las comidas de un día de lunes a viernes (de a una o todas juntas; los fines de semana son libres y no los evalúo). Evaluá la jornada completa con esta rúbrica:
 - APROBADO: la mayoría de las comidas tienen proteína y verduras o frutas; como máximo una comida ultraprocesada o de comida rápida; sin gaseosas ni bebidas azucaradas; sin alcohol en exceso; porciones razonables.
 - PARCIAL: el día todavía no terminó y hasta ahora va bien; decime qué me falta comer o evitar.
 - NO APROBADO: no cumple lo anterior.
-Respondé siempre así: primera línea APROBADO, NO APROBADO o PARCIAL; después una línea por comida; al final el motivo principal en una frase. Si te mando más comidas del mismo día, sumalas a las anteriores y evaluá de nuevo todo el día.`;
+Respondé siempre así: primera línea APROBADO, NO APROBADO o PARCIAL; después una línea por comida; al final el motivo principal en una frase. Si te mando más comidas del mismo día, sumalas a las anteriores y evaluá de nuevo todo el día. Cada mensaje trae la fecha del día que estoy evaluando.`;
 
 // Fotos: se guardan en el teléfono (IndexedDB) hasta que las mandás; en el estado solo queda la hora y el texto.
 let dbp = null;
@@ -145,8 +146,8 @@ async function hydratePhotos() {
 async function shareDay(date) {
   const list = entries(date), todo = list.filter(e => !e.sent);
   if (!todo.length) { hint('No hay comidas nuevas para enviar'); return; }
-  const first = !list.some(e => e.sent), txt = todo.filter(e => e.k === 'text').map(e => `${e.t} ${mealName(e.t)}: ${e.tx}`).join('\n');
-  const text = (first ? RUBRICA : 'Seguimos con mis comidas de hoy. Sumá estas a las anteriores y evaluá de nuevo todo el día.') + (txt ? '\n\nComidas descritas:\n' + txt : '');
+  const first = !S.rubricSent, txt = todo.filter(e => e.k === 'text').map(e => `${e.t} ${mealName(e.t)}: ${e.tx}`).join('\n');
+  const text = (first ? RUBRICA + '\n\n' : '') + `Comidas del ${pretty(date)}` + (list.some(e => e.sent) ? ' (sumalas a las que ya te mandé de ese día y evaluá de nuevo todo el día):' : ':') + (txt ? '\n\nComidas descritas:\n' + txt : '');
   try { await navigator.clipboard?.writeText(text); } catch { /* sin portapapeles */ }
   const files = [];
   for (const e of todo) if (e.k === 'photo') { const b = await fotoGet(e.id).catch(() => null); if (b) files.push(new File([b], `${e.t.replace(':', '')}-${mealName(e.t)}.jpg`, { type: 'image/jpeg' })); }
@@ -155,7 +156,7 @@ async function shareDay(date) {
     else if (!files.length && navigator.share) await navigator.share({ text });
     else { hint('Consigna copiada: pegala en Claude y adjuntá las fotos'); return; }
   } catch (err) { if (err.name !== 'AbortError') hint('No se pudo compartir'); return; }
-  todo.forEach(e => { e.sent = true; }); save(); render();
+  todo.forEach(e => { e.sent = true; }); S.rubricSent = true; save(); render();
 }
 /** Veredicto del día: 'parcial' es un consejo; 'ok' y 'no' cierran el día (lo que cuenta para la semana). */
 function setVerdict(date, st, tx) {
@@ -168,7 +169,7 @@ function setVerdict(date, st, tx) {
 function pendingMeals() {
   if (!S.token || !S.startDate) return null;
   const today = todayISO();
-  for (let d = S.startDate; d < today; d = addDays(d, 1)) { const i = S.days[d]?.input ?? {}; if (!i.meals && !foodApproved(i)) return d; }
+  for (let d = S.startDate; d < today; d = addDays(d, 1)) { if (need(d) === 4) continue; const i = S.days[d]?.input ?? {}; if (!i.meals && !foodApproved(i)) return d; }
   return null;
 }
 
@@ -185,7 +186,7 @@ function viewHoy() {
   const title = '<h1>Misiones</h1>';
   const dow = (new Date(toUTC(viewDate)).getUTCDay() + 6) % 7, wkStart = addDays(viewDate, -dow);
   const strip = Array.from({ length: 7 }, (_, i) => { const d = addDays(wkStart, i), inp = S.days[d]?.input ?? {}, n = dailyDone(inp), off = d > today;
-    return `<button class="wd ${d === viewDate ? 'sel' : ''} ${d === today ? 'tod' : ''} ${n === 5 ? 'full' : n ? 'some' : ''}" ${off ? 'disabled' : `data-act="day" data-d="${d}"`}><span>${'LMXJVSD'[i]}</span><b>${+d.slice(8)}</b><i></i></button>`; }).join('');
+    return `<button class="wd ${d === viewDate ? 'sel' : ''} ${d === today ? 'tod' : ''} ${n >= need(d) ? 'full' : n ? 'some' : ''}" ${off ? 'disabled' : `data-act="day" data-d="${d}"`}><span>${'LMXJVSD'[i]}</span><b>${+d.slice(8)}</b><i></i></button>`; }).join('');
   const nav = `<div class="wk">${strip}</div><div class="daytitle">${viewDate === today ? 'Hoy' : 'Editando'} · ${pretty(viewDate)}${viewDate !== today ? ' · <a href="#" data-act="today">volver a hoy</a>' : ''}</div>`;
   const pre = dayIdx(today) < 0;
   if (idx < 0 && !pre) return `${title}${nav}<div class="card mute">Este día es anterior al inicio de tu torre.</div>`;
@@ -207,27 +208,28 @@ function viewHoy() {
   if (st.blocked !== null && viewDate === today) h += `<div class="banner">🔒 <b>Bloqueado en el piso ${st.blocked}.</b> No sumás XP hasta cumplir la puerta (mirá la pestaña Torre).</div>`;
   h += `<div class="sum"><span><small>XP del día</small><b>+${fmt(gained)}</b></span><span><small>Piso</small><b>${r.floor}</b></span><span><small>Racha</small><b>${st.s} ${st.s === 1 ? 'mes' : 'meses'}</b></span><span><small>Multiplicador</small><b>×${String(+st.bonusW.toFixed(2)).replace('.', ',')}</b></span></div>${lost > 0 ? `<div class="mute" style="margin:-6px 0 10px">No cobrada por bloqueo: ${fmt(lost)}</div>` : ''}${ahead > 0 ? `<div class="mute" style="margin:-6px 0 10px">Tu XP ya alcanza para ${ahead === 1 ? 'un piso más' : ahead + ' pisos más'}: se sube de a uno por día.</div>` : ''}`;
   h += `<div class="seg">${sections.map(([k, l]) => `<button class="${mtab === k ? 'on' : ''}" data-act="mtab" data-v="${k}">${l}</button>`).join('')}</div><!--fit-->`;
-  const wi = pre ? { n: 1, of: 4 } : e.weekInfo(idx), gH = st.gameHWk ?? 0, today0 = inp.gameH || 0, cap = cfg.gameCapH, grace = !pre && Math.floor(idx / 7) < (cfg.gameGraceWeeks ?? 0);
+  const wi = pre ? { n: 1, of: 4 } : e.weekInfo(idx), gH = st.gameHWk ?? 0, today0 = inp.gameH || 0, cap = cfg.gameCapH;
   const petIc = c => petFace(c, e.petLevel(c), 1);
   if (mtab === 'dia') {
-    const wk = dd < 5 ? '+50 XP' : 'compensa un día perdido', n = dailyDone(inp);
-    h += `<div class="card slim"><div class="row"><h2>Misiones del día</h2><span class="pill ${n === 5 ? 'ok' : ''}">${n} / 5</span></div><div class="bar gold"><i style="width:${n * 20}%"></i></div>`;
+    const wk = dd < 5 ? '+50 XP' : 'compensa un día perdido', n = dailyDone(inp), tot = dd < 5 ? 5 : 4;
+    h += `<div class="card slim"><div class="row"><h2>Misiones del día</h2><span class="pill ${n >= tot ? 'ok' : ''}">${n} / ${tot}</span></div><div class="bar gold"><i style="width:${Math.min(100, n / tot * 100)}%"></i></div>`;
     h += row('gym', 'F', 'Gimnasio', `${wk} · sem ${w('F')}/3 · mes ${m('F')}/${cfg.gymM}`);
     h += row('read', 'I', 'Lectura', `${wk} · sem ${w('I')}/3`);
     h += row('aero', 'V', 'Aeróbico', `${wk} · sem ${w('V')}/3 · mes ${m('V')}/${cfg.aeroM}`);
     h += row('clean', 'O', 'Ambientes ordenados', `${wk} · sem ${st.roomsWk.length}/${cfg.namb} de ${ROOMS.length}`);
-    { const fo = foodApproved(inp); h += `<button class="mrow ${fo ? 'on' : ''}" data-act="gotoalim"><span class="mic">${ic('P')}</span><span class="mtx"><b>Alimentación</b><small>${fo ? 'día aprobado' : inp.meals ? 'día no aprobado' : 'se evalúa en la pestaña Alimentación'} · sem ${foodText(st, cfg)}</small></span><span class="chk">${fo ? '✓' : ''}</span></button>`; }
-    if (n === 5) h += `<p class="allok">¡Todas las misiones del día cumplidas!</p>`;
+    if (dd >= 5) h += `<div class="mrow static"><span class="mic">${ic('P')}</span><span class="mtx"><b>Alimentación</b><small>fin de semana: permitido, no se registra</small></span></div>`;
+    else { const fo = foodApproved(inp); h += `<button class="mrow ${fo ? 'on' : ''}" data-act="gotoalim"><span class="mic">${ic('P')}</span><span class="mtx"><b>Alimentación</b><small>${fo ? 'día aprobado' : inp.meals ? 'día no aprobado' : 'se evalúa en la pestaña Alimentación'} · sem ${foodText(st, cfg)}</small></span><span class="chk">${fo ? '✓' : ''}</span></button>`; }
+    if (n >= tot) h += `<p class="allok">¡Todas las misiones del día cumplidas!</p>`;
     h += `</div>`;
     { const gs = gameStatus(gH, cap), pct = Math.min(100, gH / cap * 100);
-      h += `<div class="card slim bronze"><div class="row"><h2>Videojuegos</h2><span class="pill ${grace ? '' : gs[0]}">${hrs(gH)} / ${hrs(cap)}</span></div><div class="bar gold"><i style="width:${pct}%"></i></div><div class="mute">${grace ? 'Semana de prueba: se mide pero no suma ni resta.' : gs[1]} · hoy ${hrs(today0)}</div>`
-        + `<div class="row" style="margin-top:8px"><input id="gh" type="text" inputmode="decimal" placeholder="Horas (ej.: 1,5)" ${pre ? 'disabled' : ''} autocomplete="off"><button class="btn sm" ${pre ? 'disabled' : 'data-act="gameadd"'}>Sumar</button></div>${today0 > 0 ? `<button class="undo" data-act="gamezero">Borrar las de hoy</button>` : ''}<p class="mute">Hasta ${hrs(cap)} por semana suma el punto de Disciplina (+300 XP el domingo); entre 100 % y 120 % no suma; más de 120 % resta 1.</p></div>`; }
+      h += `<div class="card slim bronze"><div class="row"><h2>Disciplina</h2><span class="pill ${gs[0]}">${hrs(gH)} / ${hrs(cap)}</span></div><div class="bar gold"><i style="width:${pct}%"></i></div><div class="mute">${gs[1]} · hoy ${hrs(today0)}</div>`
+        + `<div class="row" style="margin-top:8px"><input id="gh" type="text" inputmode="decimal" placeholder="Horas de videojuegos (ej.: 1,5)" ${pre ? 'disabled' : ''} autocomplete="off"><button class="btn sm" ${pre ? 'disabled' : 'data-act="gameadd"'}>Sumar</button></div>${today0 > 0 ? `<button class="undo" data-act="gamezero">Borrar las de hoy</button>` : ''}</div>`; }
   } else if (mtab === 'sem') {
     const rows = [['F', 'Fuerza', '3 sesiones', 3], ['I', 'Inteligencia', '3 lecturas', 3], ['V', 'Vitalidad', '3 aeróbicos', 3], ['O', 'Orden', `${cfg.namb} de ${ROOMS.length} ambientes · sin limpiar: ${ROOMS.filter(([id]) => !st.roomsWk.includes(id)).map(r => r[1]).join(', ') || 'ninguno'}`, cfg.namb]];
     const fed = foodOk(st, cfg), dn = rows.filter(([c]) => st.wdone.includes(c)).length + (st.wdone.includes('D') || st.wu.D >= 3 ? 1 : 0) + (fed ? 1 : 0);
     h += `<div class="card slim"><div class="row"><h2>Esta semana</h2><span class="pill ${dn === 6 ? 'ok' : ''}">${dn} / 6</span></div>`;
     h += rows.map(([c, nm, goal, max]) => info(c, nm, goal, pips(w(c), max), st.wdone.includes(c))).join('');
-    h += info('D', 'Disciplina', `videojuegos ${hrs(gH)} de ${hrs(cap)}${grace ? ' · semana de prueba' : ''}`, '', st.wdone.includes('D') || st.wu.D >= 3);
+    h += info('D', 'Disciplina', `videojuegos ${hrs(gH)} de ${hrs(cap)} · suma hasta el tope`, '', st.wdone.includes('D') || st.wu.D >= 3);
     h += info('P', 'Alimentación', foodText(st, cfg), '', fed);
     h += `<div class="mute">Semanas buenas seguidas: ${st.wstreak}</div><p class="mute">Fin de semana: solo compensa días perdidos de lunes a viernes, sin XP extra.</p></div>`;
   } else {
@@ -309,7 +311,7 @@ function viewRecords(h) {
   const W = h.weeks, cur = W[W.length - 1];
   const rows = [
     ['🏋️', 'Gimnasio', 'sesiones', w => w.gym, 'max'], ['🏃', 'Aeróbico', 'sesiones', w => w.aero, 'max'], ['📖', 'Lectura', 'días', w => w.read, 'max'],
-    ['🧹', 'Orden', 'ambientes', w => w.rooms, 'max'], ['🎮', 'Videojuegos', 'horas', w => w.gameH, 'min'], ['⭐', 'XP ganada', 'XP', w => w.xp, 'max'],
+    ['🧹', 'Orden', 'ambientes', w => w.rooms, 'max'], ['🎮', 'Disciplina', 'horas de juego', w => w.gameH, 'min'], ['⭐', 'XP ganada', 'XP', w => w.xp, 'max'],
   ];
   const f = (n, u) => u === 'horas' ? hrs(n) : fmt(n);
   let t = `<div class="card slim"><div class="rtab rhead"><span></span><span>Esta semana</span><span>Histórico</span></div>`;
@@ -364,13 +366,23 @@ function statSeen() {
 function viewStats() {
   if (!S.startDate) return `<h1>Estadísticas</h1><div class="card mute">Disponibles al ingresar.</div>`;
   const head = `<h1>Estadísticas</h1>` + subtabs('stats', [['est', 'Stats'], ['rec', 'Récords'], ['logr', 'Logros'], ['lib', 'Libros']]) + '<!--fit-->';
-  if (SUB.stats === 'lib') return head + viewLibros();
-  if (SUB.stats === 'rec' || SUB.stats === 'logr') { const h = history(); return head + (h ? (SUB.stats === 'rec' ? viewRecords(h) : viewLogros(h)) : `<div class="card mute">Disponible desde el primer día de tu torre.</div>`); }
+  const sc = b => head + `<div class="iscroll">${b}</div>`;
+  if (SUB.stats === 'lib') return sc(viewLibros());
+  if (SUB.stats === 'rec' || SUB.stats === 'logr') { const h = history(); return sc(h ? (SUB.stats === 'rec' ? viewRecords(h) : viewLogros(h)) : `<div class="card mute">Disponible desde el primer día de tu torre.</div>`); }
   const { e, st } = current(), cap = e.statCap(), o = arenaState(), seen = S.seenStat || {}, up = CATS.filter(c => st.stat[c] > (seen[c] ?? st.stat[c]));
   const sf = o.floor;
-  let h = head + `<div class="card statshero"><div class="stand" style="--gr:${zoneOf(o.floor).gr};--gr2:${zoneOf(o.floor).gr2}">${heroImgTag(sf, 4, o.done, 'idle')}<i class="floor"></i></div></div><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} (hasta superar la próxima puerta de estadísticas)</div>` : '');
+  let h = head + `<div class="card statshero"><div class="stand" style="--gr:${zoneOf(o.floor).gr};--gr2:${zoneOf(o.floor).gr2}">${heroImgTag(sf, 4, o.done, 'idle')}<i class="floor"></i></div></div><div class="card">` + (Number.isFinite(cap) ? `<div class="mute">Tope actual: ${cap} · +1 por semanal cumplida, −1 por mensual fallado</div>` : '');
   for (const c of CATS) h += `<div style="margin-top:12px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}</b><b>${st.stat[c]}${Number.isFinite(cap) ? ' / ' + cap : ''}</b></div><div class="bar"><i style="width:${Number.isFinite(cap) ? Math.min(100, st.stat[c] / cap * 100) : 100}%"></i></div></div>`;
-  return h + `<p class="mute">+1 por cada semanal cumplida, −1 por cada objetivo mensual fallado.</p></div>`;
+  h += `</div>`;
+  const gates = buildGates(e.cfg), nums = Object.keys(gates).map(Number).sort((a, b) => a - b), nextG = nums.find(g => g >= o.floor && !st.cleared.includes(g));
+  if (nextG && st.tower === null) {
+    const d = gates[nextG];
+    h += `<div class="card slim"><div class="row"><h2>Próxima puerta · piso ${nextG}</h2><span class="pill">${nextG - o.floor === 0 ? 'ahora' : 'faltan ' + (nextG - o.floor) + ' pisos'}</span></div>`
+      + (d.stats ? d.stats.map(c => `<div class="row" style="margin-top:6px"><span>${iconTag(c)} ${NAMES[c]}</span><b>${st.stat[c]} / ${d.req}</b></div><div class="bar"><i style="width:${Math.min(100, st.stat[c] / d.req * 100)}%"></i></div>`).join('') : '')
+      + (d.streak !== undefined ? `<div class="row" style="margin-top:6px"><span>🌙 Racha mensual</span><b>${st.s} / ${d.streak}</b></div><div class="bar"><i style="width:${Math.min(100, st.s / d.streak * 100)}%"></i></div>` : '')
+      + `</div>`;
+  }
+  return h;
 }
 
 // ---------- Alimentación (Hoy · Semana · Mascotas) ----------
@@ -386,8 +398,9 @@ function alimHoy() {
   h += txOpen ? `<textarea id="txin" rows="3" placeholder="Qué comiste (ej.: 2 milanesas con ensalada y agua)">${esc(txDraft)}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="txcancel">Cancelar</button><button class="btn sm" data-act="txsave">Guardar</button></div>`
     : `<div class="row" style="margin-top:10px"><button class="btn sm" ${pre ? 'disabled' : 'data-act="foto"'}>📷 Foto</button><button class="btn sm ghost" ${pre ? 'disabled' : 'data-act="txopen"'}>✍️ Escribir</button></div>`;
   h += `</div>`;
+  if ((new Date(toUTC(date)).getUTCDay() + 6) % 7 >= 5) return `<div class="card slim"><h2>Hoy · ${pretty(date)}</h2><p class="mute">Fin de semana: tus permitidos. No se registra la comida; la semana de alimentación corre de lunes a viernes.</p><div class="mute">Semana: ${foodText(st, cfg)} · alimenta a ${PETS[st.equipped].name}</div></div>`;
   const unsent = list.filter(x => !x.sent).length;
-  h += `<div class="card slim"><h2>Evaluar con Claude</h2><p class="mute">Mandá lo que llevás cuando quieras: te dice si vas bien o qué te falta. Para cerrar el día, la última respuesta tiene que ser aprobado o no aprobado.</p><div class="row" style="margin-top:8px"><button class="btn sm" ${pre ? 'disabled' : 'data-act="share"'}>Enviar${unsent ? ` (${unsent})` : ''}</button><button class="btn sm ghost" data-act="copyrub">Copiar consigna</button></div>`;
+  h += `<div class="card slim"><h2>Evaluar con Claude</h2><p class="mute">Mandá lo que llevás cuando quieras: te dice si vas bien o qué te falta. Para cerrar el día, la última respuesta tiene que ser aprobado o no aprobado. Usá siempre la misma conversación de Claude.</p><div class="row" style="margin-top:8px"><button class="btn sm" ${pre ? 'disabled' : 'data-act="share"'}>Enviar${unsent ? ` (${unsent})` : ''}</button><button class="btn sm ghost" data-act="copyrub">Copiar consigna</button></div>`;
   h += closed ? `<div class="row" style="margin-top:10px"><span class="mute">Día cerrado.</span><button class="undo" data-act="reopen">Reabrir el día</button></div>`
     : `<label>Respuesta de Claude (opcional)<textarea id="vtx" rows="3">${esc(vDraft)}</textarea></label><div class="row vbtns"><button class="btn sm ghost" data-act="vparcial">Parcial</button><button class="btn sm ghost" data-act="vno">No aprobado</button><button class="btn sm" data-act="vok">Aprobado</button></div>`;
   return h + `</div>`;
@@ -395,11 +408,11 @@ function alimHoy() {
 function alimSemana() {
   const today = todayISO(), dow = (new Date(toUTC(today)).getUTCDay() + 6) % 7, wk = addDays(today, -dow), { e, st } = current(), cfg = e.cfg;
   let h = `<div class="card slim"><div class="row"><h2>Esta semana</h2><span class="pill ${foodOk(st, cfg) ? 'ok' : ''}">${st.foodWk} / ${cfg.foodDays}</span></div><div class="bar gold"><i style="width:${Math.min(100, st.foodWk / cfg.foodDays * 100)}%"></i></div>`;
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 5; i++) {
     const d = addDays(wk, i), inp = S.days[d]?.input ?? {}, ok = foodApproved(inp), no = !ok && !!inp.meals, fut = d > today;
     h += `<div class="mrow static ${ok ? 'on' : ''}"><span class="mic">${'LMXJVSD'[i]}</span><span class="mtx"><b>${pretty(d)}</b><small>${ok ? 'aprobado' : no ? 'no aprobado' : fut ? 'por venir' : d === today ? 'hoy · sin cerrar' : 'sin cerrar'}</small></span><span class="chk">${ok ? '✓' : no ? '✗' : ''}</span></div>`;
   }
-  return h + `<p class="mute">Con ${cfg.foodDays} días aprobados de 7 la semana alimenta a ${PETS[st.equipped].name} (+${cfg.petWeek} XP de mascota). No da XP de torre.</p></div>`;
+  return h + `<p class="mute">Con ${cfg.foodDays} de los 5 días de lunes a viernes aprobados, la semana alimenta a ${PETS[st.equipped].name} (+${cfg.petWeek} XP de mascota). Sábado y domingo son libres. No da XP de torre.</p></div>`;
 }
 function petsBody() {
   const { e, st } = current(), lv = e.petLevels(), cum = [0];
@@ -541,7 +554,8 @@ function fit() {
     const cs = getComputedStyle(app), avail = app.getBoundingClientRect().bottom - parseFloat(cs.paddingBottom) - f.getBoundingClientRect().top;
     f.style.zoom = 1;
     const geo = `left:${f.offsetLeft}px;top:${f.offsetTop}px;right:${app.clientWidth - f.offsetLeft - f.offsetWidth}px`;
-    let z = bestZoom(f, avail);
+    const isc = f.querySelector('.iscroll');
+    let z = isc ? 1 : bestZoom(f, avail);
     const scene = f.querySelector('.torrescene');
     if (scene) {
       // Torre: la escena llena el ancho y el alto disponibles (240 px de escena, 360 de terreno + 60 de suelo)
@@ -568,12 +582,19 @@ function fit() {
         for (const v of vs.list) {
           if (v === cur) continue;
           vs.set(v); const html = view(), k = html.indexOf('<!--fit-->'); vs.set(cur);
+          if (html.includes('class="iscroll"')) continue;
           probe.innerHTML = k < 0 ? html : html.slice(k + 10);
           z = Math.min(z, bestZoom(probe, avail));
         }
       } finally { vs.set(cur); probe.remove(); }
     }
     f.style.zoom = z < 1 ? z.toFixed(3) : 1;
+    if (isc) {   // lista con desplazamiento propio: el título y las solapas quedan fijos
+      isc.style.maxHeight = 'none';
+      const off = isc.getBoundingClientRect().top - f.getBoundingClientRect().top;
+      isc.style.maxHeight = Math.max(90, (avail - off) / Math.min(1, z) - 2) + 'px';
+      app.style.overflowY = 'hidden'; return;
+    }
     app.style.overflowY = f.getBoundingClientRect().height > avail + 1 ? 'auto' : 'hidden';
   } finally { fitting = false; }
 }

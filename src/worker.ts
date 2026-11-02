@@ -93,8 +93,8 @@ export async function runReminders(env: Env, origin: string, now = Date.now()) {
     await env.DB.prepare('INSERT OR IGNORE INTO notification_log (kind, date, sent_at) VALUES (?, ?, ?)').bind(kind, date, now).run();
     await pushAll(env, origin, title, body); sent.push(kind);
   };
-  if (dow === 0 && hour >= Number(st.feed_hour) && !(input && (input.meals || input.feed)))
-    await once('feed', 'Pure Discipline', 'Hoy cierra la semana: cargá el veredicto de alimentación del día y revisá tus horas de videojuegos.');
+  if (dow >= 1 && dow <= 5 && hour >= Number(st.feed_hour) && !(input && (input.meals || input.feed)))
+    await once('feed', 'Pure Discipline', 'Cargá el veredicto de alimentación de hoy y revisá tus horas de videojuegos.');
   if (hour >= Number(st.reminder_hour) && isEmptyInput(row ? (row.input as string) : null))
     await once('daily', 'Pure Discipline', 'Todavía no registraste nada hoy. ¿Cómo te fue?');
   return sent;
@@ -137,6 +137,26 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     const days: Record<string, { input: unknown; updated_at: number }> = {};
     for (const r of rows) days[r.date] = { input: JSON.parse(r.input), updated_at: r.updated_at };
     return json({ days, settings: await readSettings(env), serverTime: Date.now() });
+  }
+  // Atajos del iPhone: entrada y salida del gimnasio. La sesión cuenta si estuviste al menos 40 minutos.
+  if (path === '/api/gym' && m === 'POST') {
+    const b: any = await req.json().catch(() => ({}));
+    const now = Date.now();
+    if (b.event === 'arrive') { await putSetting(env, 'gym_arrive', String(now)); return json({ ok: true, event: 'arrive' }); }
+    if (b.event !== 'leave') return json({ error: 'event debe ser arrive o leave' }, 400);
+    const arr = Number(await getSetting(env, 'gym_arrive') ?? 0);
+    if (!arr) return json({ ok: true, counted: false, reason: 'sin entrada registrada' });
+    await putSetting(env, 'gym_arrive', '0');
+    const minutes = Math.round((now - arr) / 60000);
+    if (minutes < 40) return json({ ok: true, counted: false, minutes });
+    const tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset);
+    const date = new Date(arr + tz * 60000).toISOString().slice(0, 10);
+    const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
+    const input = row ? JSON.parse(row.input as string) : {};
+    input.gym = true; input.gymMin = Math.max(Number(input.gymMin ?? 0), minutes);
+    await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
+      .bind(date, JSON.stringify(input), now, 'atajo-gimnasio').run();
+    return json({ ok: true, counted: true, minutes, date });
   }
   if (path === '/api/vapid' && m === 'GET') return json({ publicKey: (await vapid(env)).pub });
   if (path === '/api/push/subscribe' && m === 'POST') {

@@ -166,7 +166,7 @@ export class Engine {
     const fedOk = () => fr ? (S.meatWk ?? 0) >= fr.meat && (S.vegWk ?? 0) >= fr.veg && (S.junkWk ?? 0) <= fr.junkMax : S.foodWk >= cfg.foodDays;
     {
       const before = fedOk();
-      if (input.food || input.meat || input.veg) S.foodWk++;   // diaria aprobada: carne o verduras
+      if ((wkday || !cfg.weekendComp) && (input.food || input.meat || input.veg)) S.foodWk++;   // diaria aprobada: carne o verduras
       if (input.meat) S.meatWk = (S.meatWk ?? 0) + 1;
       if (input.veg) S.vegWk = (S.vegWk ?? 0) + 1;
       if (input.junk) S.junkWk = (S.junkWk ?? 0) + 1;

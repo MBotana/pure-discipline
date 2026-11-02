@@ -244,3 +244,11 @@ textarea{resize:none}
 .room.sel{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
 .mrow.static.on .mtx b{color:var(--ok)}
 #tabs button{font-size:9px;letter-spacing:0}
+
+/* v1.5b: desplazamiento interno, campos del mismo tamaño */
+.iscroll{overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding-right:2px}
+.iscroll>.card:last-child{margin-bottom:0}
+input[type=text],input[type=date],input[type=password],input[type=number]{height:38px;min-height:38px;line-height:1.2;-webkit-appearance:none;appearance:none;display:block}
+input[type=date]{min-width:0;text-align:left}
+input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:1.2em}
+.rtab.rhead span:last-child{text-align:right}
