@@ -79,3 +79,24 @@ test('gimnasio: la salida cuenta solo con 40 minutos o más y marca el día de l
     assert.equal((await call(e, 'POST', '/api/gym', { event: 'x' }, T)).status, 400);
   } finally { Date.now = real; }
 });
+
+test('veredicto de comida: guarda la respuesta y cierra el día según la primera línea', async () => {
+  const e = env(); const T = 'clave-larga-1';
+  await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-02' });
+  const real = Date.now; Date.now = () => Date.parse('2026-11-04T20:00:00Z');   // miércoles
+  try {
+    let r: any = await call(e, 'POST', '/api/verdict', { text: 'PARCIAL\nTe falta verdura.' }, T).then(x => x.json());
+    assert.equal(r.status, 'parcial');
+    let s: any = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
+    assert.equal(s.days['2026-11-04'].input.meals, undefined); assert.match(s.days['2026-11-04'].input.verdictTx, /verdura/);
+    r = await call(e, 'POST', '/api/verdict', { text: 'Aprobado\nTodo bien.' }, T).then(x => x.json());
+    assert.equal(r.status, 'ok');
+    s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
+    assert.deepEqual([s.days['2026-11-04'].input.meals, s.days['2026-11-04'].input.food], [true, true]);
+    r = await call(e, 'POST', '/api/verdict', { text: 'NO APROBADO\nMucha fritura.' }, T).then(x => x.json());
+    assert.equal(r.status, 'no');
+    s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
+    assert.equal(s.days['2026-11-04'].input.food, undefined); assert.equal(s.days['2026-11-04'].input.meals, true);
+    assert.equal((await call(e, 'POST', '/api/verdict', {}, T)).status, 400);
+  } finally { Date.now = real; }
+});

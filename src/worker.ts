@@ -158,6 +158,26 @@ export async function handle(req: Request, env: Env): Promise<Response> {
       .bind(date, JSON.stringify(input), now, 'atajo-gimnasio').run();
     return json({ ok: true, counted: true, minutes, date });
   }
+  // Atajo "Evaluar comida": guarda la respuesta completa del día y, si la primera línea trae el veredicto, cierra el día.
+  if (path === '/api/verdict' && m === 'POST') {
+    const b: any = await req.json().catch(() => ({}));
+    const text = typeof b.text === 'string' ? b.text.trim().slice(0, 4000) : '';
+    if (!text) return json({ error: 'falta text' }, 400);
+    const now = Date.now(), tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset);
+    const local = new Date(now + tz * 60000), date = local.toISOString().slice(0, 10), dow = local.getUTCDay();
+    const first = text.split('\n').find(l => l.trim())?.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') ?? '';
+    const status = /NO\s+APROBAD|DESAPROBAD/.test(first) ? 'no' : /APROBAD/.test(first) ? 'ok' : /PARCIAL/.test(first) ? 'parcial' : 'none';
+    const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
+    const input = row ? JSON.parse(row.input as string) : {};
+    input.verdictTx = text;
+    if (dow >= 1 && dow <= 5) {
+      if (status === 'ok') { input.meals = true; input.food = true; }
+      else if (status === 'no') { input.meals = true; delete input.food; delete input.meat; delete input.veg; }
+    }
+    await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
+      .bind(date, JSON.stringify(input), now, 'atajo-comida').run();
+    return json({ ok: true, date, status });
+  }
   if (path === '/api/vapid' && m === 'GET') return json({ publicKey: (await vapid(env)).pub });
   if (path === '/api/push/subscribe' && m === 'POST') {
     const b: any = await req.json().catch(() => ({}));

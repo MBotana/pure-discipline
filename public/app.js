@@ -393,14 +393,14 @@ function alimHoy() {
   const date = todayISO(), pre = dayIdx(date) < 0, inp = pre ? {} : S.days[date]?.input ?? {};
   const { e, st } = current(), cfg = e.cfg, list = entries(date), v = S.verdict[date], ok = foodApproved(inp), closed = ok || !!inp.meals;
   const state = closed ? (ok ? ['ok', '✅ Día aprobado'] : ['bad', '❌ Día no aprobado']) : v?.st === 'parcial' ? ['gold', '🕒 Parcial'] : ['', 'Sin evaluar'];
-  let h = `<div class="card slim"><div class="row"><h2>Hoy · ${pretty(date)}</h2><span class="pill ${state[0]}">${state[1]}</span></div>${v?.tx ? `<p class="vnote">${esc(v.tx)}</p>` : ''}<div class="mute">Semana: ${foodText(st, cfg)} · alimenta a ${PETS[st.equipped].name}</div></div>`;
+  let h = `<div class="card slim"><div class="row"><h2>Hoy · ${pretty(date)}</h2><span class="pill ${state[0]}">${state[1]}</span></div>${inp.verdictTx || v?.tx ? `<p class="vnote">${esc(inp.verdictTx || v.tx)}</p>` : ''}<div class="mute">Semana: ${foodText(st, cfg)} · alimenta a ${PETS[st.equipped].name}</div></div>`;
   h += `<div class="card slim"><div class="row"><h2>Comidas</h2><span class="pill">${list.length}</span></div>${list.length ? list.map(x => entryHTML(x, date)).join('') : '<p class="mute">Todavía no cargaste ninguna comida hoy.</p>'}`;
   h += txOpen ? `<textarea id="txin" rows="3" placeholder="Qué comiste (ej.: 2 milanesas con ensalada y agua)">${esc(txDraft)}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="txcancel">Cancelar</button><button class="btn sm" data-act="txsave">Guardar</button></div>`
     : `<div class="row" style="margin-top:10px"><button class="btn sm" ${pre ? 'disabled' : 'data-act="foto"'}>📷 Foto</button><button class="btn sm ghost" ${pre ? 'disabled' : 'data-act="txopen"'}>✍️ Escribir</button></div>`;
   h += `</div>`;
   if ((new Date(toUTC(date)).getUTCDay() + 6) % 7 >= 5) return `<div class="card slim"><h2>Hoy · ${pretty(date)}</h2><p class="mute">Fin de semana: tus permitidos. No se registra la comida; la semana de alimentación corre de lunes a viernes.</p><div class="mute">Semana: ${foodText(st, cfg)} · alimenta a ${PETS[st.equipped].name}</div></div>`;
   const unsent = list.filter(x => !x.sent).length;
-  h += `<div class="card slim"><h2>Evaluar con Claude</h2><p class="mute">Mandá lo que llevás cuando quieras: te dice si vas bien o qué te falta. Para cerrar el día, la última respuesta tiene que ser aprobado o no aprobado. Usá siempre la misma conversación de Claude.</p><div class="row" style="margin-top:8px"><button class="btn sm" ${pre ? 'disabled' : 'data-act="share"'}>Enviar${unsent ? ` (${unsent})` : ''}</button><button class="btn sm ghost" data-act="copyrub">Copiar consigna</button></div>`;
+  h += `<div class="card slim"><h2>Evaluar con Claude</h2><p class="mute">Mandá lo que llevás cuando quieras: te dice si vas bien o qué te falta. Para cerrar el día, la última respuesta tiene que ser aprobado o no aprobado. Usá siempre la misma conversación de Claude.</p><div class="row" style="margin-top:8px"><button class="btn sm" ${pre ? 'disabled' : 'data-act="share"'}>Enviar${unsent ? ` (${unsent})` : ''}</button><button class="btn sm ghost" data-act="copyrub">Copiar consigna</button></div><button class="btn sm" style="margin-top:8px;width:100%" ${pre ? 'disabled' : 'data-act="runsc"'}>⚡ Evaluar con el atajo</button>`;
   h += closed ? `<div class="row" style="margin-top:10px"><span class="mute">Día cerrado.</span><button class="undo" data-act="reopen">Reabrir el día</button></div>`
     : `<label>Respuesta de Claude (opcional)<textarea id="vtx" rows="3">${esc(vDraft)}</textarea></label><div class="row vbtns"><button class="btn sm ghost" data-act="vparcial">Parcial</button><button class="btn sm ghost" data-act="vno">No aprobado</button><button class="btn sm" data-act="vok">Aprobado</button></div>`;
   return h + `</div>`;
@@ -745,6 +745,7 @@ document.addEventListener('click', async ev => {
     S.log[d] = entries(d).filter(q => q.id !== id); save(); render();
   }
   else if (a === 'share') shareDay(el.dataset.d || todayISO());
+  else if (a === 'runsc') { location.href = 'shortcuts://run-shortcut?name=' + encodeURIComponent('Evaluar Comida'); }
   else if (a === 'copyrub') { try { await navigator.clipboard.writeText(RUBRICA); hint('Consigna copiada'); } catch { hint('No se pudo copiar'); } }
   else if (a === 'vok' || a === 'vno' || a === 'vparcial') setVerdict(todayISO(), a === 'vok' ? 'ok' : a === 'vno' ? 'no' : 'parcial', (document.getElementById('vtx')?.value || '').trim());
   else if (a === 'mvok' || a === 'mvno') { const d = el.dataset.d, tx = (document.getElementById('mvtx')?.value || '').trim(); modal = null; setVerdict(d, a === 'mvok' ? 'ok' : 'no', tx); }
