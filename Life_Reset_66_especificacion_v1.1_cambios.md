@@ -21,7 +21,7 @@ Objetivo: con juego perfecto desde el lunes 2-nov-2026, el piso 100 se abre alre
 - **Puertas de estadísticas** (lo que un jugador perfecto ya tiene dos semanas antes de llegar, máximo 90 % del tope): 10 → 1 · 20 → 2 · 30 → 4 · 40 → 7 · 50 → 12 · 60 → 15 · 70 → 20 · 80 → 29 · 90 → 40 · 100 → 45 (`statReq`). Combinaciones y topes sin cambios.
 - **Puertas de racha:** 25 → 1 mes · 50 → 2 · 75 → 3 · 100 → 4.
 - **Recompensas base sin cambios:** diaria 50 (L–V), semanal 300, mensual 1.500.
-- **Orden semanal:** se mantienen 6 ambientes distintos (a propósito: limpiar todos los días menos uno).
+- **Orden semanal:** hay 6 ambientes; la semanal se cumple con 5 distintos (`namb` = 5, pago 300/5 por ambiente).
 - **Armadura:** cambia después de vencer a cada jefe (pisos 26, 51 y 76).
 
 | Piso | Juego perfecto | Días por piso en el tramo |
@@ -33,5 +33,5 @@ Objetivo: con juego perfecto desde el lunes 2-nov-2026, el piso 100 se abre alre
 | 100 | día 421 (28-dic-2027) | 9,4 |
 
 Escenarios (motor real; el día del libro y del arreglo dentro del mes mueve el final entre el 21 y el 28-dic-2027, siempre sin perder XP):
-falla un día por semana → 12-ene-2028 · falla el gimnasio un día por semana → 3-ene-2028 · cada misión al azar con 97 % → 6-ene-2028 · con 93 % → 5-jul-2028 · pierde 3 % de los días enteros → 28-mar-2028 · 7 % → 31-jul-2028 · nunca el libro → 30-ene-2028 · romper la racha en el mes 6 → 27-mar-2028 · ignorar Orden (o limpiar solo 5 días por semana), o no hacer ninguna mensual → bloqueado para siempre (piso 20 / 25).
+falla un día por semana → 12-ene-2028 · falla el gimnasio un día por semana → 3-ene-2028 · cada misión al azar con 97 % → 6-ene-2028 · con 93 % → 5-jul-2028 · pierde 3 % de los días enteros → 28-mar-2028 · 7 % → 31-jul-2028 · nunca el libro → 30-ene-2028 · romper la racha en el mes 6 → 27-mar-2028 · falla 2 días por semana → 14-ene-2028 · ignorar Orden, o no hacer ninguna mensual → bloqueado para siempre (piso 20 / 25).
 Las pruebas de paridad con el simulador v7 usan `LEGACY_CONFIG` (balance v1.2).

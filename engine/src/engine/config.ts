@@ -12,7 +12,7 @@ export const DEFAULT_CONFIG: Config = {
   d: 50, W: 300, Mp: 1500,
   r: 1.039, A: 605,                 // costo del piso n → n+1 = 605 · 1,039^(n−1): 605 XP el primero, ~26.000 el último
   weeklyBonus: [0, 0.2, 0.3, 0.4, 0.5],
-  gymM: 18, aeroM: 12, bookTramos: 10, impUnits: 6, dchk: 2, namb: 6, foodDays: 4, dripDays: 6,
+  gymM: 18, aeroM: 12, bookTramos: 10, impUnits: 6, dchk: 2, namb: 5, foodDays: 4, dripDays: 6,
   statPw: 1, statPen: 1, statScale: 0.5, reqScale: 0.9, freezeDays: 14,
   hingeEvery: 10,
   combos: COMBOS,
@@ -34,5 +34,6 @@ export const LEGACY_CONFIG: Config = {
   statReq: undefined,
   streakGates: { 25: 2, 50: 4, 75: 6, 100: 8 },
   multStep: 1, multMax: Infinity,
+  namb: 6,
   dayFloorCap: 0, dailyMult: false,
 };

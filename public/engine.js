@@ -38,7 +38,7 @@ var DEFAULT_CONFIG = {
   bookTramos: 10,
   impUnits: 6,
   dchk: 2,
-  namb: 6,
+  namb: 5,
   foodDays: 4,
   dripDays: 6,
   statPw: 1,
@@ -68,6 +68,7 @@ var LEGACY_CONFIG = {
   streakGates: { 25: 2, 50: 4, 75: 6, 100: 8 },
   multStep: 1,
   multMax: Infinity,
+  namb: 6,
   dayFloorCap: 0,
   dailyMult: false
 };

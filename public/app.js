@@ -148,7 +148,7 @@ function viewHoy() {
     h += `</div>`;
     h += `<div class="card slim bronze"><h2>Antiobjetivo</h2><button class="mrow bronze" ${pre ? 'disabled' : 'data-act="game"'}><span class="mic">🎮</span><span class="mtx"><b>Sesión de videojuegos</b><small>hoy ${today0} · semana ${games} (más de 3 rompe el objetivo)</small></span>${pre ? '' : '<span class="dbl">2×</span>'}</button>${today0 > 0 ? `<button class="undo" data-act="gameminus">Quitar una sesión</button>` : ''}</div>`;
   } else if (mtab === 'sem') {
-    const rows = [['F', 'Fuerza', '3 sesiones', 3], ['I', 'Inteligencia', '3 lecturas', 3], ['V', 'Vitalidad', '3 aeróbicos', 3], ['O', 'Orden', `${cfg.namb} ambientes · faltan: ${ROOMS.filter(([id]) => !st.roomsWk.includes(id)).map(r => r[1]).join(', ') || 'ninguno'}`, cfg.namb]];
+    const rows = [['F', 'Fuerza', '3 sesiones', 3], ['I', 'Inteligencia', '3 lecturas', 3], ['V', 'Vitalidad', '3 aeróbicos', 3], ['O', 'Orden', `${cfg.namb} de ${ROOMS.length} ambientes · sin limpiar: ${ROOMS.filter(([id]) => !st.roomsWk.includes(id)).map(r => r[1]).join(', ') || 'ninguno'}`, cfg.namb]];
     const dn = rows.filter(([c]) => st.wdone.includes(c)).length + (st.wu.D >= 3 ? 1 : 0) + (st.foodWk >= cfg.foodDays ? 1 : 0);
     h += `<div class="card slim"><div class="row"><h2>Esta semana</h2><span class="pill ${dn === 6 ? 'ok' : ''}">${dn} / 6</span></div>`;
     h += rows.map(([c, nm, goal, max]) => info(c, nm, goal, pips(w(c), max), st.wdone.includes(c))).join('');
