@@ -255,8 +255,8 @@ img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:
 .tvwrap>img.tvg{position:absolute;left:0;top:0;width:240px;height:360px;z-index:0}
 .tvfloor{position:relative;width:240px;height:64px;max-width:100%;margin:0 auto;overflow:hidden;border-top:2px solid #2a170a;box-sizing:border-box}
 .tvfloor .arena{width:240px;height:64px;aspect-ratio:auto;max-width:none;border:0}
-.tvwrap>img.tvt{position:absolute;left:200px;bottom:6px;width:36px;height:130px;z-index:2}
-.tvwrap>i.tvd{position:absolute;width:3.6px;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);z-index:3;animation:tvt 1.4s ease-in-out infinite}
+.torrescene>img.tvt{position:absolute;left:200px;width:36px;height:130px;z-index:3}
+.torrescene>i.tvd{position:absolute;width:3.6px;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);z-index:4;animation:tvt 1.4s ease-in-out infinite}
 
 /* Torre: solo escena (terreno, personaje y torre) y los números de la próxima puerta arriba */
 .torrefull{position:relative;display:flex;flex-direction:column;align-items:center}

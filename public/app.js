@@ -182,11 +182,11 @@ let mapAct = 0, mapSel = 0;
 const TV = { W: 240, H: 360, gnd: 6, tx: 200, tw: 36, th: 130 };  // terreno arriba (360); la aguja se apoya en su borde inferior
 function torreScene(floor, o, top) {
   const f = Math.min(100, Math.max(1, floor));
-  const yBottom = TV.H - TV.gnd;                              // base de la aguja, sobre el suelo del loop
-  const yc = yBottom - 2 - (f - 1) / 99 * (TV.th - 4);        // centro del punto (1 px de la aguja = 2 px de pantalla)
+  const G = TV.H + 64 - TV.gnd;                               // suelo del loop (6 px sobre su borde inferior), en unidades de escena
+  const yc = G - 2 - (f - 1) / 99 * (TV.th - 4);              // centro del punto dorado (1 px de la aguja = 2 px de pantalla)
   const xc = TV.tx + TV.tw / 2 + 6 * Math.sin((f - 1) / 10 * 2 * Math.PI);  // espiral: una vuelta cada 10 pisos
-  const tower = has('torre_base') ? `<img class="px tvt" alt="" src="${url('torre_base')}">` : '';
-  return `<div class="torrescene">${top ? `<div class="tvtop">${top}</div>` : ''}<div class="tvwrap"><img class="px tvg" alt="" src="${zoneTowerSrc(o.hz)}">${tower}<i class="tvd" title="Piso ${f}" style="left:${xc / TV.W * 100}%;top:${yc / TV.H * 100}%"></i></div><div class="tvfloor">${arenaHTML(o, true)}</div><div class="tvground" style="--gr:${zoneOf(o.hz).gr};--gr2:${zoneOf(o.hz).gr2}"></div></div>`;
+  const tower = has('torre_base') ? `<img class="px tvt" alt="" src="${url('torre_base')}" style="top:${G - TV.th}px">` : '';
+  return `<div class="torrescene">${top ? `<div class="tvtop">${top}</div>` : ''}<div class="tvwrap"><img class="px tvg" alt="" src="${zoneTowerSrc(o.hz)}"></div><div class="tvfloor">${arenaHTML(o, true)}</div><div class="tvground" style="--gr:${zoneOf(o.hz).gr};--gr2:${zoneOf(o.hz).gr2}"></div>${tower}<i class="tvd" title="Piso ${f}" style="left:${xc}px;top:${yc}px"></i></div>`;
 }
 const z0 = f => { const z = zoneOf(f), act = Math.min(10, Math.ceil(f / 10)); return `${z.n} · ${act}-${((f - 1) % 10) + 1}`; };
 function viewTorre() {
