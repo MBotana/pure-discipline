@@ -32,7 +32,7 @@ export function initialState(): State {
     multM: 1, mu: zero(), mdone: [], bd: 0,
     bonusW: 1, wu: zero(), wdone: [],
     arrive: {}, clearedDay: {}, blocks: [], tower: null,
-    lostBlock: 0, lostClamp: 0, statWasted: 0, discPenN: 0, fl: 1,
+    lostBlock: 0, lostClamp: 0, statWasted: 0, discPenN: 0, fl: 1, meatWk: 0, vegWk: 0, junkWk: 0,
   };
 }
 
@@ -103,7 +103,7 @@ export class Engine {
         S.mu = zero(); S.mdone = []; S.bd = 0; S.wstreak = 0;
       }
       S.bonusW = S.s >= 1 ? S.multM : 1 + cfg.weeklyBonus[Math.min(S.wstreak, 4)];
-      S.wu = zero(); S.wdone = []; S.gameWk = 0; S.foodWk = 0; S.roomsWk = [];
+      S.wu = zero(); S.wdone = []; S.gameWk = 0; S.foodWk = 0; S.roomsWk = []; S.meatWk = 0; S.vegWk = 0; S.junkWk = 0;
     }
     if (input.equip) S.equipped = input.equip;
 
@@ -147,7 +147,16 @@ export class Engine {
     if (input.dwork && S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
     if (input.dweek) while (S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
     if (input.gaming) S.gameWk += input.gaming;
-    if (input.food) { S.foodWk++; if (S.foodWk === cfg.foodDays) completed.pet = true; }
+    const fr = cfg.foodRule;
+    const fedOk = () => fr ? (S.meatWk ?? 0) >= fr.meat && (S.vegWk ?? 0) >= fr.veg && (S.junkWk ?? 0) <= fr.junkMax : S.foodWk >= cfg.foodDays;
+    {
+      const before = fedOk();
+      if (input.food || input.meat || input.veg) S.foodWk++;   // diaria aprobada: carne o verduras
+      if (input.meat) S.meatWk = (S.meatWk ?? 0) + 1;
+      if (input.veg) S.vegWk = (S.vegWk ?? 0) + 1;
+      if (input.junk) S.junkWk = (S.junkWk ?? 0) + 1;
+      if (!before && fedOk()) completed.pet = true;
+    }
     if (input.improve) monthly('O', cfg.impUnits, cfg.Mp / cfg.impUnits);
     if (dd === 6 && input.dweek) { S.mu.D++; ev.push(['D', 'M', cfg.Mp / month.weeks.length]); }
     if ((dd === 2 || dd === 6) && input.dcheck) ev.push(['D', 'M', cfg.Mp / (cfg.dchk * month.weeks.length)]);
@@ -164,7 +173,7 @@ export class Engine {
       }
       // mascota equipada
       const eq = S.equipped, maxXp = this.cum[this.cum.length - 1];
-      if (input.feed || S.foodWk >= cfg.foodDays) { S.px[eq] = Math.min(maxXp, S.px[eq] + cfg.petWeek); S.feedStreak = 0; }
+      if (input.feed || fedOk()) { S.px[eq] = Math.min(maxXp, S.px[eq] + cfg.petWeek); S.feedStreak = 0; }
       else {
         S.feedStreak++;
         if (S.feedStreak >= 2 && this.petLevel(eq) > 0) S.px[eq] = this.cum[this.petLevel(eq) - 1];

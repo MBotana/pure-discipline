@@ -22,6 +22,7 @@ export const DEFAULT_CONFIG: Config = {
   multStep: 0.5, multMax: 3,        // racha 1 mes ×1,5 · 2 ×2 · 3 ×2,5 · 4 o más ×3
   dayFloorCap: 1,                   // nunca más de un piso por día: el XP se suma igual y el piso lo alcanza en los días siguientes
   dailyMult: true,                  // las diarias también se multiplican por la racha
+  foodRule: { meat: 3, veg: 3, junkMax: 3 }, // semanal de alimentación: 3+ días con carne, 3+ con verduras, hasta 3 con basura
   discPen: true,
   petRatio: 0.1, petCosts: [10, 13, 17, 20, 30], petWeek: 10,
   petsMustBeEquipped: true,
@@ -35,5 +36,5 @@ export const LEGACY_CONFIG: Config = {
   streakGates: { 25: 2, 50: 4, 75: 6, 100: 8 },
   multStep: 1, multMax: Infinity,
   namb: 6,
-  dayFloorCap: 0, dailyMult: false,
+  dayFloorCap: 0, dailyMult: false, foodRule: undefined,
 };

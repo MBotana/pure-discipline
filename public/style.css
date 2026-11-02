@@ -271,3 +271,4 @@ img.idle,.arena .hero.idle,.arena .pet.idle,.arena[data-run="0"] .pet{animation:
 #strip .strip{width:fit-content;margin:0 auto}
 #strip .arena{width:240px;max-width:none;margin:0 auto;zoom:var(--zs,1);border:0}
 .torrehead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:4px 0 12px}.torrehead h1{margin:0}.torrehead small{font-family:var(--fd,'Cinzel',serif);font-weight:700;font-size:12px;letter-spacing:.04em;color:var(--c1,#f6dc86);text-shadow:0 1px 0 #000;white-space:nowrap}
+.foodrow .mtx{flex:1}.meals{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.meal{font:inherit;font-size:12px;padding:4px 8px;border:2px solid var(--line3);background:var(--field);color:var(--ink);cursor:pointer}.meal.on{background:var(--ok);border-color:var(--ok);color:#fff}.meal.bad.on{background:var(--bad);border-color:var(--bad)}.modal .mrow.bad.on{outline:2px solid var(--bad)}

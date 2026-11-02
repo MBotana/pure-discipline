@@ -54,6 +54,7 @@ var DEFAULT_CONFIG = {
   multMax: 3,
   dayFloorCap: 1,
   dailyMult: true,
+  foodRule: { meat: 3, veg: 3, junkMax: 3 },
   discPen: true,
   petRatio: 0.1,
   petCosts: [10, 13, 17, 20, 30],
@@ -70,7 +71,8 @@ var LEGACY_CONFIG = {
   multMax: Infinity,
   namb: 6,
   dayFloorCap: 0,
-  dailyMult: false
+  dailyMult: false,
+  foodRule: undefined
 };
 
 // engine/src/engine/types.ts
@@ -130,7 +132,10 @@ function initialState() {
     lostClamp: 0,
     statWasted: 0,
     discPenN: 0,
-    fl: 1
+    fl: 1,
+    meatWk: 0,
+    vegWk: 0,
+    junkWk: 0
   };
 }
 
@@ -216,6 +221,9 @@ class Engine {
       S.gameWk = 0;
       S.foodWk = 0;
       S.roomsWk = [];
+      S.meatWk = 0;
+      S.vegWk = 0;
+      S.junkWk = 0;
     }
     if (input.equip)
       S.equipped = input.equip;
@@ -303,9 +311,19 @@ class Engine {
       }
     if (input.gaming)
       S.gameWk += input.gaming;
-    if (input.food) {
-      S.foodWk++;
-      if (S.foodWk === cfg.foodDays)
+    const fr = cfg.foodRule;
+    const fedOk = () => fr ? (S.meatWk ?? 0) >= fr.meat && (S.vegWk ?? 0) >= fr.veg && (S.junkWk ?? 0) <= fr.junkMax : S.foodWk >= cfg.foodDays;
+    {
+      const before = fedOk();
+      if (input.food || input.meat || input.veg)
+        S.foodWk++;
+      if (input.meat)
+        S.meatWk = (S.meatWk ?? 0) + 1;
+      if (input.veg)
+        S.vegWk = (S.vegWk ?? 0) + 1;
+      if (input.junk)
+        S.junkWk = (S.junkWk ?? 0) + 1;
+      if (!before && fedOk())
         completed.pet = true;
     }
     if (input.improve)
@@ -339,7 +357,7 @@ class Engine {
         }
       }
       const eq = S.equipped, maxXp = this.cum[this.cum.length - 1];
-      if (input.feed || S.foodWk >= cfg.foodDays) {
+      if (input.feed || fedOk()) {
         S.px[eq] = Math.min(maxXp, S.px[eq] + cfg.petWeek);
         S.feedStreak = 0;
       } else {

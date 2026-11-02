@@ -73,3 +73,21 @@ test('v1.3: las diarias también se multiplican por la racha', () => {
   assert.equal(daily.mult, 1.5);
   assert.equal(daily.amount, 75);
 });
+
+test('v1.4: alimentación por tipo de comida (carne, verduras, basura)', () => {
+  const week = (days: DayInput[]) => { const e = new Engine(); let pet = false; for (let d = 0; d < 7; d++) pet = e.processDay(days[d] ?? {}).completed.pet || pet; return { e, pet }; };
+  const C = { meat: true }, V = { veg: true }, CV = { meat: true, veg: true }, B = { junk: true };
+  // 3 de carne + 3 de verduras, sin basura → alimenta (+10 XP de mascota)
+  let r = week([CV, CV, CV, {}, {}, {}, {}]); assert.equal(r.e.state.px.F, 10); assert.ok(r.pet);
+  assert.equal(r.e.state.foodWk, 3, 'diarias aprobadas');
+  // hasta 3 días con basura sigue aprobando
+  r = week([{ ...CV, ...B }, { ...CV, ...B }, { ...CV, ...B }, {}, {}, {}, {}]); assert.equal(r.e.state.px.F, 10);
+  // 4 días con basura falla
+  r = week([{ ...CV, ...B }, { ...CV, ...B }, { ...CV, ...B }, B, {}, {}, {}]); assert.equal(r.e.state.px.F, 0); assert.equal(r.e.state.feedStreak, 1);
+  // solo carne no alcanza
+  r = week([C, C, C, C, C, V, V]); assert.equal(r.e.state.px.F, 0);
+  // la basura sola no aprueba la diaria
+  r = week([B, {}, {}, {}, {}, {}, {}]); assert.equal(r.e.state.foodWk, 0);
+  // no da XP de torre
+  assert.equal(week([CV, CV, CV, CV, CV, CV, CV]).e.state.xp, 0);
+});

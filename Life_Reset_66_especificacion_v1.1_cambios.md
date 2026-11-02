@@ -35,3 +35,9 @@ Objetivo: con juego perfecto desde el lunes 2-nov-2026, el piso 100 se abre alre
 Escenarios (motor real; el día del libro y del arreglo dentro del mes mueve el final entre el 21 y el 28-dic-2027, siempre sin perder XP):
 falla un día por semana → 12-ene-2028 · falla el gimnasio un día por semana → 3-ene-2028 · cada misión al azar con 97 % → 6-ene-2028 · con 93 % → 5-jul-2028 · pierde 3 % de los días enteros → 28-mar-2028 · 7 % → 31-jul-2028 · nunca el libro → 30-ene-2028 · romper la racha en el mes 6 → 27-mar-2028 · falla 2 días por semana → 14-ene-2028 · ignorar Orden, o no hacer ninguna mensual → bloqueado para siempre (piso 20 / 25).
 Las pruebas de paridad con el simulador v7 usan `LEGACY_CONFIG` (balance v1.2).
+
+## v1.4 — alimentación por tipo de comida
+- **Registro diario:** carne, verduras y basura (se puede marcar más de una; campos `meat`, `veg`, `junk`, y `meals` = registro confirmado). La diaria se cumple con carne o verduras; la basura sola no la cumple.
+- **Semanal:** 3 o más días con carne, 3 o más con verduras y hasta 3 con basura (`foodRule`); 4 días con basura la hacen fallar. Al cierre del domingo alimenta a la mascota equipada (+10 XP de mascota); la penalidad por semanas falladas no cambia. No da XP de torre ni puntos de estadística.
+- **Registro obligatorio:** si un día ya terminado quedó sin registrar, al abrir la app aparece un cartel que no se puede cerrar hasta registrar y confirmar ese día (de a uno, empezando por el más viejo).
+- El campo `food` de la v1.1 sigue aceptándose como día aprobado (compatibilidad).

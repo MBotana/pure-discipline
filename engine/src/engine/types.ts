@@ -19,7 +19,12 @@ export interface DayInput {
   dform?: boolean;      // domingo: el formulario de cierre fue respondido
   phone?: boolean;      // domingo: el promedio semanal de celular superó las 5 h (antiobjetivo violado)
   gaming?: number;      // sesiones de videojuegos de ese día (la semana permite hasta 3)
-  food?: boolean;       // misión diaria de alimentación cumplida (4 días en la semana alimentan a la mascota)
+  food?: boolean;       // misión diaria de alimentación cumplida (modo v1.1: 4 días en la semana alimentan a la mascota)
+  // --- v1.4: registro de comidas del día (se puede tildar más de una) ---
+  meat?: boolean;       // comió carne
+  veg?: boolean;        // comió verduras
+  junk?: boolean;       // comió comida basura
+  meals?: boolean;      // el registro de comidas del día fue confirmado
   book?: boolean;       // libro terminado (misión mensual de Inteligencia, una sola unidad)
   repair?: boolean;     // arreglo en la casa (misión mensual de Orden, una sola unidad)
   room?: string;        // ambiente limpiado ese día (cada uno cuenta una vez por semana)
@@ -52,6 +57,7 @@ export interface Config {
   multMax?: number;                   // tope del multiplicador (por defecto sin tope)
   dayFloorCap?: number;               // máximo de pisos por día: el XP se suma igual, el piso alcanza al XP en los días siguientes (0 o ausente = sin límite)
   dailyMult?: boolean;                // las diarias también se multiplican por la racha (por defecto no)
+  foodRule?: { meat: number; veg: number; junkMax: number }; // semanal de alimentación por tipo de comida (si falta: foodDays días)
   discPen: boolean;
   petRatio: number; petCosts: number[]; petWeek: number;
   /** true = solo la mascota equipada aporta a la puerta (regla del diseño). false = paridad con el simulador. */
@@ -83,4 +89,5 @@ export interface State {
   tower: number | null;
   lostBlock: number; lostClamp: number; statWasted: number; discPenN: number;
   fl?: number;                   // piso alcanzado (solo con dayFloorCap: sube como máximo dayFloorCap por día)
+  meatWk?: number; vegWk?: number; junkWk?: number; // días de la semana con carne, verduras y basura
 }

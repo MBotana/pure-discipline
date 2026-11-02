@@ -106,12 +106,31 @@ const pending = () => Object.values(S.days).filter(v => v.dirty).length;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmt = n => Math.round(n).toLocaleString('es-AR');
 
+// ---------- alimentación: registro de comidas ----------
+const MEALS = [['meat', 'Carne', '🥩'], ['veg', 'Verduras', '🥦'], ['junk', 'Basura', '🍔']];
+const dailyDone = inp => ['gym', 'read', 'aero', 'clean'].filter(k => inp[k]).length + (inp.meat || inp.veg || inp.food ? 1 : 0);
+const foodOk = (st, cfg) => cfg.foodRule ? (st.meatWk ?? 0) >= cfg.foodRule.meat && (st.vegWk ?? 0) >= cfg.foodRule.veg && (st.junkWk ?? 0) <= cfg.foodRule.junkMax : st.foodWk >= cfg.foodDays;
+const foodText = (st, cfg) => cfg.foodRule ? `carne ${st.meatWk ?? 0}/${cfg.foodRule.meat} · verduras ${st.vegWk ?? 0}/${cfg.foodRule.veg} · basura ${st.junkWk ?? 0} (máx. ${cfg.foodRule.junkMax})` : `${st.foodWk}/${cfg.foodDays} días`;
+/** Fila de alimentación: siempre visible, con las tres opciones del día (se puede tildar más de una). */
+function mealRow(inp, st, cfg, pre, icon) {
+  const ok = !!(inp.meat || inp.veg || inp.food);
+  const chips = MEALS.map(([k, l, e]) => `<button class="meal ${inp[k] ? 'on' : ''} ${k === 'junk' ? 'bad' : ''}" ${pre ? 'disabled' : `data-act="meal" data-k="${k}"`}>${e} ${l}</button>`).join('');
+  return `<div class="mrow static foodrow ${ok ? 'on' : ''}"><span class="mic">${icon}</span><span class="mtx"><b>Alimentación</b><small>sem ${foodText(st, cfg)} · alimenta a ${PETS[st.equipped].name}</small><span class="meals">${chips}</span></span><span class="chk">${ok ? '✓' : ''}</span></div>`;
+}
+/** Primer día ya terminado (desde el inicio) sin registro de comidas confirmado. */
+function pendingMeals() {
+  if (!S.token || !S.startDate) return null;
+  const today = todayISO();
+  for (let d = S.startDate; d < today; d = addDays(d, 1)) { const i = S.days[d]?.input ?? {}; if (!i.meals && !i.food) return d; }
+  return null;
+}
+
 function viewHoy() {
   if (!S.startDate) return '';
   const today = todayISO(), idx = dayIdx(viewDate);
   const title = '<h1>Misiones</h1>';
-  const dow = (new Date(toUTC(viewDate)).getUTCDay() + 6) % 7, wkStart = addDays(viewDate, -dow), DK = ['gym', 'read', 'aero', 'clean', 'food'];
-  const strip = Array.from({ length: 7 }, (_, i) => { const d = addDays(wkStart, i), inp = S.days[d]?.input ?? {}, n = DK.filter(k => inp[k]).length, off = d > today;
+  const dow = (new Date(toUTC(viewDate)).getUTCDay() + 6) % 7, wkStart = addDays(viewDate, -dow);
+  const strip = Array.from({ length: 7 }, (_, i) => { const d = addDays(wkStart, i), inp = S.days[d]?.input ?? {}, n = dailyDone(inp), off = d > today;
     return `<button class="wd ${d === viewDate ? 'sel' : ''} ${d === today ? 'tod' : ''} ${n === 5 ? 'full' : n ? 'some' : ''}" ${off ? 'disabled' : `data-act="day" data-d="${d}"`}><span>${'LMXJVSD'[i]}</span><b>${+d.slice(8)}</b><i></i></button>`; }).join('');
   const nav = `<div class="wk">${strip}</div><div class="daytitle">${viewDate === today ? 'Hoy' : 'Editando'} · ${pretty(viewDate)}${viewDate !== today ? ' · <a href="#" data-act="today">volver a hoy</a>' : ''}</div>`;
   const pre = dayIdx(today) < 0;
@@ -137,23 +156,23 @@ function viewHoy() {
   const wi = pre ? { n: 1, of: 4 } : e.weekInfo(idx), games = st.gameWk, today0 = inp.gaming || 0;
   const petIc = c => petFace(c, e.petLevel(c), 1);
   if (mtab === 'dia') {
-    const wk = dd < 5 ? '+50 XP' : 'solo suma a la semana', n = DK.filter(tick).length;
+    const wk = dd < 5 ? '+50 XP' : 'solo suma a la semana', n = dailyDone(inp);
     h += `<div class="card slim"><div class="row"><h2>Misiones del día</h2><span class="pill ${n === 5 ? 'ok' : ''}">${n} / 5</span></div><div class="bar gold"><i style="width:${n * 20}%"></i></div>`;
     h += row('gym', 'F', 'Gimnasio', `${wk} · sem ${w('F')}/3 · mes ${m('F')}/${cfg.gymM}`);
     h += row('read', 'I', 'Lectura', `${wk} · sem ${w('I')}/3`);
     h += row('aero', 'V', 'Aeróbico', `${wk} · sem ${w('V')}/3 · mes ${m('V')}/${cfg.aeroM}`);
     h += row('clean', 'O', 'Ambiente ordenado', `${wk} · sem ${w('O')}/${cfg.namb}`);
-    h += row('food', 'P', 'Alimentación cumplida', `sem ${st.foodWk}/${cfg.foodDays} días · alimenta a ${PETS[st.equipped].name}`);
+    h += mealRow(inp, st, cfg, pre, ic('P'));
     if (n === 5) h += `<p class="allok">¡Todas las misiones del día cumplidas!</p>`;
     h += `</div>`;
     h += `<div class="card slim bronze"><h2>Antiobjetivo</h2><button class="mrow bronze" ${pre ? 'disabled' : 'data-act="game"'}><span class="mic">🎮</span><span class="mtx"><b>Sesión de videojuegos</b><small>hoy ${today0} · semana ${games} (más de 3 rompe el objetivo)</small></span>${pre ? '' : '<span class="dbl">2×</span>'}</button>${today0 > 0 ? `<button class="undo" data-act="gameminus">Quitar una sesión</button>` : ''}</div>`;
   } else if (mtab === 'sem') {
     const rows = [['F', 'Fuerza', '3 sesiones', 3], ['I', 'Inteligencia', '3 lecturas', 3], ['V', 'Vitalidad', '3 aeróbicos', 3], ['O', 'Orden', `${cfg.namb} de ${ROOMS.length} ambientes · sin limpiar: ${ROOMS.filter(([id]) => !st.roomsWk.includes(id)).map(r => r[1]).join(', ') || 'ninguno'}`, cfg.namb]];
-    const dn = rows.filter(([c]) => st.wdone.includes(c)).length + (st.wu.D >= 3 ? 1 : 0) + (st.foodWk >= cfg.foodDays ? 1 : 0);
+    const fed = foodOk(st, cfg), dn = rows.filter(([c]) => st.wdone.includes(c)).length + (st.wu.D >= 3 ? 1 : 0) + (fed ? 1 : 0);
     h += `<div class="card slim"><div class="row"><h2>Esta semana</h2><span class="pill ${dn === 6 ? 'ok' : ''}">${dn} / 6</span></div>`;
     h += rows.map(([c, nm, goal, max]) => info(c, nm, goal, pips(w(c), max), st.wdone.includes(c))).join('');
     h += info('D', 'Disciplina', DTEXT[Math.min(wi.n, 5) - 1], '', st.wu.D >= 3);
-    h += info('P', 'Alimentación', `${cfg.foodDays} días de alimentación`, pips(st.foodWk, cfg.foodDays), st.foodWk >= cfg.foodDays);
+    h += info('P', 'Alimentación', foodText(st, cfg), '', fed);
     h += `<div class="mute">Semanas buenas seguidas: ${st.wstreak}</div></div>`;
     h += `<div class="card slim"><h2>Cierre de semana</h2>`;
     if (dd === 6 && !pre) h += `<button class="btn" data-act="closeweek">${inp.dform ? 'Revisar el cierre' : 'Completar el cierre'}</button><p class="mute">${inp.dform ? `Disciplina: ${inp.dweek ? 'cumplida' : 'no cumplida'} · celular > 5 h: ${inp.phone ? 'sí' : 'no'}` : 'Respondé tu objetivo de Disciplina y el promedio de celular.'}</p>`;
@@ -266,6 +285,10 @@ function viewAjustes() {
 const TABS = [['hoy', '✅', 'Misiones', viewHoy], ['torre', '🏰', 'Torre', viewTorre], ['stats', '📊', 'Estadísticas', viewStats], ['mascotas', '🐾', 'Mascotas', viewMascotas], ['ajustes', '⚙️', 'Ajustes', viewAjustes]];
 function modalHTML() {
   if (!modal || !S.startDate) return '';
+  if (modal.kind === 'meals') {
+    const opts = MEALS.map(([k, l, e]) => `<button class="mrow ${modal[k] ? 'on' : ''} ${k === 'junk' ? 'bad' : ''}" data-act="mdl" data-k="${k}"><span class="mic">${e}</span><span class="mtx"><b>${l}</b></span><span class="chk">${modal[k] ? '✓' : ''}</span></button>`).join('');
+    return `<div class="modal"><div class="card slim"><h2>¿Qué comiste el ${pretty(modal.date)}?</h2><p class="mute">Registrá tus comidas de ese día para seguir. Podés marcar más de una opción. Carne o verduras cumplen la diaria; para la semanal hacen falta 3 días con carne, 3 con verduras y hasta 3 con basura.</p>${opts}<div class="row" style="margin-top:12px"><button class="btn" data-act="mealsave">Confirmar</button></div></div></div>`;
+  }
   const i = dayIdx(modal.date), { e, results } = compute(i), st = e.state;
   if (modal.kind === 'room') {
     const mine = S.days[modal.date]?.input?.room, taken = st.roomsWk.filter(r => r !== mine);
@@ -288,6 +311,8 @@ function render() {
   const offline = (!navigator.onLine || pending() > 0) && S.token ? `<div class="mute" style="text-align:right">${navigator.onLine ? 'pendiente de sincronizar' : 'sin conexión'}</div>` : '';
   if (!S.token && tab !== 'ajustes') { tab = 'ajustes'; return render(); }
   document.documentElement.classList.toggle('cf', has('marco'));
+  // Registro de comidas obligatorio: si un día ya terminado quedó sin registrar, se pide antes que cualquier otra cosa.
+  if (!modal || modal.kind === 'week') { const pm = pendingMeals(); if (pm) { const i = S.days[pm]?.input ?? {}; modal = { kind: 'meals', date: pm, meat: !!i.meat, veg: !!i.veg, junk: !!i.junk }; } }
   if (tab === 'hoy' && S.startDate && !modal && viewDate === todayISO() && dayIdx(viewDate) >= 0 && dayIdx(viewDate) % 7 === 6 && askedFor !== viewDate && !(S.days[viewDate]?.input?.dform)) {
     askedFor = viewDate; modal = { kind: 'week', dw: false, ph: false, date: viewDate };
   }
@@ -529,6 +554,13 @@ document.addEventListener('click', async ev => {
   else if (a === 'gameminus') setInput(viewDate, i => { i.gaming = Math.max(0, (i.gaming || 0) - 1); });
   else if (a === 'closeweek') { const i = S.days[viewDate]?.input ?? {}; modal = { kind: 'week', dw: !!i.dweek, ph: !!i.phone, date: viewDate }; render(); }
   else if (a === 'mdl') { modal[el.dataset.k] = !modal[el.dataset.k]; render(); }
+  else if (a === 'mealsave') { const m0 = modal; modal = null; setInput(m0.date, i => { i.meals = true; i.meat = m0.meat; i.veg = m0.veg; i.junk = m0.junk; }); }
+  else if (a === 'meal') {
+    const k = el.dataset.k, date = viewDate, before = dayGain(date), wasOk = !!(S.days[date]?.input?.meat || S.days[date]?.input?.veg);
+    setInput(date, i => { i[k] = !i[k]; i.meals = true; });
+    const now = S.days[date].input, idx = dayIdx(date), c = idx >= 0 ? compute(idx).results[idx].completed : null;
+    if (k !== 'junk' && now[k] && (c?.pet || !wasOk)) fx(Math.round(dayGain(date) - before), c?.pet ? 'semanal' : 'diaria');
+  }
   else if (a === 'room') {
     const m0 = modal; modal = null;
     setInput(m0.date, i => { i.room = el.dataset.r; });
