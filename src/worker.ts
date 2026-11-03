@@ -29,8 +29,8 @@ async function authed(req: Request, env: Env): Promise<boolean> {
   return tok.length > 0 && (await sha256hex(tok)) === stored;
 }
 
-const PUBLIC_SETTINGS = ['start_date', 'tz_offset', 'reminder_hour', 'feed_hour', 'reminders_on', 'gym_notify'] as const;
-const DEFAULTS: Record<string, string> = { tz_offset: '-180', reminder_hour: '21', feed_hour: '18', reminders_on: '1', gym_notify: '1' };
+const PUBLIC_SETTINGS = ['start_date', 'tz_offset', 'reminder_hour', 'feed_hour', 'reminders_on', 'gym_notify', 'aero_steps', 'aero_kcal', 'aero_hour'] as const;
+const DEFAULTS: Record<string, string> = { tz_offset: '-180', reminder_hour: '21', feed_hour: '18', reminders_on: '1', gym_notify: '1', aero_steps: '10000', aero_kcal: '500', aero_hour: '19' };
 
 async function readSettings(env: Env) {
   const out: Record<string, string> = {};
@@ -245,6 +245,7 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     // Sin gimnasio, la ventana queda vacía a medianoche: todo el día cuenta como "fuera del gimnasio".
     return json({ date, hasGym: !!w, from: iso(w ? w[0] : day0), to: iso(w ? w[1] : day0), dayStart: iso(day0), dayEnd: iso(day0 + 86400000 - 1000) });
   }
+  if (path === '/api/health/last' && m === 'GET') { const last = Number(await getSetting(env, 'health_last') ?? 0); return json({ last: last || null, minutesAgo: last ? Math.round((Date.now() - last) / 60000) : 99999 }); }
   if (path === '/api/health' && m === 'POST') {
     const b: any = await req.json().catch(() => ({}));
     const tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset), now = Date.now(), today = new Date(now + tz * 60000).toISOString().slice(0, 10);
@@ -260,6 +261,30 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
     const input = row ? JSON.parse(row.input as string) : {};
     input.health = { steps: steps ?? 0, kcal: kcal ?? 0, hr: hr ?? 0, at: now, final: today > date };
+    // Aeróbico del día: alcanza con llegar a los pasos O a las calorías activas (sin contar el gimnasio). Se marca solo; lo marcado a mano nunca se desmarca.
+    const minSteps = Number((await getSetting(env, 'aero_steps')) ?? DEFAULTS.aero_steps), minKcal = Number((await getSetting(env, 'aero_kcal')) ?? DEFAULTS.aero_kcal);
+    const aeroOk = input.health.steps >= minSteps || input.health.kcal >= minKcal;
+    // Si estás en el gimnasio ahora mismo (entrada sin salida), los totales todavía incluyen la sesión: no se decide nada hasta que salgas.
+    const inGym = date === today && Number(await getSetting(env, 'gym_arrive') ?? 0) > 0;
+    input.health.aero = aeroOk;
+    if (!inGym) {
+      // Lo que se marcó solo (aeroAuto) se desmarca si un dato posterior ya no alcanza (p. ej. al registrarse la ventana del gimnasio); lo marcado a mano nunca.
+      if (aeroOk && !input.aero) { input.aero = true; input.aeroAuto = true; }
+      else if (!aeroOk && input.aeroAuto) { delete input.aero; delete input.aeroAuto; }
+    }
+    const hourNow = new Date(now + tz * 60000).getUTCHours(), aeroHour = Number((await getSetting(env, 'aero_hour')) ?? DEFAULTS.aero_hour);
+    const fmt = (n: number) => Math.round(n).toLocaleString('es-AR');
+    const once = async (kind: string, body: string) => {
+      if (await env.DB.prepare('SELECT 1 AS x FROM notification_log WHERE kind = ? AND date = ?').bind(kind, date).first()) return;
+      await env.DB.prepare('INSERT OR IGNORE INTO notification_log (kind, date, sent_at) VALUES (?, ?, ?)').bind(kind, date, now).run();
+      await pushAll(env, url.origin, 'Aeróbico', body);
+    };
+    const have = `${fmt(input.health.steps)} pasos y ${fmt(input.health.kcal)} kcal activas`;
+    if (!inGym && !aeroOk && !input.aero) {
+      if (today > date) await once('aero_miss', `Ayer no cumpliste el aeróbico: ${have} (mínimo ${fmt(minSteps)} pasos o ${fmt(minKcal)} kcal).`);
+      else if (hourNow >= aeroHour) await once('aero_eve', `Hoy todavía no hiciste el aeróbico: ${have}. Mínimo ${fmt(minSteps)} pasos o ${fmt(minKcal)} kcal.`);
+    }
+    await putSetting(env, 'health_last', String(now));
     await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
       .bind(date, JSON.stringify(input), now, 'atajo-salud').run();
     return json({ ok: true, date, health: input.health });

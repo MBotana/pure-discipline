@@ -184,3 +184,42 @@ test('steam: la primera lectura es el punto de partida; después suma las horas 
     assert.equal((await runSteam({ ...env() } as any)).ok, false, 'sin claves');
   } finally { globalThis.fetch = realFetch; Date.now = realNow; }
 });
+
+test('aeróbico por Salud: 10.000 pasos o 500 kcal fuera del gimnasio lo marca solo; aviso a la tarde (una vez) y aviso del día siguiente', async () => {
+  const e = env(); const T = 'clave-larga-1';
+  await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-02' });
+  const logs = async () => ((await e.DB.prepare('SELECT kind, date FROM notification_log ORDER BY kind, date').all()).results as any[]).filter(x => x.kind.startsWith('aero')).map(x => `${x.kind}@${x.date}`);
+  const real = Date.now; let t = Date.parse('2026-11-03T15:00:00Z'); Date.now = () => t;   // 12:00 locales
+  const post = (b: any) => call(e, 'POST', '/api/health', b, T).then(x => x.json()) as Promise<any>;
+  try {
+    assert.equal(((await call(e, 'GET', '/api/health/last', undefined, T).then(x => x.json())) as any).last, null);
+    await post({ date: '2026-11-03', steps: 3000, kcal: 150 });
+    assert.deepEqual(await logs(), [], 'antes de las 19:00 no avisa');
+    t = Date.parse('2026-11-03T22:30:00Z');   // 19:30 locales
+    await post({ date: '2026-11-03', steps: 4000, kcal: 200 }); await post({ date: '2026-11-03', steps: 4100, kcal: 210 });
+    assert.deepEqual(await logs(), ['aero_eve@2026-11-03'], 'después de las 19:00 avisa una sola vez');
+    let r = await post({ date: '2026-11-03', steps: 10200, kcal: 300 });
+    assert.equal(r.health.aero, true, '10.000 pasos alcanzan');
+    let s: any = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); assert.equal(s.days['2026-11-03'].input.aero, true, 'se marca solo');
+    t = Date.parse('2026-11-04T22:30:00Z');   // 19:30 del día siguiente
+    r = await post({ date: '2026-11-04', steps: 2000, kcal: 520 });
+    assert.equal(r.health.aero, true, '500 kcal alcanzan');
+    r = await post({ date: '2026-11-04', steps: 9000, kcal: 900, gymSteps: 2000, gymKcal: 600 });
+    assert.equal(r.health.aero, false, 'el gimnasio no cuenta (7.000 pasos y 300 kcal)');
+    s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); assert.equal(s.days['2026-11-04'].input.aero, undefined, 'se desmarcó lo que se había marcado solo');
+    // en el gimnasio ahora mismo no se decide nada
+    await call(e, 'POST', '/api/gym', { event: 'arrive' }, T);
+    r = await post({ date: '2026-11-04', steps: 20000, kcal: 2000 });
+    s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); assert.equal(s.days['2026-11-04'].input.aero, undefined, 'dentro del gimnasio no marca');
+    await call(e, 'POST', '/api/gym', { event: 'leave' }, T);
+    t = Date.parse('2026-11-05T13:00:00Z');   // día siguiente
+    await post({ date: '2026-11-04', steps: 9000, kcal: 900, gymSteps: 2000, gymKcal: 600 }); await post({ date: '2026-11-04', steps: 9100, kcal: 910, gymSteps: 2000, gymKcal: 600 });
+    assert.deepEqual(await logs(), ['aero_eve@2026-11-03', 'aero_eve@2026-11-04', 'aero_miss@2026-11-04'].sort(), 'aviso del día siguiente, una sola vez');
+    assert.ok(((await call(e, 'GET', '/api/health/last', undefined, T).then(x => x.json())) as any).minutesAgo === 0);
+    // lo marcado a mano nunca se desmarca ni genera aviso
+    await call(e, 'POST', '/api/sync', { changes: [{ date: '2026-11-05', input: { aero: true }, updated_at: t + 1 }] }, T);
+    await post({ date: '2026-11-05', steps: 100, kcal: 10 });
+    s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); assert.equal(s.days['2026-11-05'].input.aero, true);
+    assert.equal((await logs()).filter(x => x.endsWith('2026-11-05')).length, 0);
+  } finally { Date.now = real; }
+});
