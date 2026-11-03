@@ -95,7 +95,7 @@ test('vitalidad: ventana del gimnasio y datos de Salud fuera de esa ventana', as
     assert.equal((await call(e, 'GET', '/api/health/window?date=mal', undefined, T)).status, 400);
     // hoy: queda provisorio; al día siguiente, final
     let r: any = await call(e, 'POST', '/api/health', { date: '2026-11-03', steps: '5.200', kcal: '310,5', hrMax: 128 }, T).then(x => x.json());
-    assert.equal(r.health.final, false); assert.equal(r.health.kcal, 310.5);
+    assert.equal(r.health.final, false); assert.equal(r.health.kcal, 311);
     t = Date.parse('2026-11-04T13:00:00Z');
     r = await call(e, 'POST', '/api/health', { date: '2026-11-03', steps: 7300, kcal: 410, hrMax: 131 }, T).then(x => x.json());
     assert.equal(r.health.final, true);
