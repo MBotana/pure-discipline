@@ -257,7 +257,7 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     const gs = num(b.gymSteps) ?? 0, gk = num(b.gymKcal) ?? 0, ts = num(b.steps), tk = num(b.kcal);
     const steps = ts === null ? null : Math.max(0, ts - gs), kcal = tk === null ? null : Math.max(0, tk - gk);
     const hrs = [num(b.hrMax), num(b.hrA), num(b.hrB)].filter((x): x is number => x !== null), hr = hrs.length ? Math.max(...hrs) : null;
-    if (steps === null && kcal === null && hr === null) return json({ error: 'faltan steps, kcal o hrMax' }, 400);
+    if (steps === null && kcal === null && hr === null) return json({ error: 'faltan steps, kcal o hrMax', recibido: { campos: Object.keys(b), date: b.date ?? null, steps: b.steps ?? null, kcal: b.kcal ?? null, gymSteps: b.gymSteps ?? null, gymKcal: b.gymKcal ?? null } }, 400);   // el eco ayuda a depurar el atajo
     const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
     const input = row ? JSON.parse(row.input as string) : {};
     input.health = { steps: steps ?? 0, kcal: kcal ?? 0, hr: hr ?? 0, at: now, final: today > date };
