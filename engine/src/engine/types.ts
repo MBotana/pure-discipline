@@ -62,6 +62,7 @@ export interface Config {
   dayFloorCap?: number;               // máximo de pisos por día: el XP se suma igual, el piso alcanza al XP en los días siguientes (0 o ausente = sin límite)
   dailyMult?: boolean;                // las diarias también se multiplican por la racha (por defecto no)
   foodRule?: { meat: number; veg: number; junkMax: number }; // semanal de alimentación por tipo de comida (si falta: foodDays días aprobados)
+  payOnComplete?: boolean;            // v1.6: la misión semanal/mensual paga completa al cumplirla (y nada si no se cumple); sin esto se reparte por unidad
   weekendComp?: boolean;              // sábado y domingo pagan la diaria solo si faltó un día de lunes a viernes (máximo 5 diarias pagadas por semana y categoría)
   gameCapH?: number;                  // tope semanal de horas de videojuegos; si falta, rige el modo de sesiones (anti)
   gameGraceWeeks?: number;            // semanas iniciales en que las horas se miden pero no se premian ni castigan

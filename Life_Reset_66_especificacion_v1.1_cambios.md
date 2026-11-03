@@ -65,3 +65,8 @@ Las pruebas de paridad con el simulador v7 usan `LEGACY_CONFIG` (balance v1.2).
 - Rúbrica fija en el servidor (proteína en almuerzo y cena, verduras/frutas, máximo un ultraprocesado, sin bebidas azucaradas, porciones razonables; lo que falta debe compensarse en otra comida).
 - Requiere el secreto `GEMINI_KEY` en Cloudflare (opcional `GEMINI_MODEL`). Modelos probados en orden: gemini-3.6-flash, 3.5-flash-lite, 3.8-flash.
 - Los atajos (`/api/verdict`) quedan como camino alternativo.
+
+## v1.6 — Misiones semanales y mensuales: todo o nada
+- Semanal: paga los 300 XP completos al completar el objetivo (3 sesiones, 5 ambientes, etc.); si no se completa, no suma nada. Antes se repartía por sesión (100 XP cada una).
+- Mensual: paga los 1.500 XP completos al cumplir el objetivo (16 sesiones de gimnasio, etc.), repartidos en 6 cuotas diarias para no romper el límite de un piso por día; con una sesión menos no suma nada.
+- Para que el año perfecto siga abriendo el piso 100 el 28-dic-2027 (día 421), la base de la curva bajó de A=605 a A=599,5. Los primeros pisos salen algo más lentos (piso 10 pasa del día 10 al 16) porque la primera semanal llega el tercer día y la primera mensual recién al completar el mes.

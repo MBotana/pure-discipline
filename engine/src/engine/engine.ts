@@ -116,13 +116,20 @@ export class Engine {
       if (S.wu[cat] < units) {
         S.wu[cat]++;
         if (S.wu[cat] === units) { addDone(S.wdone, cat); completed.weekly.push(cat); ev.push([cat, 'S', 0]); }
-        ev.push([cat, 'W', cfg.W / units]);
+        // v1.6: la misión semanal paga todo junto al completarla (y nada si no se completa).
+        if (cfg.payOnComplete) { if (S.wu[cat] === units) ev.push([cat, 'W', cfg.W]); }
+        else ev.push([cat, 'W', cfg.W / units]);
       }
     };
     const monthly = (cat: Cat, limit: number, base: number) => {
       if (S.mu[cat] < limit) {
-        S.mu[cat]++; ev.push([cat, 'M', base]);
-        if (S.mu[cat] === limit) { addDone(S.mdone, cat); completed.monthly.push(cat); }
+        S.mu[cat]++;
+        if (!cfg.payOnComplete) ev.push([cat, 'M', base]);
+        if (S.mu[cat] === limit) {
+          addDone(S.mdone, cat); completed.monthly.push(cat);
+          // v1.6: la misión mensual paga completa al cumplirla, en cuotas diarias (así ningún día concentra el pozo y se mantiene el límite de un piso por día).
+          if (cfg.payOnComplete) S.drips.push({ cat, base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
+        }
       }
     };
 
@@ -159,8 +166,11 @@ export class Engine {
     const gameRatio = hoursMode ? (S.gameHWk ?? 0) / cfg.gameCapH! : 0;
     const gameOk = hoursMode && dd === 6 && (grace || gameRatio <= 1 + 1e-9);
     const dweek = hoursMode ? gameOk : !!input.dweek;
-    if (input.dwork && S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
-    if (dweek) while (S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
+    if (cfg.payOnComplete) { if (dweek && S.wu.D < 3) { S.wu.D = 3; ev.push(['D', 'W', cfg.W]); } }
+    else {
+      if (input.dwork && S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
+      if (dweek) while (S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
+    }
     if (input.gaming) S.gameWk += input.gaming;
     const fr = cfg.foodRule;
     const fedOk = () => fr ? (S.meatWk ?? 0) >= fr.meat && (S.vegWk ?? 0) >= fr.veg && (S.junkWk ?? 0) <= fr.junkMax : S.foodWk >= cfg.foodDays;
@@ -173,13 +183,16 @@ export class Engine {
       if (!before && fedOk()) completed.pet = true;
     }
     if (input.improve) monthly('O', cfg.impUnits, cfg.Mp / cfg.impUnits);
-    if (dd === 6 && dweek) { S.mu.D++; ev.push(['D', 'M', cfg.Mp / month.weeks.length]); }
-    if ((dd === 2 || dd === 6) && input.dcheck) ev.push(['D', 'M', cfg.Mp / (cfg.dchk * month.weeks.length)]);
+    if (dd === 6 && dweek) { S.mu.D++; if (!cfg.payOnComplete) ev.push(['D', 'M', cfg.Mp / month.weeks.length]); }
+    if (!cfg.payOnComplete && (dd === 2 || dd === 6) && input.dcheck) ev.push(['D', 'M', cfg.Mp / (cfg.dchk * month.weeks.length)]);
 
     const lastWeekOfMonth = w === month.weeks[month.weeks.length - 1];
     if (dd === 6) {
       if (input.dcheck && lastWeekOfMonth) { addDone(S.mdone, 'D'); completed.monthly.push('D'); }
-      if (lastWeekOfMonth && S.mu.D >= month.weeks.length) { addDone(S.mdone, 'D'); completed.monthly.push('D'); }
+      if (lastWeekOfMonth && S.mu.D >= month.weeks.length) {
+        addDone(S.mdone, 'D'); completed.monthly.push('D');
+        if (cfg.payOnComplete) S.drips.push({ cat: 'D', base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
+      }
       const anti = hoursMode ? gameOk : (input.anti ?? true) && S.gameWk <= 3 && !input.phone;
       if (S.wu.D >= 3 && anti) { addDone(S.wdone, 'D'); completed.weekly.push('D'); ev.unshift(['D', 'S', 0]); }
       else {
