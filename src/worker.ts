@@ -251,7 +251,11 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     const date = typeof b.date === 'string' ? b.date : today;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today) return json({ error: 'date inválida' }, 400);
     const num = (v: unknown) => { if (v === undefined || v === null || String(v).trim() === '') return null; const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) && n >= 0 ? Math.round(n * 10) / 10 : null; };
-    const steps = num(b.steps), kcal = num(b.kcal), hr = num(b.hrMax);
+    // El atajo manda totales del día y, aparte, lo que midió dentro de la ventana del gimnasio: el servidor resta (sin gimnasio, esos campos van en 0).
+    // El pulso máximo viene en dos tramos (antes y después del gimnasio): se queda con el mayor.
+    const gs = num(b.gymSteps) ?? 0, gk = num(b.gymKcal) ?? 0, ts = num(b.steps), tk = num(b.kcal);
+    const steps = ts === null ? null : Math.max(0, ts - gs), kcal = tk === null ? null : Math.max(0, tk - gk);
+    const hrs = [num(b.hrMax), num(b.hrA), num(b.hrB)].filter((x): x is number => x !== null), hr = hrs.length ? Math.max(...hrs) : null;
     if (steps === null && kcal === null && hr === null) return json({ error: 'faltan steps, kcal o hrMax' }, 400);
     const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
     const input = row ? JSON.parse(row.input as string) : {};

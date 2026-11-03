@@ -101,6 +101,8 @@ test('vitalidad: ventana del gimnasio y datos de Salud fuera de esa ventana', as
     assert.equal(r.health.final, true);
     const s: any = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
     assert.equal(s.days['2026-11-03'].input.health.steps, 7300); assert.equal(s.days['2026-11-03'].input.gym, true, 'no pisa el resto del día');
+    r = await call(e, 'POST', '/api/health', { date: '2026-11-03', steps: 9000, gymSteps: 1500, kcal: 700, gymKcal: 350, hrA: 120, hrB: 135 }, T).then(x => x.json());
+    assert.deepEqual([r.health.steps, r.health.kcal, r.health.hr], [7500, 350, 135], 'resta el gimnasio y toma el pulso mayor de los dos tramos');
     assert.equal((await call(e, 'POST', '/api/health', { date: '2026-11-09', steps: 1 }, T)).status, 400, 'día futuro');
     assert.equal((await call(e, 'POST', '/api/health', { date: '2026-11-03' }, T)).status, 400, 'sin datos');
   } finally { Date.now = real; }
