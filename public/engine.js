@@ -246,6 +246,7 @@ class Engine {
       if (!arr.includes(c))
         arr.push(c);
     };
+    const payMonthly = (cat) => ev.push([cat, "M", cfg.Mp, S.s === 0 ? 1 : S.multM]);
     const weekly = (cat, units) => {
       if (S.wu[cat] < units) {
         S.wu[cat]++;
@@ -270,7 +271,7 @@ class Engine {
           addDone(S.mdone, cat);
           completed.monthly.push(cat);
           if (cfg.payOnComplete)
-            S.drips.push({ cat, base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
+            payMonthly(cat);
         }
       }
     };
@@ -314,6 +315,10 @@ class Engine {
       S.mu[cat]++;
       addDone(S.mdone, cat);
       completed.monthly.push(cat);
+      if (cfg.payOnComplete) {
+        payMonthly(cat);
+        return;
+      }
       S.drips.push({ cat, base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
     };
     if (input.book || input.books?.length)
@@ -384,7 +389,7 @@ class Engine {
         addDone(S.mdone, "D");
         completed.monthly.push("D");
         if (cfg.payOnComplete)
-          S.drips.push({ cat: "D", base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
+          payMonthly("D");
       }
       const anti = hoursMode ? gameOk : (input.anti ?? true) && S.gameWk <= 3 && !input.phone;
       if (S.wu.D >= 3 && anti) {

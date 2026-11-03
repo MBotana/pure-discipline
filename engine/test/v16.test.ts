@@ -15,7 +15,7 @@ test('v1.6: la misión semanal paga todo (300) al completarla y nada si no se co
   assert.equal(w, 0, 'con 2 de 3 sesiones no se paga nada de la semanal');
 });
 
-test('v1.6: la misión mensual paga completa (1.500) al cumplir las 16 sesiones, en cuotas diarias; con 15 no paga nada', () => {
+test('v1.6: la misión mensual paga completa (1.500) al cumplir las 16 sesiones, de una vez; con 15 no paga nada', () => {
   const run = (sessions: number) => {
     const e = new Engine(); let m = 0, d = 0, done = 0;
     for (; d < 28; d++) { const act = d % 7 < 5 && done < sessions; if (act) done++; m += e.processDay(act ? { gym: true } : {}).events.filter(x => x.cat === 'F' && x.kind === 'M').reduce((a, x) => a + x.amount, 0); }

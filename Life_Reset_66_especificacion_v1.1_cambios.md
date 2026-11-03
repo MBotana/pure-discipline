@@ -68,5 +68,5 @@ Las pruebas de paridad con el simulador v7 usan `LEGACY_CONFIG` (balance v1.2).
 
 ## v1.6 — Misiones semanales y mensuales: todo o nada
 - Semanal: paga los 300 XP completos al completar el objetivo (3 sesiones, 5 ambientes, etc.); si no se completa, no suma nada. Antes se repartía por sesión (100 XP cada una).
-- Mensual: paga los 1.500 XP completos al cumplir el objetivo (16 sesiones de gimnasio, etc.), repartidos en 6 cuotas diarias para no romper el límite de un piso por día; con una sesión menos no suma nada.
+- Mensual: paga los 1.500 XP completos al cumplir el objetivo (16 sesiones de gimnasio, etc.), en un solo pago el mismo día (sin cuotas; el piso igual sube como máximo uno por día y el resto del XP lo alcanza en los días siguientes); con una sesión menos no suma nada. Libro y arreglo también pagan completos el día que se marcan.
 - Para que el año perfecto siga abriendo el piso 100 el 28-dic-2027 (día 421), la base de la curva bajó de A=605 a A=599,5. Los primeros pisos salen algo más lentos (piso 10 pasa del día 10 al 16) porque la primera semanal llega el tercer día y la primera mensual recién al completar el mes.

@@ -112,6 +112,8 @@ export class Engine {
     const ev: [Cat, 'D' | 'W' | 'M' | 'S', number, number?][] = [];
     const wkday = dd < 5;
     const addDone = (arr: Cat[], c: Cat) => { if (!arr.includes(c)) arr.push(c); };
+    // v1.6: misión mensual cumplida = pago completo el mismo día (sin cuotas). El piso igual sube como máximo uno por día.
+    const payMonthly = (cat: Cat) => ev.push([cat, 'M', cfg.Mp, S.s === 0 ? 1 : S.multM]);
     const weekly = (cat: Cat, units: number) => {
       if (S.wu[cat] < units) {
         S.wu[cat]++;
@@ -128,7 +130,7 @@ export class Engine {
         if (S.mu[cat] === limit) {
           addDone(S.mdone, cat); completed.monthly.push(cat);
           // v1.6: la misión mensual paga completa al cumplirla, en cuotas diarias (así ningún día concentra el pozo y se mantiene el límite de un piso por día).
-          if (cfg.payOnComplete) S.drips.push({ cat, base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
+          if (cfg.payOnComplete) payMonthly(cat);
         }
       }
     };
@@ -152,6 +154,7 @@ export class Engine {
     const mark = (cat: Cat) => {
       if (S.mu[cat] >= 1) return;
       S.mu[cat]++; addDone(S.mdone, cat); completed.monthly.push(cat);
+      if (cfg.payOnComplete) { payMonthly(cat); return; }
       S.drips.push({ cat, base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
     };
     if (input.book || input.books?.length) mark('I');
@@ -191,7 +194,7 @@ export class Engine {
       if (input.dcheck && lastWeekOfMonth) { addDone(S.mdone, 'D'); completed.monthly.push('D'); }
       if (lastWeekOfMonth && S.mu.D >= month.weeks.length) {
         addDone(S.mdone, 'D'); completed.monthly.push('D');
-        if (cfg.payOnComplete) S.drips.push({ cat: 'D', base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
+        if (cfg.payOnComplete) payMonthly('D');
       }
       const anti = hoursMode ? gameOk : (input.anti ?? true) && S.gameWk <= 3 && !input.phone;
       if (S.wu.D >= 3 && anti) { addDone(S.wdone, 'D'); completed.weekly.push('D'); ev.unshift(['D', 'S', 0]); }
