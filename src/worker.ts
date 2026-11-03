@@ -255,27 +255,30 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today) return json({ error: 'date inválida' }, 400);
     // Cada campo puede ser un número o una LISTA de valores (las muestras de Salud unidas con saltos de línea o ";"): el servidor suma.
     // Así el atajo no hace cuentas con decimales, que Atajos en español interpreta mal (la coma decimal como separador de miles).
-    const one = (s: string) => {
+    // dec=true (kcal): si no hay coma, el punto es decimal (0.354 = 0,354). dec=false (pasos, siempre enteros): el punto es de miles (1.234 = 1234).
+    const one = (s: string, dec: boolean) => {
       s = s.trim().replace(/[^\d.,-]/g, ''); if (!s) return 0;
       if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');      // 1.234,5 → 1234.5 (formato español)
-      else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');   // 1.234 → 1234
+      else if (!dec) s = s.replace(/\./g, '');                              // pasos: 1.234 → 1234
       const n = Number(s); return Number.isFinite(n) && n >= 0 ? n : NaN;
     };
-    const num = (v: unknown) => {
+    const num = (v: unknown, dec = true) => {
       if (v === undefined || v === null) return null;
       if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? Math.round(v * 10) / 10 : null;
       const parts = String(v).split(/[\n;]+/).filter(p => p.trim() !== ''); if (!parts.length) return null;
-      const t = parts.reduce((a, p) => a + one(p), 0); return Number.isFinite(t) ? Math.round(t * 10) / 10 : null;
+      const t = parts.reduce((a, p) => a + one(p, dec), 0); return Number.isFinite(t) ? Math.round(t * 10) / 10 : null;
     };
+    // Muestra cruda de lo último recibido (para depurar el formato que manda Atajos).
+    await putSetting(env, 'health_raw', JSON.stringify({ date, steps: String(b.steps ?? '').slice(0, 200), kcal: String(b.kcal ?? '').slice(0, 300), gymKcal: String(b.gymKcal ?? '').slice(0, 200) }));
     // El atajo manda totales del día y, aparte, lo que midió dentro de la ventana del gimnasio: el servidor resta (sin gimnasio, esos campos van en 0).
     // El pulso máximo viene en dos tramos (antes y después del gimnasio): se queda con el mayor.
     // Vacío = sin muestras. Para HOY cuenta como 0 (p. ej. recién pasada la medianoche); para un día ya cerrado, vacío en pasos Y kcal
     // casi seguro es un atajo roto, y no se registra (si no, daría "fallaste el aeróbico" por error).
     const zeroOk = date === today;
-    const gs = num(b.gymSteps) ?? 0, gk = num(b.gymKcal) ?? 0, ts = num(b.steps) ?? (zeroOk && 'steps' in b ? 0 : null), tk = num(b.kcal) ?? (zeroOk && 'kcal' in b ? 0 : null);
+    const gs = num(b.gymSteps, false) ?? 0, gk = num(b.gymKcal) ?? 0, ts = num(b.steps, false) ?? (zeroOk && 'steps' in b ? 0 : null), tk = num(b.kcal) ?? (zeroOk && 'kcal' in b ? 0 : null);
     const steps = ts === null ? null : Math.max(0, ts - gs), kcal = tk === null ? null : Math.max(0, tk - gk);
     // Un decimal con coma mal convertido por Atajos llega como un número gigante (295,8 → 2958...): se rechaza en vez de marcar un aeróbico falso.
-    if ([ts, tk, gs, gk].some(v => v !== null && v > 200000)) return json({ error: 'valor fuera de rango: redondeá pasos y kcal a entero', recibido: { steps: b.steps ?? null, kcal: b.kcal ?? null, gymSteps: b.gymSteps ?? null, gymKcal: b.gymKcal ?? null } }, 400);
+    if ([ts, gs].some(v => v !== null && v > 200000) || [tk, gk].some(v => v !== null && v > 8000)) return json({ error: 'valor fuera de rango: redondeá pasos y kcal a entero', recibido: { steps: b.steps ?? null, kcal: b.kcal ?? null, gymSteps: b.gymSteps ?? null, gymKcal: b.gymKcal ?? null } }, 400);
     const hrs = [num(b.hrMax), num(b.hrA), num(b.hrB)].filter((x): x is number => x !== null), hr = hrs.length ? Math.max(...hrs) : null;
     if (steps === null && kcal === null && hr === null) return json({ error: 'faltan steps, kcal o hrMax', recibido: { campos: Object.keys(b), date: b.date ?? null, steps: b.steps ?? null, kcal: b.kcal ?? null, gymSteps: b.gymSteps ?? null, gymKcal: b.gymKcal ?? null } }, 400);   // el eco ayuda a depurar el atajo
     const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
