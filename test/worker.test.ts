@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { handle, runReminders } from '../src/worker.ts';
+import { handle, runReminders, runSteam } from '../src/worker.ts';
 
 // D1 simulado sobre node:sqlite
 function fakeD1() {
@@ -161,4 +161,24 @@ test('alimentación con IA: describe cada comida, acumula el día y cierra con e
     assert.equal(g.meals.length, 2); assert.match(g.text, /Falta verdura/);
     assert.equal((await call(e, 'POST', '/api/meal/close', { date: '2026-11-05' }, T)).status, 400, 'sin comidas no se cierra');
   } finally { globalThis.fetch = real; }
+});
+
+test('steam: la primera lectura es el punto de partida; después suma las horas nuevas al día de hoy', async () => {
+  const e: any = { ...env(), STEAM_KEY: 'k', STEAM_ID: '123' }; const T = 'clave-larga-1';
+  await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-02' });
+  const realFetch = globalThis.fetch, realNow = Date.now; let games: any[] = [{ appid: 1, playtime_forever: 600 }, { appid: 2, playtime_forever: 60 }];
+  globalThis.fetch = (async () => new Response(JSON.stringify({ response: { games } }))) as any; Date.now = () => Date.parse('2026-11-03T23:00:00Z');   // 20:00 locales
+  try {
+    assert.deepEqual(await runSteam(e), { ok: true, baseline: true, addedH: 0 });
+    assert.equal((await runSteam(e) as any).addedH, 0, 'sin cambios no suma');
+    games = [{ appid: 1, playtime_forever: 690 }, { appid: 2, playtime_forever: 60 }, { appid: 3, playtime_forever: 30 }];   // +90 min en el 1 y juego nuevo con 30 min
+    const r: any = await runSteam(e); assert.equal(r.addedH, 2);   // 90 + 30 minutos
+    const s: any = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
+    assert.equal(s.days['2026-11-03'].input.gameH, 2);
+    games = [{ appid: 1, playtime_forever: 750 }, { appid: 2, playtime_forever: 60 }, { appid: 3, playtime_forever: 30 }];
+    assert.equal((await runSteam(e) as any).addedH, 1); assert.equal(((await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json())) as any).days['2026-11-03'].input.gameH, 3, 'acumula');
+    globalThis.fetch = (async () => new Response(JSON.stringify({ response: {} }))) as any;
+    assert.match(String(((await runSteam(e)) as any).error), /público/);
+    assert.equal((await runSteam({ ...env() } as any)).ok, false, 'sin claves');
+  } finally { globalThis.fetch = realFetch; Date.now = realNow; }
 });

@@ -1,7 +1,7 @@
 /* Pure Discipline — servidor (Cloudflare Worker + D1). Un solo usuario.
  * Autenticación: la primera vez se define una clave (/api/setup); después todo exige Authorization: Bearer <clave>. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export interface Env { DB: any; ASSETS: any; GEMINI_KEY?: string; GEMINI_MODEL?: string }
+export interface Env { DB: any; ASSETS: any; GEMINI_KEY?: string; GEMINI_MODEL?: string; STEAM_KEY?: string; STEAM_ID?: string }
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
@@ -230,6 +230,9 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     await notify(`Saliste del gimnasio · ${hhmm(now)} · ${minutes} min: sesión contada ✔`);
     return json({ ok: true, counted: true, minutes, date });
   }
+  // Steam: lectura manual (para probar la conexión) y estado.
+  if (path === '/api/steam/sync' && m === 'POST') return json(await runSteam(env));
+  if (path === '/api/steam' && m === 'GET') return json({ configured: !!(env.STEAM_KEY && env.STEAM_ID), last: Number(await getSetting(env, 'steam_last') ?? 0) || null });
   // Vitalidad: el atajo de Salud pide la ventana del gimnasio de un día y manda lo medido FUERA de esa ventana.
   if (path === '/api/health/window' && m === 'GET') {
     const tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset), date = url.searchParams.get('date') ?? '';
@@ -329,10 +332,40 @@ export async function handle(req: Request, env: Env): Promise<Response> {
   return json({ error: 'no encontrado' }, 404);
 }
 
+// ---------- Steam: horas jugadas (Disciplina). Compara el tiempo total de cada juego contra la última lectura y suma la diferencia al día de hoy ----------
+export async function runSteam(env: Env): Promise<{ ok: boolean; addedH?: number; baseline?: boolean; error?: string }> {
+  if (!env.STEAM_KEY || !env.STEAM_ID) return { ok: false, error: 'Faltan STEAM_KEY o STEAM_ID en Cloudflare' };
+  let games: { appid: number; playtime_forever?: number }[];
+  try {
+    const r = await fetch(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${encodeURIComponent(env.STEAM_KEY)}&steamid=${encodeURIComponent(env.STEAM_ID)}&include_played_free_games=1&format=json`);
+    if (!r.ok) return { ok: false, error: `Steam respondió ${r.status}` };
+    const j: any = await r.json(); games = j?.response?.games;
+  } catch { return { ok: false, error: 'No se pudo consultar Steam' }; }
+  if (!Array.isArray(games)) return { ok: false, error: 'Steam no devolvió juegos: el perfil o los detalles de juego deben estar en público' };
+  const now = Date.now(), tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset);
+  const cur: Record<string, number> = {}; for (const g of games) cur[String(g.appid)] = Number(g.playtime_forever ?? 0);
+  const raw = await getSetting(env, 'steam_snap');
+  await putSetting(env, 'steam_snap', JSON.stringify(cur)); await putSetting(env, 'steam_last', String(now));
+  if (!raw) return { ok: true, baseline: true, addedH: 0 };   // primera lectura: es el punto de partida, no cuenta horas pasadas
+  const prev: Record<string, number> = JSON.parse(raw); let mins = 0;
+  // Un juego que aparece por primera vez cuenta lo que trae (hasta 8 h): evita sumar cientos de horas viejas si entra a la biblioteca con historial.
+  for (const [id, m] of Object.entries(cur)) { const d = id in prev ? m - prev[id] : Math.min(m, 480); if (d > 0) mins += d; }
+  if (mins <= 0) return { ok: true, addedH: 0 };
+  const date = new Date(now + tz * 60000).toISOString().slice(0, 10);
+  const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
+  const input = row ? JSON.parse(row.input as string) : {};
+  const addedH = Math.round(mins / 60 * 100) / 100;
+  input.gameH = Math.round(((Number(input.gameH) || 0) + addedH) * 100) / 100;
+  await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
+    .bind(date, JSON.stringify(input), now, 'steam').run();
+  return { ok: true, addedH };
+}
+
 export default {
   fetch: (req: Request, env: Env) => handle(req, env),
   scheduled: async (_e: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }) => {
     const origin = (await getSetting(env, 'origin')) ?? 'https://pure-discipline.workers.dev';
     ctx.waitUntil(runReminders(env, origin));
+    ctx.waitUntil(runSteam(env).then(() => undefined, () => undefined));
   },
 };
