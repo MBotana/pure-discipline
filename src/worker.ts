@@ -259,6 +259,8 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     // Atajos devuelve "" al sumar cero muestras (p. ej. recién pasada la medianoche): si el campo vino, vacío cuenta como 0.
     const gs = num(b.gymSteps) ?? 0, gk = num(b.gymKcal) ?? 0, ts = num(b.steps) ?? ('steps' in b ? 0 : null), tk = num(b.kcal) ?? ('kcal' in b ? 0 : null);
     const steps = ts === null ? null : Math.max(0, ts - gs), kcal = tk === null ? null : Math.max(0, tk - gk);
+    // Un decimal con coma mal convertido por Atajos llega como un número gigante (295,8 → 2958...): se rechaza en vez de marcar un aeróbico falso.
+    if ([ts, tk, gs, gk].some(v => v !== null && v > 200000)) return json({ error: 'valor fuera de rango: redondeá pasos y kcal a entero', recibido: { steps: b.steps ?? null, kcal: b.kcal ?? null, gymSteps: b.gymSteps ?? null, gymKcal: b.gymKcal ?? null } }, 400);
     const hrs = [num(b.hrMax), num(b.hrA), num(b.hrB)].filter((x): x is number => x !== null), hr = hrs.length ? Math.max(...hrs) : null;
     if (steps === null && kcal === null && hr === null) return json({ error: 'faltan steps, kcal o hrMax', recibido: { campos: Object.keys(b), date: b.date ?? null, steps: b.steps ?? null, kcal: b.kcal ?? null, gymSteps: b.gymSteps ?? null, gymKcal: b.gymKcal ?? null } }, 400);   // el eco ayuda a depurar el atajo
     const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
