@@ -243,7 +243,9 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     const w = wins.length ? [Math.min(...wins.map(x => x[0])), Math.max(...wins.map(x => x[1]))] : null;
     const day0 = Date.parse(date + 'T00:00:00Z') - tz * 60000;
     // Sin gimnasio, la ventana queda vacía a medianoche: todo el día cuenta como "fuera del gimnasio".
-    return json({ date, hasGym: !!w, from: iso(w ? w[0] : day0), to: iso(w ? w[1] : day0), dayStart: iso(day0), dayEnd: iso(day0 + 86400000 - 1000) });
+    // fromMin/toMin: minutos desde las 00:00 locales del día; el atajo arma las fechas con "Ajustar fecha" sin tener que interpretar texto.
+    const mins = (ms: number) => Math.max(0, Math.round((ms - day0) / 60000));
+    return json({ date, hasGym: !!w, from: iso(w ? w[0] : day0), to: iso(w ? w[1] : day0), dayStart: iso(day0), dayEnd: iso(day0 + 86400000 - 1000), fromMin: w ? mins(w[0]) : 0, toMin: w ? mins(w[1]) : 0 });
   }
   if (path === '/api/health/last' && m === 'GET') { const last = Number(await getSetting(env, 'health_last') ?? 0); return json({ last: last || null, minutesAgo: last ? Math.round((Date.now() - last) / 60000) : 99999 }); }
   if (path === '/api/health' && m === 'POST') {
@@ -254,7 +256,8 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     const num = (v: unknown) => { if (v === undefined || v === null || String(v).trim() === '') return null; const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) && n >= 0 ? Math.round(n * 10) / 10 : null; };
     // El atajo manda totales del día y, aparte, lo que midió dentro de la ventana del gimnasio: el servidor resta (sin gimnasio, esos campos van en 0).
     // El pulso máximo viene en dos tramos (antes y después del gimnasio): se queda con el mayor.
-    const gs = num(b.gymSteps) ?? 0, gk = num(b.gymKcal) ?? 0, ts = num(b.steps), tk = num(b.kcal);
+    // Atajos devuelve "" al sumar cero muestras (p. ej. recién pasada la medianoche): si el campo vino, vacío cuenta como 0.
+    const gs = num(b.gymSteps) ?? 0, gk = num(b.gymKcal) ?? 0, ts = num(b.steps) ?? ('steps' in b ? 0 : null), tk = num(b.kcal) ?? ('kcal' in b ? 0 : null);
     const steps = ts === null ? null : Math.max(0, ts - gs), kcal = tk === null ? null : Math.max(0, tk - gk);
     const hrs = [num(b.hrMax), num(b.hrA), num(b.hrB)].filter((x): x is number => x !== null), hr = hrs.length ? Math.max(...hrs) : null;
     if (steps === null && kcal === null && hr === null) return json({ error: 'faltan steps, kcal o hrMax', recibido: { campos: Object.keys(b), date: b.date ?? null, steps: b.steps ?? null, kcal: b.kcal ?? null, gymSteps: b.gymSteps ?? null, gymKcal: b.gymKcal ?? null } }, 400);   // el eco ayuda a depurar el atajo
