@@ -222,10 +222,40 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
     const input = row ? JSON.parse(row.input as string) : {};
     input.gym = true; input.gymMin = Math.max(Number(input.gymMin ?? 0), minutes);
+    // Ventana de la sesión (para separar el gimnasio de la actividad del resto del día en Vitalidad).
+    const wins: [number, number][] = Array.isArray(input.gymWins) ? input.gymWins : [];
+    wins.push([arr, now]); input.gymWins = wins.slice(-4);
     await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
       .bind(date, JSON.stringify(input), now, 'atajo-gimnasio').run();
     await notify(`Saliste del gimnasio · ${hhmm(now)} · ${minutes} min: sesión contada ✔`);
     return json({ ok: true, counted: true, minutes, date });
+  }
+  // Vitalidad: el atajo de Salud pide la ventana del gimnasio de un día y manda lo medido FUERA de esa ventana.
+  if (path === '/api/health/window' && m === 'GET') {
+    const tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset), date = url.searchParams.get('date') ?? '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ error: 'date debe ser AAAA-MM-DD' }, 400);
+    const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
+    const wins: [number, number][] = row ? (JSON.parse(row.input as string).gymWins ?? []) : [];
+    const iso = (ms: number) => new Date(ms + tz * 60000).toISOString().slice(0, 19);
+    const w = wins.length ? [Math.min(...wins.map(x => x[0])), Math.max(...wins.map(x => x[1]))] : null;
+    const day0 = Date.parse(date + 'T00:00:00Z') - tz * 60000;
+    // Sin gimnasio, la ventana queda vacía a medianoche: todo el día cuenta como "fuera del gimnasio".
+    return json({ date, hasGym: !!w, from: iso(w ? w[0] : day0), to: iso(w ? w[1] : day0), dayStart: iso(day0), dayEnd: iso(day0 + 86400000 - 1000) });
+  }
+  if (path === '/api/health' && m === 'POST') {
+    const b: any = await req.json().catch(() => ({}));
+    const tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset), now = Date.now(), today = new Date(now + tz * 60000).toISOString().slice(0, 10);
+    const date = typeof b.date === 'string' ? b.date : today;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today) return json({ error: 'date inválida' }, 400);
+    const num = (v: unknown) => { if (v === undefined || v === null || String(v).trim() === '') return null; const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) && n >= 0 ? Math.round(n * 10) / 10 : null; };
+    const steps = num(b.steps), kcal = num(b.kcal), hr = num(b.hrMax);
+    if (steps === null && kcal === null && hr === null) return json({ error: 'faltan steps, kcal o hrMax' }, 400);
+    const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
+    const input = row ? JSON.parse(row.input as string) : {};
+    input.health = { steps: steps ?? 0, kcal: kcal ?? 0, hr: hr ?? 0, at: now, final: today > date };
+    await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
+      .bind(date, JSON.stringify(input), now, 'atajo-salud').run();
+    return json({ ok: true, date, health: input.health });
   }
   // Atajo "Evaluar comida": devuelve el análisis acumulado de hoy (para que el modelo lo tenga en cuenta).
   if (path === '/api/verdict' && m === 'GET') {

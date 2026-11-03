@@ -80,6 +80,32 @@ test('gimnasio: la salida cuenta solo con 40 minutos o más y marca el día de l
   } finally { Date.now = real; }
 });
 
+test('vitalidad: ventana del gimnasio y datos de Salud fuera de esa ventana', async () => {
+  const e = env(); const T = 'clave-larga-1';
+  await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-02' });
+  const real = Date.now; let t = Date.parse('2026-11-03T22:00:00Z'); Date.now = () => t;   // 19:00 locales
+  try {
+    let w: any = await call(e, 'GET', '/api/health/window?date=2026-11-03', undefined, T).then(r => r.json());
+    assert.equal(w.hasGym, false); assert.equal(w.from, w.to, 'sin gimnasio la ventana queda vacía');
+    assert.equal(w.dayStart, '2026-11-03T00:00:00');
+    await call(e, 'POST', '/api/gym', { event: 'arrive' }, T); t += 75 * 60000;
+    await call(e, 'POST', '/api/gym', { event: 'leave' }, T);
+    w = await call(e, 'GET', '/api/health/window?date=2026-11-03', undefined, T).then(r => r.json());
+    assert.equal(w.hasGym, true); assert.equal(w.from, '2026-11-03T19:00:00'); assert.equal(w.to, '2026-11-03T20:15:00');
+    assert.equal((await call(e, 'GET', '/api/health/window?date=mal', undefined, T)).status, 400);
+    // hoy: queda provisorio; al día siguiente, final
+    let r: any = await call(e, 'POST', '/api/health', { date: '2026-11-03', steps: '5.200', kcal: '310,5', hrMax: 128 }, T).then(x => x.json());
+    assert.equal(r.health.final, false); assert.equal(r.health.kcal, 310.5);
+    t = Date.parse('2026-11-04T13:00:00Z');
+    r = await call(e, 'POST', '/api/health', { date: '2026-11-03', steps: 7300, kcal: 410, hrMax: 131 }, T).then(x => x.json());
+    assert.equal(r.health.final, true);
+    const s: any = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
+    assert.equal(s.days['2026-11-03'].input.health.steps, 7300); assert.equal(s.days['2026-11-03'].input.gym, true, 'no pisa el resto del día');
+    assert.equal((await call(e, 'POST', '/api/health', { date: '2026-11-09', steps: 1 }, T)).status, 400, 'día futuro');
+    assert.equal((await call(e, 'POST', '/api/health', { date: '2026-11-03' }, T)).status, 400, 'sin datos');
+  } finally { Date.now = real; }
+});
+
 test('veredicto de comida: guarda la respuesta y cierra el día según la primera línea', async () => {
   const e = env(); const T = 'clave-larga-1';
   await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-02' });
