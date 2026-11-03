@@ -62,7 +62,10 @@ export interface Config {
   dayFloorCap?: number;               // máximo de pisos por día: el XP se suma igual, el piso alcanza al XP en los días siguientes (0 o ausente = sin límite)
   dailyMult?: boolean;                // las diarias también se multiplican por la racha (por defecto no)
   foodRule?: { meat: number; veg: number; junkMax: number }; // semanal de alimentación por tipo de comida (si falta: foodDays días aprobados)
-  payOnComplete?: boolean;            // v1.6: la misión semanal/mensual paga completa al cumplirla (y nada si no se cumple); sin esto se reparte por unidad
+  payOnComplete?: boolean;
+  monthPayNextDay?: boolean;
+  lumpMult?: boolean;
+  lumpPct?: { W: number; M: number };  // v1.6: semanal/mensual pagan un % del costo del piso actual (por estadística), en vez de W/Mp fijos                 // v1.6: false = las semanales y mensuales pagan fijo (la racha multiplica solo las diarias)          // v1.6: la mensual cumplida se cobra el primer día del mes siguiente (no el mismo domingo que las semanales)            // v1.6: la misión semanal/mensual paga completa al cumplirla (y nada si no se cumple); sin esto se reparte por unidad
   weekendComp?: boolean;              // sábado y domingo pagan la diaria solo si faltó un día de lunes a viernes (máximo 5 diarias pagadas por semana y categoría)
   gameCapH?: number;                  // tope semanal de horas de videojuegos; si falta, rige el modo de sesiones (anti)
   gameGraceWeeks?: number;            // semanas iniciales en que las horas se miden pero no se premian ni castigan
@@ -86,6 +89,7 @@ export interface State {
   feedStreak: number;
   gameWk: number; foodWk: number; roomsWk: string[];
   drips: { cat: Cat; base: number; mult: number; left: number }[]; // pagos fraccionados de misiones mensuales de una sola unidad
+  mpay?: { cat: Cat; mult: number }[];   // v1.6: mensuales cumplidas que se cobran el lunes siguiente al cierre del mes
   wstreak: number;
   // acumuladores del mes
   multM: number; mu: Record<Cat, number>; mdone: Cat[]; bd: number;

@@ -66,7 +66,10 @@ Las pruebas de paridad con el simulador v7 usan `LEGACY_CONFIG` (balance v1.2).
 - Requiere el secreto `GEMINI_KEY` en Cloudflare (opcional `GEMINI_MODEL`). Modelos probados en orden: gemini-3.6-flash, 3.5-flash-lite, 3.8-flash.
 - Los atajos (`/api/verdict`) quedan como camino alternativo.
 
-## v1.6 — Misiones semanales y mensuales: todo o nada
-- Semanal: paga los 300 XP completos al completar el objetivo (3 sesiones, 5 ambientes, etc.); si no se completa, no suma nada. Antes se repartía por sesión (100 XP cada una).
-- Mensual: paga los 1.500 XP completos al cumplir el objetivo (16 sesiones de gimnasio, etc.), en un solo pago el mismo día (sin cuotas; el piso igual sube como máximo uno por día y el resto del XP lo alcanza en los días siguientes); con una sesión menos no suma nada. Libro y arreglo también pagan completos el día que se marcan.
-- Para que el año perfecto siga abriendo el piso 100 el 28-dic-2027 (día 421), la base de la curva bajó de A=605 a A=599,5. Los primeros pisos salen algo más lentos (piso 10 pasa del día 10 al 16) porque la primera semanal llega el tercer día y la primera mensual recién al completar el mes.
+## v1.6 — Misiones todo o nada, cobradas al cierre, en proporción al piso
+- Diarias: monto fijo (50 XP por estadística) × multiplicador de racha. Son las que hacen rápidos los primeros pisos.
+- Semanales: no pagan nada durante la semana. El domingo (cierre), cada misión semanal cumplida paga el 8 % del costo del piso actual; las no cumplidas no pagan nada.
+- Mensuales: no pagan nada durante el mes. El lunes siguiente al cierre del mes, cada misión mensual cumplida paga el 6 % del costo del piso actual. Va el lunes para no sumarse al domingo de las semanales.
+- Semanales y mensuales no llevan multiplicador (la racha multiplica las diarias).
+- Curva: costo del piso n → n+1 = 436 · 1,03^(n−1) (436 XP el primero, ~7.900 el último).
+- Verificado sin el tope de un piso por día de la pantalla: 1.009 escenarios de año completo y 14.848 formas de jugar el primer mes → ningún día alcanza para 2 pisos (peor día: 91 % del piso siguiente). Año perfecto: piso 10 el día 22, piso 12 al cerrar el primer mes, piso 50 el día 136, piso 100 el 28-dic-2027 (día 421), sin XP perdido ni bloqueos. Reparto del XP del año perfecto: diarias 62 %, semanales 32 %, mensuales 5 %.

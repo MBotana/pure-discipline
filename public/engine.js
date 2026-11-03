@@ -30,8 +30,8 @@ var DEFAULT_CONFIG = {
   d: 50,
   W: 300,
   Mp: 1500,
-  r: 1.039,
-  A: 599.5,
+  r: 1.03,
+  A: 436,
   weeklyBonus: [0, 0.2, 0.3, 0.4, 0.5],
   gymM: 16,
   aeroM: 12,
@@ -55,6 +55,8 @@ var DEFAULT_CONFIG = {
   dayFloorCap: 1,
   dailyMult: true,
   payOnComplete: true,
+  monthPayNextDay: true,
+  lumpPct: { W: 0.08, M: 0.06 },
   weekendComp: true,
   gameCapH: 15,
   gameGraceWeeks: 0,
@@ -79,6 +81,8 @@ var LEGACY_CONFIG = {
   dailyMult: false,
   foodRule: undefined,
   payOnComplete: false,
+  monthPayNextDay: false,
+  lumpPct: undefined,
   weekendComp: false,
   gameCapH: undefined,
   gameGraceWeeks: undefined
@@ -246,7 +250,6 @@ class Engine {
       if (!arr.includes(c))
         arr.push(c);
     };
-    const payMonthly = (cat) => ev.push([cat, "M", cfg.Mp, S.s === 0 ? 1 : S.multM]);
     const weekly = (cat, units) => {
       if (S.wu[cat] < units) {
         S.wu[cat]++;
@@ -255,10 +258,7 @@ class Engine {
           completed.weekly.push(cat);
           ev.push([cat, "S", 0]);
         }
-        if (cfg.payOnComplete) {
-          if (S.wu[cat] === units)
-            ev.push([cat, "W", cfg.W]);
-        } else
+        if (!cfg.payOnComplete)
           ev.push([cat, "W", cfg.W / units]);
       }
     };
@@ -270,8 +270,6 @@ class Engine {
         if (S.mu[cat] === limit) {
           addDone(S.mdone, cat);
           completed.monthly.push(cat);
-          if (cfg.payOnComplete)
-            payMonthly(cat);
         }
       }
     };
@@ -315,10 +313,8 @@ class Engine {
       S.mu[cat]++;
       addDone(S.mdone, cat);
       completed.monthly.push(cat);
-      if (cfg.payOnComplete) {
-        payMonthly(cat);
+      if (cfg.payOnComplete)
         return;
-      }
       S.drips.push({ cat, base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
     };
     if (input.book || input.books?.length)
@@ -338,10 +334,8 @@ class Engine {
     const gameOk = hoursMode && dd === 6 && (grace || gameRatio <= 1 + 0.000000001);
     const dweek = hoursMode ? gameOk : !!input.dweek;
     if (cfg.payOnComplete) {
-      if (dweek && S.wu.D < 3) {
+      if (dweek)
         S.wu.D = 3;
-        ev.push(["D", "W", cfg.W]);
-      }
     } else {
       if (input.dwork && S.wu.D < 3) {
         S.wu.D++;
@@ -388,8 +382,6 @@ class Engine {
       if (lastWeekOfMonth && S.mu.D >= month.weeks.length) {
         addDone(S.mdone, "D");
         completed.monthly.push("D");
-        if (cfg.payOnComplete)
-          payMonthly("D");
       }
       const anti = hoursMode ? gameOk : (input.anti ?? true) && S.gameWk <= 3 && !input.phone;
       if (S.wu.D >= 3 && anti) {
@@ -413,6 +405,24 @@ class Engine {
         if (S.feedStreak >= 2 && this.petLevel(eq) > 0)
           S.px[eq] = this.cum[this.petLevel(eq) - 1];
       }
+    }
+    const floorCost = () => cfg.A * Math.pow(cfg.r, levelOf(S.xp, cfg.A, cfg.r) - 1);
+    if (cfg.payOnComplete && dd === 6) {
+      for (const c of S.wdone)
+        ev.push(cfg.lumpPct ? [c, "W", cfg.lumpPct.W * floorCost(), 1] : cfg.lumpMult === false ? [c, "W", cfg.W, 1] : [c, "W", cfg.W]);
+      if (lastWeekOfMonth) {
+        const mult = S.s === 0 || cfg.lumpMult === false ? 1 : S.multM;
+        if (cfg.monthPayNextDay)
+          S.mpay = S.mdone.map((cat) => ({ cat, mult }));
+        else
+          for (const c of S.mdone)
+            ev.push([c, "M", cfg.Mp, mult]);
+      }
+    }
+    if (dd === 0 && S.mpay?.length) {
+      for (const x of S.mpay)
+        ev.push([x.cat, "M", cfg.lumpPct ? cfg.lumpPct.M * floorCost() : cfg.Mp, cfg.lumpPct ? 1 : x.mult]);
+      S.mpay = [];
     }
     const tryUnblock = () => {
       if (S.blocked !== null && this.gateOk(S.blocked)) {

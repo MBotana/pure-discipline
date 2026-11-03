@@ -10,7 +10,7 @@ const COMBOS = [['F', 'I'], ['I', 'O'], ['O', 'D'], ['D', 'V'], ['V', 'F'], ['F'
 export const DEFAULT_CONFIG: Config = {
   startDate: '2026-11-02',
   d: 50, W: 300, Mp: 1500,
-  r: 1.039, A: 599.5,                 // costo del piso n → n+1 = 599,5 · 1,039^(n−1): ~600 XP el primero, ~26.000 el último (v1.6: A bajó de 605 a 599,5 para que, pagando todo o nada, el año perfecto siga abriendo el piso 100 el 28-dic-2027)
+  r: 1.03, A: 436,                  // costo del piso n → n+1 = 436 · 1,03^(n−1): 436 XP el primero, ~7.900 el último (v1.6, ver especificación)
   weeklyBonus: [0, 0.2, 0.3, 0.4, 0.5],
   gymM: 16, aeroM: 12, bookTramos: 10, impUnits: 6, dchk: 2, namb: 5, foodDays: 4, dripDays: 6,   // gimnasio: 16 sesiones al mes (4 por semana); comida: 4 de los 5 días de lunes a viernes (el fin de semana es libre)
   statPw: 1, statPen: 1, statScale: 0.5, reqScale: 0.9, freezeDays: 14,
@@ -22,7 +22,9 @@ export const DEFAULT_CONFIG: Config = {
   multStep: 0.5, multMax: 3,        // racha 1 mes ×1,5 · 2 ×2 · 3 ×2,5 · 4 o más ×3
   dayFloorCap: 1,                   // nunca más de un piso por día: el XP se suma igual y el piso lo alcanza en los días siguientes
   dailyMult: true,                  // las diarias también se multiplican por la racha
-  payOnComplete: true,              // v1.6: semanal = todo o nada (300 al completar); mensual = todo o nada (1.500 al completar, en cuotas diarias)
+  payOnComplete: true,              // v1.6: misiones todo o nada, cobradas al cierre: la semana el domingo, el mes el lunes siguiente
+  monthPayNextDay: true,
+  lumpPct: { W: 0.08, M: 0.06 },    // cada semanal cumplida = 8 % del costo del piso actual; cada mensual = 6 % (sin multiplicador: la racha multiplica las diarias)
   weekendComp: true,                // v1.5: el fin de semana solo compensa días perdidos de lunes a viernes
   gameCapH: 15, gameGraceWeeks: 0,  // v1.5: Disciplina por horas de videojuegos (≤100 % cumple · 100–120 % no suma · >120 % resta 1); sin semanas de prueba
   discPen: true,
@@ -38,6 +40,6 @@ export const LEGACY_CONFIG: Config = {
   streakGates: { 25: 2, 50: 4, 75: 6, 100: 8 },
   multStep: 1, multMax: Infinity,
   namb: 6, gymM: 18, foodDays: 4,
-  dayFloorCap: 0, dailyMult: false, foodRule: undefined, payOnComplete: false,
+  dayFloorCap: 0, dailyMult: false, foodRule: undefined, payOnComplete: false, monthPayNextDay: false, lumpPct: undefined,
   weekendComp: false, gameCapH: undefined, gameGraceWeeks: undefined,
 };

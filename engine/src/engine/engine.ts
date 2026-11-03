@@ -112,15 +112,12 @@ export class Engine {
     const ev: [Cat, 'D' | 'W' | 'M' | 'S', number, number?][] = [];
     const wkday = dd < 5;
     const addDone = (arr: Cat[], c: Cat) => { if (!arr.includes(c)) arr.push(c); };
-    // v1.6: misión mensual cumplida = pago completo el mismo día (sin cuotas). El piso igual sube como máximo uno por día.
-    const payMonthly = (cat: Cat) => ev.push([cat, 'M', cfg.Mp, S.s === 0 ? 1 : S.multM]);
     const weekly = (cat: Cat, units: number) => {
       if (S.wu[cat] < units) {
         S.wu[cat]++;
         if (S.wu[cat] === units) { addDone(S.wdone, cat); completed.weekly.push(cat); ev.push([cat, 'S', 0]); }
-        // v1.6: la misión semanal paga todo junto al completarla (y nada si no se completa).
-        if (cfg.payOnComplete) { if (S.wu[cat] === units) ev.push([cat, 'W', cfg.W]); }
-        else ev.push([cat, 'W', cfg.W / units]);
+        // v1.6: con payOnComplete la semanal no paga por unidad: se cobra entera al cierre de la semana (domingo) si se cumplió.
+        if (!cfg.payOnComplete) ev.push([cat, 'W', cfg.W / units]);
       }
     };
     const monthly = (cat: Cat, limit: number, base: number) => {
@@ -129,8 +126,6 @@ export class Engine {
         if (!cfg.payOnComplete) ev.push([cat, 'M', base]);
         if (S.mu[cat] === limit) {
           addDone(S.mdone, cat); completed.monthly.push(cat);
-          // v1.6: la misión mensual paga completa al cumplirla, en cuotas diarias (así ningún día concentra el pozo y se mantiene el límite de un piso por día).
-          if (cfg.payOnComplete) payMonthly(cat);
         }
       }
     };
@@ -154,7 +149,7 @@ export class Engine {
     const mark = (cat: Cat) => {
       if (S.mu[cat] >= 1) return;
       S.mu[cat]++; addDone(S.mdone, cat); completed.monthly.push(cat);
-      if (cfg.payOnComplete) { payMonthly(cat); return; }
+      if (cfg.payOnComplete) return;   // v1.6: se cobra al cierre del mes
       S.drips.push({ cat, base: cfg.Mp / cfg.dripDays, mult: S.s === 0 ? 1 : S.multM, left: cfg.dripDays });
     };
     if (input.book || input.books?.length) mark('I');
@@ -169,7 +164,7 @@ export class Engine {
     const gameRatio = hoursMode ? (S.gameHWk ?? 0) / cfg.gameCapH! : 0;
     const gameOk = hoursMode && dd === 6 && (grace || gameRatio <= 1 + 1e-9);
     const dweek = hoursMode ? gameOk : !!input.dweek;
-    if (cfg.payOnComplete) { if (dweek && S.wu.D < 3) { S.wu.D = 3; ev.push(['D', 'W', cfg.W]); } }
+    if (cfg.payOnComplete) { if (dweek) S.wu.D = 3; }
     else {
       if (input.dwork && S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
       if (dweek) while (S.wu.D < 3) { S.wu.D++; ev.push(['D', 'W', cfg.W / 3]); }
@@ -194,7 +189,6 @@ export class Engine {
       if (input.dcheck && lastWeekOfMonth) { addDone(S.mdone, 'D'); completed.monthly.push('D'); }
       if (lastWeekOfMonth && S.mu.D >= month.weeks.length) {
         addDone(S.mdone, 'D'); completed.monthly.push('D');
-        if (cfg.payOnComplete) payMonthly('D');
       }
       const anti = hoursMode ? gameOk : (input.anti ?? true) && S.gameWk <= 3 && !input.phone;
       if (S.wu.D >= 3 && anti) { addDone(S.wdone, 'D'); completed.weekly.push('D'); ev.unshift(['D', 'S', 0]); }
@@ -212,6 +206,18 @@ export class Engine {
       }
     }
 
+    // v1.6: cobro al cierre. Domingo: cada misión semanal cumplida paga W entera. Último domingo del mes: cada mensual cumplida paga Mp entera.
+    const floorCost = () => cfg.A * Math.pow(cfg.r, levelOf(S.xp, cfg.A, cfg.r) - 1);
+    if (cfg.payOnComplete && dd === 6) {
+      for (const c of S.wdone) ev.push(cfg.lumpPct ? [c, 'W', cfg.lumpPct.W * floorCost(), 1] : cfg.lumpMult === false ? [c, 'W', cfg.W, 1] : [c, 'W', cfg.W]);
+      if (lastWeekOfMonth) {
+        const mult = S.s === 0 || cfg.lumpMult === false ? 1 : S.multM;
+        if (cfg.monthPayNextDay) S.mpay = S.mdone.map(cat => ({ cat, mult }));
+        else for (const c of S.mdone) ev.push([c, 'M', cfg.Mp, mult]);
+      }
+    }
+    // Lunes siguiente al cierre: se cobran las mensuales del mes que terminó, con el multiplicador de ese mes.
+    if (dd === 0 && S.mpay?.length) { for (const x of S.mpay) ev.push([x.cat, 'M', cfg.lumpPct ? cfg.lumpPct.M * floorCost() : cfg.Mp, cfg.lumpPct ? 1 : x.mult]); S.mpay = []; }
     const tryUnblock = () => {
       if (S.blocked !== null && this.gateOk(S.blocked)) {
         S.cleared.push(S.blocked); S.clearedDay[S.blocked] = i;
