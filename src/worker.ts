@@ -269,7 +269,7 @@ export async function handle(req: Request, env: Env): Promise<Response> {
       const t = parts.reduce((a, p) => a + one(p, dec), 0); return Number.isFinite(t) ? Math.round(t * 10) / 10 : null;
     };
     // Muestra cruda de lo último recibido (para depurar el formato que manda Atajos).
-    await putSetting(env, 'health_raw', JSON.stringify({ date, steps: String(b.steps ?? '').slice(0, 200), kcal: String(b.kcal ?? '').slice(0, 300), gymKcal: String(b.gymKcal ?? '').slice(0, 200) }));
+    await putSetting(env, 'health_raw', JSON.stringify({ date, steps: String(b.steps ?? '').slice(0, 200), kcal: String(b.kcal ?? '').slice(0, 300), gymSteps: String(b.gymSteps ?? '').slice(0, 200), gymKcal: String(b.gymKcal ?? '').slice(0, 200) }));
     // El atajo manda totales del día y, aparte, lo que midió dentro de la ventana del gimnasio: el servidor resta (sin gimnasio, esos campos van en 0).
     // El pulso máximo viene en dos tramos (antes y después del gimnasio): se queda con el mayor.
     // Vacío = sin muestras. Para HOY cuenta como 0 (p. ej. recién pasada la medianoche); para un día ya cerrado, vacío en pasos Y kcal
@@ -283,7 +283,7 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     if (steps === null && kcal === null && hr === null) return json({ error: 'faltan steps, kcal o hrMax', recibido: { campos: Object.keys(b), date: b.date ?? null, steps: b.steps ?? null, kcal: b.kcal ?? null, gymSteps: b.gymSteps ?? null, gymKcal: b.gymKcal ?? null } }, 400);   // el eco ayuda a depurar el atajo
     const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
     const input = row ? JSON.parse(row.input as string) : {};
-    input.health = { steps: steps ?? 0, kcal: kcal ?? 0, hr: hr ?? 0, at: now, final: today > date };
+    input.health = { steps: Math.round(steps ?? 0), kcal: Math.round(kcal ?? 0), hr: hr ?? 0, at: now, final: today > date };
     // Aeróbico del día: alcanza con llegar a los pasos O a las calorías activas (sin contar el gimnasio). Se marca solo; lo marcado a mano nunca se desmarca.
     const minSteps = Number((await getSetting(env, 'aero_steps')) ?? DEFAULTS.aero_steps), minKcal = Number((await getSetting(env, 'aero_kcal')) ?? DEFAULTS.aero_kcal);
     const aeroOk = input.health.steps >= minSteps || input.health.kcal >= minKcal;
