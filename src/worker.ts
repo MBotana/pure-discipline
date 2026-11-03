@@ -253,11 +253,26 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     const tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset), now = Date.now(), today = new Date(now + tz * 60000).toISOString().slice(0, 10);
     const date = typeof b.date === 'string' ? b.date : today;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today) return json({ error: 'date inválida' }, 400);
-    const num = (v: unknown) => { if (v === undefined || v === null || String(v).trim() === '') return null; const n = Number(String(v).replace(',', '.')); return Number.isFinite(n) && n >= 0 ? Math.round(n * 10) / 10 : null; };
+    // Cada campo puede ser un número o una LISTA de valores (las muestras de Salud unidas con saltos de línea o ";"): el servidor suma.
+    // Así el atajo no hace cuentas con decimales, que Atajos en español interpreta mal (la coma decimal como separador de miles).
+    const one = (s: string) => {
+      s = s.trim().replace(/[^\d.,-]/g, ''); if (!s) return 0;
+      if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');      // 1.234,5 → 1234.5 (formato español)
+      else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');   // 1.234 → 1234
+      const n = Number(s); return Number.isFinite(n) && n >= 0 ? n : NaN;
+    };
+    const num = (v: unknown) => {
+      if (v === undefined || v === null) return null;
+      if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? Math.round(v * 10) / 10 : null;
+      const parts = String(v).split(/[\n;]+/).filter(p => p.trim() !== ''); if (!parts.length) return null;
+      const t = parts.reduce((a, p) => a + one(p), 0); return Number.isFinite(t) ? Math.round(t * 10) / 10 : null;
+    };
     // El atajo manda totales del día y, aparte, lo que midió dentro de la ventana del gimnasio: el servidor resta (sin gimnasio, esos campos van en 0).
     // El pulso máximo viene en dos tramos (antes y después del gimnasio): se queda con el mayor.
-    // Atajos devuelve "" al sumar cero muestras (p. ej. recién pasada la medianoche): si el campo vino, vacío cuenta como 0.
-    const gs = num(b.gymSteps) ?? 0, gk = num(b.gymKcal) ?? 0, ts = num(b.steps) ?? ('steps' in b ? 0 : null), tk = num(b.kcal) ?? ('kcal' in b ? 0 : null);
+    // Vacío = sin muestras. Para HOY cuenta como 0 (p. ej. recién pasada la medianoche); para un día ya cerrado, vacío en pasos Y kcal
+    // casi seguro es un atajo roto, y no se registra (si no, daría "fallaste el aeróbico" por error).
+    const zeroOk = date === today;
+    const gs = num(b.gymSteps) ?? 0, gk = num(b.gymKcal) ?? 0, ts = num(b.steps) ?? (zeroOk && 'steps' in b ? 0 : null), tk = num(b.kcal) ?? (zeroOk && 'kcal' in b ? 0 : null);
     const steps = ts === null ? null : Math.max(0, ts - gs), kcal = tk === null ? null : Math.max(0, tk - gk);
     // Un decimal con coma mal convertido por Atajos llega como un número gigante (295,8 → 2958...): se rechaza en vez de marcar un aeróbico falso.
     if ([ts, tk, gs, gk].some(v => v !== null && v > 200000)) return json({ error: 'valor fuera de rango: redondeá pasos y kcal a entero', recibido: { steps: b.steps ?? null, kcal: b.kcal ?? null, gymSteps: b.gymSteps ?? null, gymKcal: b.gymKcal ?? null } }, 400);
