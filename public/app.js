@@ -774,7 +774,7 @@ document.addEventListener('click', async ev => {
   else if (a === 'login') login();
   else if (a === 'sync') sync();
   else if (a === 'push') enablePush();
-  else if (a === 'pushtest') { try { const r = await api('/api/push/test', 'POST', { pet: 'behemot' }); document.getElementById('pushmsg').textContent = r.delivered ? 'Enviada ✔' : 'No hay dispositivos suscritos.'; } catch (e) { document.getElementById('pushmsg').textContent = e.message; } }
+  else if (a === 'pushtest') { try { const r = await api('/api/push/test', 'POST', { pet: 'behemot' }); document.getElementById('pushmsg').textContent = r.telegram ? 'Enviada por Telegram ✔ «' + r.text + '»' : r.error ? 'No se pudo: ' + r.error : r.delivered ? 'Enviada ✔' : 'No hay dispositivos suscritos.'; } catch (e) { document.getElementById('pushmsg').textContent = e.message; } }
   else if (a === 'saveset') {
     try { const r = await api('/api/settings', 'PUT', { reminder_hour: +document.getElementById('rh').value, feed_hour: +document.getElementById('fh').value }); S.settings = r.settings; save(); document.getElementById('pushmsg').textContent = 'Horarios guardados ✔'; } catch (e) { document.getElementById('pushmsg').textContent = e.message; }
   }

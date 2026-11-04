@@ -1,7 +1,7 @@
 /* Pure Discipline — servidor (Cloudflare Worker + D1). Un solo usuario.
  * Autenticación: la primera vez se define una clave (/api/setup); después todo exige Authorization: Bearer <clave>. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export interface Env { DB: any; ASSETS: any; GEMINI_KEY?: string; GEMINI_MODEL?: string; STEAM_KEY?: string; STEAM_ID?: string }
+export interface Env { DB: any; ASSETS: any; GEMINI_KEY?: string; GEMINI_MODEL?: string; STEAM_KEY?: string; STEAM_ID?: string; TELEGRAM_CHAT_ID?: string; [bot: `TELEGRAM_BOT_${string}`]: string | undefined }
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
@@ -93,6 +93,26 @@ async function gemini(env: Env, system: string, parts: unknown[], temperature = 
     last = `${m}: ${r.status}`; if (![404, 429, 500, 503].includes(r.status)) break;
   }
   throw Object.assign(new Error('La IA no respondió (' + last + ')'), { status: 502 });
+}
+// ---------- Mascotas que hablan (Gemini redacta, Telegram entrega) ----------
+// El servidor decide SI hay algo que decir y qué hechos pasaron; Gemini solo decide CÓMO decirlo, con la voz de la mascota.
+const PERSONAS: Record<string, string> = {
+  behemot: 'Sos Behemot, una bestia de fuerza bruta que entrena junto a su dueño. Hablás directo, seco y exigente, con respeto y algo de orgullo; nunca humillás. Rioplatense, tuteo con "vos".',
+};
+const PET_RULES = 'Escribí UN mensaje de 1 o 2 frases, máximo 220 caracteres, en español rioplatense. Usá SOLO los hechos que te paso: no inventes números, horas, ejercicios ni logros. Sin comillas, sin hashtags, como mucho un emoji. Si hay un reproche, que sea firme pero que deje una salida concreta para hoy.';
+async function petMessage(env: Env, pet: string, facts: string): Promise<string> {
+  const persona = PERSONAS[pet]; if (!persona) throw Object.assign(new Error('mascota sin personalidad: ' + pet), { status: 400 });
+  const t = await gemini(env, persona + ' ' + PET_RULES, [{ text: 'Hechos de hoy:\n' + facts }], 0.9);
+  return t.replace(/^["“]|["”]$/g, '').slice(0, 400);
+}
+async function sendTelegram(env: Env, pet: string, text: string): Promise<{ ok: boolean; error?: string }> {
+  const token = env[`TELEGRAM_BOT_${pet.toUpperCase()}` as `TELEGRAM_BOT_${string}`], chat = env.TELEGRAM_CHAT_ID;
+  if (!token || !chat) return { ok: false, error: 'faltan TELEGRAM_BOT_' + pet.toUpperCase() + ' o TELEGRAM_CHAT_ID en Cloudflare' };
+  const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text }) }).catch(() => null);
+  if (!r) return { ok: false, error: 'sin conexión con Telegram' };
+  if (r.ok) return { ok: true };
+  const j: any = await r.json().catch(() => ({}));
+  return { ok: false, error: `Telegram ${r.status}: ${j.description ?? 'error'}` };
 }
 const DESCRIBE_SYSTEM = `Sos un nutricionista que describe comidas. Describí en español, en 2 a 4 líneas, qué contiene la comida: cada alimento, porción aproximada y cocción. Cerrá siempre con estas cinco etiquetas, en una línea cada una:
 Proteína: (sí/no y cuál)
@@ -381,10 +401,15 @@ export async function handle(req: Request, env: Env): Promise<Response> {
   }
   if (path === '/api/push/test' && m === 'POST') {
     const b: any = await req.json().catch(() => ({}));
-    // Prueba con la imagen de una mascota (hoy solo Behemot): ?pet=behemot en el cuerpo.
-    const n = b.pet === 'behemot'
-      ? await pushAll(env, url.origin, 'Behemot', '¿Ya entrenaste hoy? Yo estoy listo.', { icon: '/img/notif/behemot_icon.png', image: '/img/notif/behemot_image.png' })
-      : await pushAll(env, url.origin, 'Rise', 'Las notificaciones funcionan.');
+    // Con ?pet=behemot: la mascota habla por Telegram (Gemini redacta con hechos de ejemplo). Sin Telegram configurado, cae al aviso web normal.
+    if (typeof b.pet === 'string' && PERSONAS[b.pet]) {
+      try {
+        const text = await petMessage(env, b.pet, 'PRUEBA del sistema de mensajes. Son las 21:00, todavía no fue al gimnasio ni salió a correr hoy, y lleva 3 días seguidos cumpliendo sus misiones.');
+        const tg = await sendTelegram(env, b.pet, text);
+        return json({ delivered: tg.ok ? 1 : 0, telegram: tg.ok, text, error: tg.error });
+      } catch (err: any) { return json({ delivered: 0, telegram: false, error: err.message }, 200); }
+    }
+    const n = await pushAll(env, url.origin, 'Rise', 'Las notificaciones funcionan.');
     return json({ delivered: n });
   }
   return json({ error: 'no encontrado' }, 404);

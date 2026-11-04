@@ -224,3 +224,32 @@ test('aeróbico por Salud: 10.000 pasos o 500 kcal lo marca solo; aviso a la tar
     assert.equal((await logs()).filter(x => x.endsWith('2026-11-05')).length, 0);
   } finally { Date.now = real; }
 });
+
+test('mascota que habla: Gemini redacta con los hechos y Telegram entrega; errores claros', async () => {
+  const e: any = env(); const T = 'clave-larga-1';
+  await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-02' });
+  let r: any = await call(e, 'POST', '/api/push/test', { pet: 'behemot' }, T).then(x => x.json());
+  assert.equal(r.telegram, false); assert.match(r.error, /GEMINI_KEY/, 'sin clave de Gemini lo dice');
+  e.GEMINI_KEY = 'k';
+  const real = globalThis.fetch; const calls: string[] = []; let tgStatus = 200;
+  globalThis.fetch = (async (url: any, init: any) => {
+    calls.push(String(url));
+    if (String(url).includes('api.telegram.org')) {
+      const b = JSON.parse(init.body); assert.equal(b.chat_id, '123'); assert.ok(b.text.length > 0);
+      return tgStatus === 200 ? new Response('{"ok":true}', { status: 200 }) : new Response(JSON.stringify({ ok: false, description: 'chat not found' }), { status: 400 });
+    }
+    const body = JSON.parse(init.body); assert.match(body.systemInstruction.parts[0].text, /Behemot/); assert.match(body.contents[0].parts[0].text, /gimnasio/);
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '"Dale, levantate y andá al gimnasio."' }] } }] }), { status: 200 });
+  }) as any;
+  try {
+    r = await call(e, 'POST', '/api/push/test', { pet: 'behemot' }, T).then(x => x.json());
+    assert.match(r.error, /TELEGRAM_BOT_BEHEMOT/, 'sin secretos de Telegram lo dice');
+    e.TELEGRAM_BOT_BEHEMOT = 'tok'; e.TELEGRAM_CHAT_ID = '123';
+    r = await call(e, 'POST', '/api/push/test', { pet: 'behemot' }, T).then(x => x.json());
+    assert.deepEqual([r.telegram, r.text], [true, 'Dale, levantate y andá al gimnasio.']);
+    assert.ok(calls.some(u => u.includes('/bottok/sendMessage')));
+    tgStatus = 400;
+    r = await call(e, 'POST', '/api/push/test', { pet: 'behemot' }, T).then(x => x.json());
+    assert.equal(r.telegram, false); assert.match(r.error, /chat not found/);
+  } finally { globalThis.fetch = real; }
+});
