@@ -1,5 +1,5 @@
 // Service worker: funciona sin conexión (caché) y muestra las notificaciones push.
-const CACHE = 'pd-v70';
+const CACHE = 'pd-v71';
 const SHELL = ['/', '/index.html', '/app.js', '/engine.js', '/style.css', '/art.js', '/px.js', '/assets.js', '/manifest.webmanifest', '/icon-180.png', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
@@ -22,7 +22,8 @@ self.addEventListener('push', e => {
   e.waitUntil((async () => {
     let n = { title: 'Rise', body: 'Tenés un recordatorio.' };
     try { const r = await fetch('/api/last-notification', { cache: 'no-store' }); if (r.ok) n = await r.json(); } catch { /* sin red: texto genérico */ }
-    await self.registration.showNotification(n.title, { body: n.body, icon: '/icon-192.png', badge: '/icon-192.png', tag: 'pd-reminder' });
+    const o = { body: n.body, icon: n.icon || '/icon-192.png', badge: '/icon-192.png', tag: 'pd-reminder' }; if (n.image) o.image = n.image;
+    await self.registration.showNotification(n.title, o);
   })());
 });
 

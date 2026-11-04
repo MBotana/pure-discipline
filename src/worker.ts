@@ -59,8 +59,9 @@ async function vapidAuth(env: Env, endpoint: string, origin: string) {
   return `vapid t=${data}.${b64u(sig)}, k=${pub}`;
 }
 
-async function pushAll(env: Env, origin: string, title: string, body: string): Promise<number> {
-  await putSetting(env, 'last_notification', JSON.stringify({ title, body, at: Date.now() }));
+// opts.icon / opts.image: rutas de imagen propias (Android/escritorio las muestran; iOS suele usar siempre el ícono de la app).
+async function pushAll(env: Env, origin: string, title: string, body: string, opts: { icon?: string; image?: string } = {}): Promise<number> {
+  await putSetting(env, 'last_notification', JSON.stringify({ title, body, ...opts, at: Date.now() }));
   const subs = (await env.DB.prepare('SELECT endpoint FROM push_subscriptions').all()).results as { endpoint: string }[];
   let ok = 0;
   for (const s of subs) {
@@ -379,7 +380,11 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     return json({ ok: true });
   }
   if (path === '/api/push/test' && m === 'POST') {
-    const n = await pushAll(env, url.origin, 'Rise', 'Las notificaciones funcionan.');
+    const b: any = await req.json().catch(() => ({}));
+    // Prueba con la imagen de una mascota (hoy solo Behemot): ?pet=behemot en el cuerpo.
+    const n = b.pet === 'behemot'
+      ? await pushAll(env, url.origin, 'Behemot', '¿Ya entrenaste hoy? Yo estoy listo.', { icon: '/img/notif/behemot_icon.png', image: '/img/notif/behemot_image.png' })
+      : await pushAll(env, url.origin, 'Rise', 'Las notificaciones funcionan.');
     return json({ delivered: n });
   }
   return json({ error: 'no encontrado' }, 404);
