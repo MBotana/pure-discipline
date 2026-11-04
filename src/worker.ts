@@ -275,7 +275,8 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     // Vacío = sin muestras. Para HOY cuenta como 0 (p. ej. recién pasada la medianoche); para un día ya cerrado, vacío en pasos Y kcal
     // casi seguro es un atajo roto, y no se registra (si no, daría "fallaste el aeróbico" por error).
     const zeroOk = date === today;
-    const gs = num(b.gymSteps, false) ?? 0, gk = num(b.gymKcal) ?? 0, ts = num(b.steps, false) ?? (zeroOk && 'steps' in b ? 0 : null), tk = num(b.kcal) ?? (zeroOk && 'kcal' in b ? 0 : null);
+    // El gimnasio ya no se resta: el atajo solo manda el total del día del iPhone (si llegan gymSteps/gymKcal de un atajo viejo, se ignoran).
+    const gs = 0, gk = 0, ts = num(b.steps, false) ?? (zeroOk && 'steps' in b ? 0 : null), tk = num(b.kcal) ?? (zeroOk && 'kcal' in b ? 0 : null);
     const steps = ts === null ? null : Math.max(0, ts - gs), kcal = tk === null ? null : Math.max(0, tk - gk);
     // Un decimal con coma mal convertido por Atajos llega como un número gigante (295,8 → 2958...): se rechaza en vez de marcar un aeróbico falso.
     if ([ts, gs].some(v => v !== null && v > 200000) || [tk, gk].some(v => v !== null && v > 8000)) return json({ error: 'valor fuera de rango: redondeá pasos y kcal a entero', recibido: { steps: b.steps ?? null, kcal: b.kcal ?? null, gymSteps: b.gymSteps ?? null, gymKcal: b.gymKcal ?? null } }, 400);
@@ -288,7 +289,7 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     const minSteps = Number((await getSetting(env, 'aero_steps')) ?? DEFAULTS.aero_steps), minKcal = Number((await getSetting(env, 'aero_kcal')) ?? DEFAULTS.aero_kcal);
     const aeroOk = input.health.steps >= minSteps || input.health.kcal >= minKcal;
     // Si estás en el gimnasio ahora mismo (entrada sin salida), los totales todavía incluyen la sesión: no se decide nada hasta que salgas.
-    const inGym = date === today && Number(await getSetting(env, 'gym_arrive') ?? 0) > 0;
+    const inGym = false;   // sin resta del gimnasio no hay nada que esperar a que salgas
     input.health.aero = aeroOk;
     if (!inGym) {
       // Lo que se marcó solo (aeroAuto) se desmarca si un dato posterior ya no alcanza (p. ej. al registrarse la ventana del gimnasio); lo marcado a mano nunca.

@@ -102,7 +102,7 @@ test('vitalidad: ventana del gimnasio y datos de Salud fuera de esa ventana', as
     const s: any = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
     assert.equal(s.days['2026-11-03'].input.health.steps, 7300); assert.equal(s.days['2026-11-03'].input.gym, true, 'no pisa el resto del día');
     r = await call(e, 'POST', '/api/health', { date: '2026-11-03', steps: 9000, gymSteps: 1500, kcal: 700, gymKcal: 350, hrA: 120, hrB: 135 }, T).then(x => x.json());
-    assert.deepEqual([r.health.steps, r.health.kcal, r.health.hr], [7500, 350, 135], 'resta el gimnasio y toma el pulso mayor de los dos tramos');
+    assert.deepEqual([r.health.steps, r.health.kcal, r.health.hr], [9000, 700, 135], 'el gimnasio ya no se resta (se ignora gymSteps/gymKcal); toma el pulso mayor');
     assert.equal((await call(e, 'POST', '/api/health', { date: '2026-11-09', steps: 1 }, T)).status, 400, 'día futuro');
     assert.equal((await call(e, 'POST', '/api/health', { date: '2026-11-03' }, T)).status, 400, 'sin datos');
   } finally { Date.now = real; }
@@ -185,7 +185,7 @@ test('steam: la primera lectura es el punto de partida; después suma las horas 
   } finally { globalThis.fetch = realFetch; Date.now = realNow; }
 });
 
-test('aeróbico por Salud: 10.000 pasos o 500 kcal fuera del gimnasio lo marca solo; aviso a la tarde (una vez) y aviso del día siguiente', async () => {
+test('aeróbico por Salud: 10.000 pasos o 500 kcal lo marca solo; aviso a la tarde (una vez) y aviso del día siguiente', async () => {
   const e = env(); const T = 'clave-larga-1';
   await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-02' });
   const logs = async () => ((await e.DB.prepare('SELECT kind, date FROM notification_log ORDER BY kind, date').all()).results as any[]).filter(x => x.kind.startsWith('aero')).map(x => `${x.kind}@${x.date}`);
@@ -204,16 +204,17 @@ test('aeróbico por Salud: 10.000 pasos o 500 kcal fuera del gimnasio lo marca s
     t = Date.parse('2026-11-04T22:30:00Z');   // 19:30 del día siguiente
     r = await post({ date: '2026-11-04', steps: 2000, kcal: 520 });
     assert.equal(r.health.aero, true, '500 kcal alcanzan');
-    r = await post({ date: '2026-11-04', steps: 9000, kcal: 900, gymSteps: 2000, gymKcal: 600 });
-    assert.equal(r.health.aero, false, 'el gimnasio no cuenta (7.000 pasos y 300 kcal)');
+    r = await post({ date: '2026-11-04', steps: 7000, kcal: 300, gymSteps: 2000, gymKcal: 600 });
+    assert.equal(r.health.aero, false, 'el gimnasio ya no se resta: 7.000 pasos y 300 kcal no alcanzan');
     s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); assert.equal(s.days['2026-11-04'].input.aero, undefined, 'se desmarcó lo que se había marcado solo');
-    // en el gimnasio ahora mismo no se decide nada
+    // estar en el gimnasio ahora mismo ya no frena la decisión (no hay resta que esperar)
     await call(e, 'POST', '/api/gym', { event: 'arrive' }, T);
     r = await post({ date: '2026-11-04', steps: 20000, kcal: 2000 });
-    s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); assert.equal(s.days['2026-11-04'].input.aero, undefined, 'dentro del gimnasio no marca');
+    s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); assert.equal(s.days['2026-11-04'].input.aero, true, 'marca igual aunque haya una entrada al gimnasio abierta');
     await call(e, 'POST', '/api/gym', { event: 'leave' }, T);
+    r = await post({ date: '2026-11-04', steps: 7000, kcal: 300 });
     t = Date.parse('2026-11-05T13:00:00Z');   // día siguiente
-    await post({ date: '2026-11-04', steps: 9000, kcal: 900, gymSteps: 2000, gymKcal: 600 }); await post({ date: '2026-11-04', steps: 9100, kcal: 910, gymSteps: 2000, gymKcal: 600 });
+    await post({ date: '2026-11-04', steps: 7000, kcal: 300 }); await post({ date: '2026-11-04', steps: 7100, kcal: 310 });
     assert.deepEqual(await logs(), ['aero_eve@2026-11-03', 'aero_eve@2026-11-04', 'aero_miss@2026-11-04'].sort(), 'aviso del día siguiente, una sola vez');
     assert.ok(((await call(e, 'GET', '/api/health/last', undefined, T).then(x => x.json())) as any).minutesAgo === 0);
     // lo marcado a mano nunca se desmarca ni genera aviso
