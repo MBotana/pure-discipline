@@ -113,22 +113,22 @@ test('veredicto de comida: guarda la respuesta y cierra el día según la primer
   await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-02' });
   const real = Date.now; Date.now = () => Date.parse('2026-11-04T20:00:00Z');   // miércoles
   try {
-    let r: any = await call(e, 'POST', '/api/verdict', { text: 'PARCIAL\nTe falta verdura.' }, T).then(x => x.json());
-    assert.equal(r.status, 'parcial');
+    let r: any = await call(e, 'POST', '/api/verdict', { text: 'Te falta verdura.\nPUNTAJE: 60%' }, T).then(x => x.json());
+    assert.equal(r.status, 'no'); assert.equal(r.closed, false);
     let s: any = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
-    assert.equal(s.days['2026-11-04'].input.meals, undefined); assert.match(s.days['2026-11-04'].input.verdictTx, /verdura/);
-    r = await call(e, 'POST', '/api/verdict', { text: 'Aprobado hasta ahora', final: 'no' }, T).then(x => x.json());
+    assert.equal(s.days['2026-11-04'].input.meals, undefined); assert.match(s.days['2026-11-04'].input.verdictTx, /verdura/); assert.equal(s.days['2026-11-04'].input.foodPct, 0.6);
+    r = await call(e, 'POST', '/api/verdict', { text: 'Va bien hasta ahora. PUNTAJE: 70%', final: 'no' }, T).then(x => x.json());
     assert.equal(r.closed, false, 'sin final no cierra');
     s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); assert.equal(s.days['2026-11-04'].input.meals, undefined);
     const g: any = await call(e, 'GET', '/api/verdict', undefined, T).then(x => x.json()); assert.match(g.text, /hasta ahora/);
-    r = await call(e, 'POST', '/api/verdict', { text: 'Aprobado\nTodo bien.', final: 'si' }, T).then(x => x.json());
+    r = await call(e, 'POST', '/api/verdict', { text: 'PUNTAJE: 90%\nTodo bien.', final: 'si' }, T).then(x => x.json());
     assert.equal(r.status, 'ok');
     s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
-    assert.deepEqual([s.days['2026-11-04'].input.meals, s.days['2026-11-04'].input.food], [true, true]);
-    r = await call(e, 'POST', '/api/verdict', { text: 'NO APROBADO\nMucha fritura.', final: true }, T).then(x => x.json());
+    assert.deepEqual([s.days['2026-11-04'].input.meals, s.days['2026-11-04'].input.foodPct], [true, 0.9]);
+    r = await call(e, 'POST', '/api/verdict', { text: 'PUNTAJE: 40%\nMucha fritura.', final: true }, T).then(x => x.json());
     assert.equal(r.status, 'no');
     s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
-    assert.equal(s.days['2026-11-04'].input.food, undefined); assert.equal(s.days['2026-11-04'].input.meals, true);
+    assert.equal(s.days['2026-11-04'].input.foodPct, 0.4); assert.equal(s.days['2026-11-04'].input.meals, true);
     assert.equal((await call(e, 'POST', '/api/verdict', {}, T)).status, 400);
   } finally { Date.now = real; }
 });
@@ -143,7 +143,7 @@ test('alimentación con IA: describe cada comida, acumula el día y cierra con e
     const body = JSON.parse(init.body); const parts = body.contents[0].parts; prompts.push(parts.map((p: any) => p.text ?? '[imagen]').join('|'));
     assert.equal(init.headers['x-goog-api-key'], 'k');
     const isJudge = /Comidas del día/.test(parts[0].text);
-    const out = !isJudge ? 'Pollo con arroz.\nProteína: sí, pollo' : /El día terminó/.test(parts[0].text) ? 'NO APROBADO\nFalta verdura.' : 'Comida de ahora: pollo.\nTe falta para una buena alimentación: verduras';
+    const out = !isJudge ? 'Pollo con arroz.\nProteína: sí, pollo' : /El día terminó/.test(parts[0].text) ? 'PUNTAJE: 55%\nFalta verdura.' : 'Comida de ahora: pollo.\nTe falta para una buena alimentación: verduras';
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: out }] } }] }), { status: 200 });
   }) as any;
   try {
@@ -158,7 +158,7 @@ test('alimentación con IA: describe cada comida, acumula el día y cierra con e
     r = await call(e, 'POST', '/api/meal/close', { date: '2026-11-04' }, T).then(x => x.json());
     assert.deepEqual([r.status, r.closed], ['no', true]);
     s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
-    assert.deepEqual([s.days['2026-11-04'].input.meals, s.days['2026-11-04'].input.food], [true, undefined]);
+    assert.deepEqual([s.days['2026-11-04'].input.meals, s.days['2026-11-04'].input.foodPct], [true, 0.55]);
     const g: any = await call(e, 'GET', '/api/meals?date=2026-11-04', undefined, T).then(x => x.json());
     assert.equal(g.meals.length, 2); assert.match(g.text, /Falta verdura/);
     assert.equal((await call(e, 'POST', '/api/meal/close', { date: '2026-11-05' }, T)).status, 400, 'sin comidas no se cierra');
@@ -197,7 +197,7 @@ test('aeróbico por Salud: 10.000 pasos o 500 kcal lo marca solo; aviso a la tar
     assert.deepEqual(await logs(), [], 'antes de las 19:00 no avisa');
     t = Date.parse('2026-11-03T22:30:00Z');   // 19:30 locales
     await post({ date: '2026-11-03', steps: 4000, kcal: 200 }); await post({ date: '2026-11-03', steps: 4100, kcal: 210 });
-    assert.deepEqual(await logs(), ['aero_eve@2026-11-03'], 'después de las 19:00 avisa una sola vez');
+    assert.deepEqual(await logs(), [], 'la misión aeróbica se eliminó: no hay avisos');
     let r = await post({ date: '2026-11-03', steps: 10200, kcal: 300 });
     assert.equal(r.health.aero, true, '10.000 pasos alcanzan');
     let s: any = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); assert.equal(s.days['2026-11-03'].input.aero, true, 'se marca solo');
@@ -215,7 +215,7 @@ test('aeróbico por Salud: 10.000 pasos o 500 kcal lo marca solo; aviso a la tar
     r = await post({ date: '2026-11-04', steps: 7000, kcal: 300 });
     t = Date.parse('2026-11-05T13:00:00Z');   // día siguiente
     await post({ date: '2026-11-04', steps: 7000, kcal: 300 }); await post({ date: '2026-11-04', steps: 7100, kcal: 310 });
-    assert.deepEqual(await logs(), ['aero_eve@2026-11-03', 'aero_eve@2026-11-04', 'aero_miss@2026-11-04'].sort(), 'aviso del día siguiente, una sola vez');
+    assert.deepEqual(await logs(), [], 'sin avisos aeróbicos');
     assert.ok(((await call(e, 'GET', '/api/health/last', undefined, T).then(x => x.json())) as any).minutesAgo === 0);
     // lo marcado a mano nunca se desmarca ni genera aviso
     await call(e, 'POST', '/api/sync', { changes: [{ date: '2026-11-05', input: { aero: true }, updated_at: t + 1 }] }, T);

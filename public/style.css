@@ -255,3 +255,19 @@ input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:1.2em}
 .entry small.dsc{white-space:pre-line;overflow:visible;text-overflow:clip;max-height:none}
 .busy{color:var(--gold)}
 .err:empty{display:none}
+
+/* v2: engranaje de Ajustes, mascota, calendario de racha */
+#gear{position:fixed;top:calc(env(safe-area-inset-top) + 8px);right:10px;z-index:7;width:34px;height:34px;display:grid;place-items:center;padding:0;background:var(--btn);border:1px solid var(--c3,var(--line3));color:var(--ink);font-size:17px;line-height:1;cursor:pointer;border-radius:3px;opacity:.92}
+#app h1{padding-right:44px}.torrehead small{right:44px}
+.backpill{margin:0 0 6px;cursor:pointer}
+.regpill{position:absolute;top:6px;left:6px;z-index:5;cursor:pointer}
+.petlvl{width:100%;display:block;text-align:left;background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:0}
+.pdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:7px;vertical-align:middle;animation:tvt 1.4s ease-in-out infinite}
+.pstats .prow{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line3)}.pstats .nm{flex:1;min-width:0}.pstats .btn.sm{padding:5px 12px}
+.tama{position:relative;min-height:200px;display:grid;place-items:center;text-align:center;background:linear-gradient(var(--field),color-mix(in srgb,var(--field) 65%,#000));overflow:hidden;padding:14px}
+.tama img.scene{max-width:100%;max-height:240px;image-rendering:pixelated}
+.scenefb{display:flex;flex-direction:column;align-items:center;gap:8px}.scenefb>span{font-size:34px}
+.tama .cap{position:absolute;left:8px;bottom:6px;font-size:12px;color:var(--mute)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px}
+.cal span{aspect-ratio:1;display:grid;place-items:center;font-size:11px;background:var(--field);border:1px solid var(--line3);color:var(--mute)}
+.cal span.on{background:var(--ok);border-color:var(--ok);color:#fff}.cal span.some{border-color:var(--gold)}.cal span.today{outline:2px solid var(--gold)}.cal span.blank{background:none;border:0}

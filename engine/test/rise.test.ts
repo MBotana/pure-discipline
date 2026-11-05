@@ -147,6 +147,7 @@ test('datos de versiones anteriores se convierten', () => {
   assert.equal(normalize({ food: true }).foodPct, 1);
   assert.equal(normalize({ meals: true }).foodPct, 0.5);
   assert.equal(normalize({ gym: true, gymMin: 83 }).gymMin, 83);
+  assert.equal(normalize({ waterMl: 2500 }).water, true); assert.equal(normalize({ waterMl: 2000 }).water, undefined);
 });
 
 test('progreso: carga/descarga alternan 3+1 y el ciclo paga con 4 ejercicios distintos', () => {

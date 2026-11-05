@@ -121,16 +121,15 @@ Ultraprocesado, frito o comida rápida: (sí/no y cuál)
 Bebida: (cuál, o ninguna visible)
 Macros aproximados: proteína X g · carbohidratos X g · grasas X g · ~X kcal
 No evalúes el día ni des consejos. Si la imagen no es comida, respondé solo "No parece comida". No inventes lo que no se ve; si algo no se puede saber (aceite, azúcar, salsas), decilo.`;
-const RUBRIC = `Rúbrica fija para evaluar el día de alimentación (aplicala siempre igual):
-1. Proteína presente en el almuerzo y en la cena, y en general a lo largo del día.
-2. Verduras o frutas presentes durante el día, idealmente en almuerzo y cena.
-3. Como máximo una comida ultraprocesada, frita o de comida rápida en el día.
-4. Sin gaseosas ni bebidas azucaradas, y sin exceso de alcohol.
-5. Porciones razonables, sin excesos evidentes.
-El día se aprueba si se cumplen los cinco puntos mirando el día completo: lo que faltó en una comida cuenta como cumplido solo si se compensó en otra. Si falta algún punto y no se compensó, no se aprueba. Si falta información para juzgar un punto, no lo penalices. Usá solo las comidas listadas; no inventes otras.`;
+const RUBRIC = `Rúbrica fija para puntuar la alimentación del día (aplicala siempre igual). El puntaje es un porcentaje de 0 a 100:
+- 100: proteína abundante a lo largo del día (idealmente en almuerzo y cena), verduras o frutas presentes, grasas razonables, porciones adecuadas, sin comida basura ni bebidas azucaradas.
+- 80: bastante bien, con una falla menor (por ejemplo, poca verdura o una comida algo desbalanceada).
+- 50: malo: falta de proteína clara, desbalance fuerte, comida basura o ultraprocesados repetidos, o comer muy poco.
+- Menos de 50: peor todavía (varias fallas juntas). 0 si no se comió nada.
+Lo que baja el puntaje, sobre todo: falta de proteína, desbalance entre proteínas, verduras, frutas y grasas, comida basura y comer muy poco. Mirá el día completo: lo que faltó en una comida cuenta como cumplido si se compensó en otra. Si falta información para juzgar algo, no lo penalices. Usá solo las comidas listadas; no inventes otras.`;
 const mealName = (t: string) => { const h = +t.slice(0, 2); return h < 11 ? 'Desayuno' : h < 16 ? 'Almuerzo' : h < 20 ? 'Merienda' : 'Cena'; };
 const normFirst = (text: string) => text.split('\n').find(l => l.trim())?.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') ?? '';
-const parseStatus = (text: string) => { const f = normFirst(text); return /NO\s+APROBAD|DESAPROBAD/.test(f) ? 'no' : /APROBAD/.test(f) ? 'ok' : /PARCIAL/.test(f) ? 'parcial' : 'none'; };
+const parseScore = (text: string): number | null => { const m = /PUNTAJE[^0-9\n]{0,20}(\d{1,3})/i.exec(text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')); return m ? Math.min(100, Number(m[1])) : null; };
 const validDate = (d: unknown): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
 const dowOf = (date: string) => new Date(date + 'T00:00:00Z').getUTCDay();
 const mealsReady = new WeakSet<object>();
@@ -141,23 +140,24 @@ async function ensureMeals(env: Env) {
 }
 const listMeals = async (env: Env, date: string) =>
   ((await env.DB.prepare('SELECT id, t, kind, descr FROM meals WHERE date = ? ORDER BY t, created_at').bind(date).all()).results as { id: string; t: string; kind: string; descr: string }[]);
-/** Guarda el análisis del día en la entrada del día; con final cierra el día (solo lunes a viernes) si la primera línea trae el veredicto. */
+/** Guarda el análisis del día en la entrada del día. El puntaje (lunes a viernes) va a foodPct; con final cierra el día. */
 async function saveVerdict(env: Env, date: string, text: string, fin: boolean) {
   const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
-  const input = row ? JSON.parse(row.input as string) : {}, status = parseStatus(text), weekday = dowOf(date) >= 1 && dowOf(date) <= 5;
+  const input = row ? JSON.parse(row.input as string) : {}, score = parseScore(text), weekday = dowOf(date) >= 1 && dowOf(date) <= 5;
   if (text) input.verdictTx = text; else delete input.verdictTx;
-  const closed = fin && weekday && (status === 'ok' || status === 'no');
-  if (closed) { input.meals = true; if (status === 'ok') input.food = true; else { delete input.food; delete input.meat; delete input.veg; } }
+  if (weekday && score !== null) input.foodPct = Math.round(score) / 100;
+  const closed = fin && weekday && score !== null;
+  if (closed) { input.meals = true; delete input.food; delete input.meat; delete input.veg; }
   await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
     .bind(date, JSON.stringify(input), Date.now(), 'ia-comida').run();
-  return { status, closed };
+  return { status: score === null ? 'none' : score >= 80 ? 'ok' : 'no', closed, score };
 }
 async function judgeDay(env: Env, date: string, final: boolean) {
   const meals = await listMeals(env, date);
   const list = meals.map(m => `${m.t} ${mealName(m.t)}: ${m.descr}`).join('\n');
   const how = final
-    ? 'El día terminó. Primera línea: solo APROBADO o NO APROBADO, según TODO el día junto. Después: "Macros del día (aprox.): proteína X g · carbohidratos X g · grasas X g · ~X kcal". Después, si es NO APROBADO, una sección "Qué faltó:" con cada punto de la rúbrica que no se cumplió y qué habría que haber comido para cumplirlo; si es APROBADO, una línea de por qué. Sin markdown.'
-    : 'El día sigue. Respondé con estas cuatro líneas, sin encabezado de veredicto y sin markdown: "Comida de ahora: qué comí (la última comida listada)", "Macros de esa comida (aprox.): proteína X g · carbohidratos X g · grasas X g · ~X kcal", "Macros del día hasta ahora (aprox.): sumando todas las comidas", "Te falta para una buena alimentación: lo que todavía haría falta comer o evitar hoy según la rúbrica".';
+    ? 'El día terminó. Primera línea: solo "PUNTAJE: NN%" (un número entero de 0 a 100), según TODO el día junto. Después: "Macros del día (aprox.): proteína X g · carbohidratos X g · grasas X g · ~X kcal". Después, una sección "Qué bajó el puntaje:" con cada falla y qué habría que haber comido para evitarla (o una línea de por qué fue 100 si no hubo fallas). Sin markdown.'
+    : 'El día sigue. Respondé con estas cuatro líneas, sin encabezado de veredicto y sin markdown: "Comida de ahora: qué comí (la última comida listada)", "Macros de esa comida (aprox.): proteína X g · carbohidratos X g · grasas X g · ~X kcal", "Macros del día hasta ahora (aprox.): sumando todas las comidas", "Te falta para una buena alimentación: lo que todavía haría falta comer o evitar hoy según la rúbrica", "Puntaje estimado hasta ahora: PUNTAJE: NN%" (suponiendo que no comes nada más). ';
   return gemini(env, 'Sos un evaluador consistente de la alimentación diaria de un adulto que entrena. Respondés en español rioplatense, breve y concreto.\n' + RUBRIC, [{ text: `${how}\n\nComidas del día:\n${list}` }]);
 }
 
@@ -324,11 +324,7 @@ export async function handle(req: Request, env: Env): Promise<Response> {
       await env.DB.prepare('INSERT OR IGNORE INTO notification_log (kind, date, sent_at) VALUES (?, ?, ?)').bind(kind, date, now).run();
       await pushAll(env, url.origin, 'Aeróbico', body);
     };
-    const have = `${fmt(input.health.steps)} pasos y ${fmt(input.health.kcal)} kcal activas`;
-    if (!inGym && !aeroOk && !input.aero) {
-      if (today > date) await once('aero_miss', `Ayer no cumpliste el aeróbico: ${have} (mínimo ${fmt(minSteps)} pasos o ${fmt(minKcal)} kcal).`);
-      else if (hourNow >= aeroHour) await once('aero_eve', `Hoy todavía no hiciste el aeróbico: ${have}. Mínimo ${fmt(minSteps)} pasos o ${fmt(minKcal)} kcal.`);
-    }
+    // v2: la misión aeróbica se eliminó; los datos de Salud se guardan pero ya no generan avisos.
     await putSetting(env, 'health_last', String(now));
     await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
       .bind(date, JSON.stringify(input), now, 'atajo-salud').run();

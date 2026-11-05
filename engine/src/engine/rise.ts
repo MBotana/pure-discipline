@@ -16,8 +16,11 @@ export interface RiseInput {
   read?: boolean;                  // «Leí hoy»
   rooms?: string[];                // ambientes limpiados ese día
   foodPct?: number;                // 0..1, lo que Gemini puntúa del día (L–V)
-  food?: boolean; meals?: boolean; // v1.x: aprobado = 100 %, cerrado sin aprobar = 50 %
+  food?: boolean;                  // v1.x: aprobado = 100 %, cerrado sin aprobar = 50 %
   water?: boolean;                 // meta de agua cumplida
+  waterMl?: number;                // agua tomada (la meta son 2.500 ml)
+  closed?: boolean;                // el día fue confirmado a mano (solo la app lo usa)
+  meals?: boolean;                 // el análisis de comida del día quedó cerrado
   gameH?: number;                  // horas de videojuegos
   books?: { t: string; a?: string }[];
   repairs?: { t: string }[];
@@ -116,6 +119,7 @@ export class Rise {
     const n = this.statLevel(c), max = n >= this.cfg.statMax, into = this.state.xp[c] - this.cumStat[n];
     return { level: n, max, into, cost: max ? 0 : this.statCost(n), pct: max ? 1 : into / this.statCost(n) };
   }
+  floor(): number { return Math.max(1, this.state.floor); }
   level(): number { return CATS.reduce((a, c) => a + this.statLevel(c), 0); }
   petLevel(): number { let n = 0; while (n < this.cfg.petMax && this.state.petXp >= this.cumPet[n + 1] - 1e-9) n++; return n; }
   petProgress() {
@@ -230,6 +234,7 @@ export function normalize(r: RiseInput, c: RiseConfig = RISE): RiseInput {
   const o: RiseInput = { ...r };
   if (o.gymMin === undefined && r.gym) o.gymMin = 60;
   if (o.foodPct === undefined) { if (r.food) o.foodPct = 1; else if (r.meals) o.foodPct = 0.5; }
+  if (o.water === undefined && (r.waterMl ?? 0) >= 2500) o.water = true;
   void c; return o;
 }
 
