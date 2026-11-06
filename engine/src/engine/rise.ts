@@ -19,7 +19,7 @@ export interface RiseInput {
   foodPct?: number;                // 0..1, lo que Gemini puntúa del día (L–V)
   food?: boolean;                  // v1.x: aprobado = 100 %, cerrado sin aprobar = 50 %
   water?: boolean;                 // meta de agua cumplida
-  waterMl?: number;                // agua tomada (la meta son 2.500 ml)
+  waterMl?: number;                // agua tomada (la meta es 1 litro)
   closed?: boolean;                // el día fue confirmado a mano (solo la app lo usa)
   meals?: boolean;                 // el análisis de comida del día quedó cerrado
   gameH?: number;                  // horas de videojuegos
@@ -258,7 +258,7 @@ export function normalize(r: RiseInput, c: RiseConfig = RISE): RiseInput {
   const o: RiseInput = { ...r };
   if (o.gymMin === undefined && r.gym) o.gymMin = 60;
   if (o.foodPct === undefined) { if (r.food) o.foodPct = 1; else if (r.meals) o.foodPct = 0.5; }
-  if (o.water === undefined && (r.waterMl ?? 0) >= 2500) o.water = true;
+  if (o.water === undefined && (r.waterMl ?? 0) >= 1000) o.water = true;
   void c; return o;
 }
 

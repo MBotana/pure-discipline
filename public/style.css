@@ -123,3 +123,5 @@ img.tile{width:52px;height:52px;object-fit:contain;filter:grayscale(1) invert(1)
 :root[data-theme=papel] .scrollbtn.on img.ico{filter:grayscale(1) invert(1)}
 .scrollbtn .pdot{position:absolute;top:-4px;right:-4px;margin:0;border:2px solid var(--bg)}
 .scrollbtn img.ico{margin:0}
+.wq{margin:8px 0;padding:8px 10px;border:1px solid var(--hi);background:var(--field)}.wq b{display:block;font-size:13px;margin-bottom:6px}.wq .row{justify-content:flex-start}
+.rooms{gap:6px}.room{min-height:64px;padding:5px 2px;gap:2px}.room .tile,img.tile{width:36px;height:36px;font-size:20px}

@@ -94,7 +94,18 @@ async function sync() {
     syncMsg = e.status === 401 ? 'Clave inválida: volvé a ingresar.' : 'Sin conexión: se sincroniza más tarde.';
     if (e.status === 401) S.token = '';
   }
-  syncing = false; save(); render();
+  syncing = false; save(); render(); autoClose();
+}
+/** Los días anteriores se cierran solos: se fija el puntaje final de la comida. */
+const closing = new Set();
+function autoClose() {
+  if (!S.startDate || !S.token) return;
+  const today = todayISO();
+  for (const [d, v] of Object.entries(S.days)) {
+    if (d >= today || v.input?.closed || !Object.keys(v.input || {}).length) continue;
+    setInput(d, i => { i.closed = true; });
+    if (wkdayOf(d) < 5 && !S.days[d].input.meals && !closing.has(d)) { closing.add(d); loadMeals(d, true).then(() => { if (mealsOf(d).length) mealClose(d); }); }
+  }
 }
 const pending = () => Object.values(S.days).filter(v => v.dirty).length;
 
@@ -133,7 +144,7 @@ async function hydratePhotos() {
   }
 }
 /** Alimentación con IA: el servidor describe cada comida, guarda la lista del día y rehace el análisis completo. */
-let busy = '', errMeal = '', pendBlob = null, pendURL = '';
+let waterQ = null, busy = '', errMeal = '', pendBlob = null, pendURL = '';
 S.mc = S.mc || {};
 const mealsOf = date => S.mc[date]?.meals ?? [];
 const blobB64 = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
@@ -143,11 +154,11 @@ async function aiRun(label, fn) {
   catch (e) { errMeal = e.message || 'No se pudo completar'; }
   busy = ''; render();
 }
-const mealSend = (blob, text) => aiRun('Analizando la comida…', async () => {
+const mealSend = (blob, text) => { waterQ = { date: todayISO() }; return aiRun('Analizando la comida…', async () => {
   const date = todayISO(), r = await api('/api/meal', 'POST', { date, t: hhmm(), image: blob ? await blobB64(blob) : undefined, mime: 'image/jpeg', text: text || undefined });
   if (blob) await fotoPut(r.id, blob).catch(() => {});
   S.mc[date] = { meals: r.meals }; txOpen = false; txDraft = ''; pendBlob = null; if (pendURL) URL.revokeObjectURL(pendURL); pendURL = '';
-});
+}); };
 const mealClose = date => aiRun('Armando el puntaje final del día…', async () => {
   const r = await api('/api/meal/close', 'POST', { date }); S.mc[date] = { meals: r.meals };
   if (!r.closed) errMeal = 'La IA no dio un puntaje claro: tocá Reabrir y volvé a confirmar.';
@@ -166,7 +177,7 @@ function gameStatus(h, cap) {
 // ---------- Objetivos: el tablero del día ----------
 const wkdayOf = d => (new Date(toUTC(d)).getUTCDay() + 6) % 7;
 const isSess = inp => (inp.gymMin ?? (inp.gym ? 60 : 0)) >= 40;
-const waterOk = inp => (inp.waterMl ?? 0) >= 2500 || !!inp.water;
+const waterOk = inp => (inp.waterMl ?? 0) >= 1000 || !!inp.water;
 const dayDoneN = (inp, d) => [isSess(inp), !!inp.read, roomsOf(inp).length > 0, waterOk(inp), ...(wkdayOf(d) < 5 ? [inp.foodPct !== undefined] : [])].filter(Boolean).length;
 const dayNeed = d => (wkdayOf(d) < 5 ? 5 : 4);
 const pc = x => Math.round(x * 100) + ' %';
@@ -177,13 +188,14 @@ const infoRow = (cat, label, meta, right, done) => `<div class="mrow static ${do
 
 /** Tarjeta de comidas del día: lista, carga (foto o texto) y el puntaje que va dando la IA. */
 function foodCard(date, inp, locked) {
-  if (wkdayOf(date) >= 5) return `<div class="card slim"><h2>${pic('comida', '')} Comidas</h2><p class="mute">Fin de semana: tus permitidos. La comida no puntúa.</p></div>`;
+  if (wkdayOf(date) >= 5) return `<div class="card slim"><h2>${pic('comida', '')} Comidas</h2><p class="mute">Fin de semana: tus permitidos. La comida no puntúa.</p>${date === todayISO() ? `<div class="row" style="margin-top:8px"><span class="mute">Agua: ${litros(inp.waterMl ?? 0)} / 1 L</span><button class="btn sm" data-act="waterq" data-v="1">Bebí 250 ml</button></div>` : ''}</div>`;
   const list = mealsOf(date), isToday = date === todayISO(), pre = dayIdx(date) < 0, off = pre || !!busy || locked || !isToday;
   const sc = inp.foodPct, cls = sc >= 0.8 ? 'ok' : sc >= 0.5 ? 'gold' : sc !== undefined ? 'bad' : '';
   let h = `<div class="card slim"><div class="row"><h2>${pic('comida', '')} Comidas</h2><span class="pill ${cls}">${sc === undefined ? 'sin puntuar' : (inp.meals ? 'final ' : 'va ') + pc(sc)}</span></div>`;
   h += list.length ? list.map(x => entryHTML(x, date)).join('') : '<p class="mute">Todavía no cargaste ninguna comida.</p>';
   h += txOpen && isToday ? `<div class="row" style="margin-top:10px"><button class="btn sm ghost" data-act="pickfoto" ${busy ? 'disabled' : ''}>📷 ${pendBlob ? 'Cambiar foto' : 'Agregar foto'}</button>${pendBlob ? `<img class="thumb" src="${pendURL}" alt="">` : '<span class="mute">sin foto</span>'}</div><textarea id="txin" rows="3" placeholder="${pendBlob ? 'Descripción breve (opcional, por las dudas)' : 'Qué comiste (ej.: 2 milanesas con ensalada y agua)'}">${esc(txDraft)}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="txcancel" ${busy ? 'disabled' : ''}>Cancelar</button><button class="btn sm" data-act="mealsend" ${busy ? 'disabled' : ''}>Enviar</button></div>`
     : `<button class="btn" style="margin-top:10px;width:100%" ${off ? 'disabled' : 'data-act="txopen"'}>Cargar comida</button>`;
+  if (waterQ && waterQ.date === date) h += `<div class="wq"><b>¿Bebiste 250 ml de agua con esta comida?</b><div class="row"><button class="btn sm" data-act="waterq" data-v="1">Sí</button><button class="btn sm ghost" data-act="waterq" data-v="0">No</button></div></div>`;
   h += `${busy ? `<p class="mute busy">⏳ ${busy}</p>` : ''}${errMeal ? `<p class="err">${esc(errMeal)}</p>` : ''}`;
   if (inp.verdictTx) h += `<p class="vnote">${esc(inp.verdictTx)}</p>`;
   return h + `</div>`;
@@ -199,30 +211,24 @@ function viewHoy() {
   const nav = `<div class="wk">${strip}</div><div class="daytitle">${viewDate === today ? 'Hoy' : 'Editando'} · ${pretty(viewDate)}${viewDate !== today ? ' · <a href="#" data-act="today">volver a hoy</a>' : ''}</div>`;
   if (idx < 0 && !pre) return `${title}${nav}<div class="card mute">Este día es anterior al inicio.</div>`;
   const { e, results } = pre ? { e: newRise(), results: [{ events: [] }] } : compute(idx), st = e.state, r = results[pre ? 0 : idx], cfg = e.cfg;
-  const inp = pre ? {} : S.days[viewDate]?.input ?? {}, locked = pre || !!inp.closed;
+  const inp = pre ? {} : S.days[viewDate]?.input ?? {}, locked = pre;
   const gained = r.events.reduce((a, x) => a + x.amount, 0), mult = ladder(st.k, Math.min(st.wk.sess, 4));
   const wk = st.wk, mo = st.mo, gH = wk.gameH, cap = cfg.gameCapH;
   let h = title + `<div class="quote">${esc(dayPhrase(viewDate, pre, idx, e, st))}</div>` + nav;
-  if (viewDate === today && idx > 0) { const y = addDays(today, -1), yi = S.days[y]?.input; if (yi && Object.keys(yi).length && !yi.closed) h += `<div class="banner">Ayer quedó sin confirmar. <a href="#" data-act="day" data-d="${y}">Revisarlo</a></div>`; }
-  h += `<div class="sum"><span><small>XP del día</small><b>+${fmt(gained)}</b></span><span><small>Nivel</small><b>${e.level()}</b></span><span><small>Racha</small><b>${st.k} ${st.k === 1 ? 'sem' : 'sems'}</b></span><span><small>Multiplic.</small><b>×${String(+mult.toFixed(2)).replace('.', ',')}</b></span></div>`;
   h += `<div class="seg">${[['dia', 'Día'], ['sem', 'Semana'], ['mes', 'Mes']].map(([k, l]) => `<button class="${mtab === k ? 'on' : ''}" data-act="mtab" data-v="${k}">${l}</button>`).join('')}</div><!--fit-->`;
   if (mtab === 'dia') {
-    const sessMin = inp.gymMin ?? (inp.gym ? 60 : 0), gs = gameStatus(gH, cap), n = dayDoneN(inp, viewDate), tot = dayNeed(viewDate);
+    const sessMin = inp.gymMin ?? (inp.gym ? 60 : 0), gs = gameStatus(gH, cap), ml = inp.waterMl ?? 0;
     let b = `<div class="card slim"><div class="row"><h2>Automático</h2><span class="pill ${isSess(inp) ? 'ok' : ''}">${isSess(inp) ? 'sesión ✓' : 'sin sesión'}</span></div>`
       + infoRow('F', 'Gimnasio / boxeo', `${sessMin} min · se detecta por ubicación`, '', isSess(inp))
-      + `<div class="row" style="margin:4px 0 8px"><input id="gm" type="text" inputmode="numeric" placeholder="Minutos (si falló el atajo)" ${locked ? 'disabled' : ''} autocomplete="off"><button class="btn sm" ${locked ? 'disabled' : 'data-act="gymset"'}>Fijar</button></div>`
       + `<div class="row"><b>${pic('juegos', iconTag('D', 1))} Juegos</b><span class="pill ${gs[0]}">${hrs(gH)} / ${hrs(cap)}</span></div><div class="bar gold"><i style="width:${Math.min(100, gH / cap * 100)}%"></i></div><div class="mute">${gs[1]} · hoy ${hrs(inp.gameH || 0)}</div>`
-      + `<div class="row" style="margin-top:8px"><input id="gh" type="text" inputmode="decimal" placeholder="Horas de videojuegos (ej.: 1,5)" ${locked ? 'disabled' : ''} autocomplete="off"><button class="btn sm" ${locked ? 'disabled' : 'data-act="gameadd"'}>Sumar</button></div>${(inp.gameH || 0) > 0 && !locked ? `<button class="undo" data-act="gamezero">Borrar las de hoy</button>` : ''}</div>`;
+      + `<div class="row" style="margin-top:6px"><b>${pic('agua', '💧')} Agua</b><span class="pill ${waterOk(inp) ? 'ok' : ''}">${litros(ml)} / 1 L</span></div><div class="bar"><i style="width:${Math.min(100, ml / 10)}%"></i></div></div>`;
     b += foodCard(viewDate, inp, locked);
-    const ml = inp.waterMl ?? 0;
-    b += `<div class="card slim"><div class="row"><h2>${pic('agua', '')} Agua</h2><span class="pill ${waterOk(inp) ? 'ok' : ''}">${litros(ml)} / 2,5 L</span></div><div class="bar"><i style="width:${Math.min(100, ml / 25)}%"></i></div><div class="row"><button class="btn sm ghost" data-act="water" data-v="-250" ${locked || ml <= 0 ? 'disabled' : ''}>− vaso</button><button class="btn sm" data-act="water" data-v="250" ${locked ? 'disabled' : ''}>+ vaso (250 ml)</button></div></div>`;
     const mine = roomsOf(inp), taken = wk.rooms.filter(x => !mine.includes(x));
-    b += `<div class="card slim"><div class="row"><h2>Ambientes</h2><span class="pill ${wk.rooms.length >= cfg.cleanRoomsWeek ? 'ok' : ''}">${wk.rooms.length} / ${cfg.cleanRoomsWeek} esta semana</span></div><div class="rooms">${ROOMS.map(([id, nm]) => `<button class="room ${mine.includes(id) ? 'sel' : ''} ${taken.includes(id) ? 'taken' : ''}" ${locked ? 'disabled' : `data-act="roomtap" data-r="${id}"`}>${roomTile(id)}<b>${nm}</b>${mine.includes(id) || taken.includes(id) ? '<span class="ck">✓</span>' : ''}</button>`).join('')}</div><p class="mute">Tocá los que limpiaste hoy. La primera limpieza del día vale más; los otros ambientes suman menos. Cada ambiente cuenta una vez por semana.</p></div>`;
-    b += `<div class="card slim"><button class="mrow ${inp.read ? 'on' : ''}" ${locked ? 'disabled' : 'data-act="readtog"'}><span class="mic">${iconTag('I', 2)}</span><span class="mtx"><b>Leí hoy</b><small>10 páginas alcanzan · suma XP de Inteligencia</small></span><span class="chk">${inp.read ? '✓' : ''}</span></button></div>`;
-    b += locked && !pre
-      ? `<div class="banner ok">Día confirmado ✓ · ${n} / ${tot}</div><button class="btn ghost" style="width:100%" data-act="reopen">Reabrir el día</button>`
-      : `<button class="btn" style="width:100%" ${pre || viewDate > today ? 'disabled' : 'data-act="confirm"'}>Confirmar día (${n} / ${tot})</button>`;
-    h += `<div class="iscroll">${b}</div>`;
+    b += `<div class="card slim"><div class="row"><h2>Ambientes</h2><span class="pill ${wk.rooms.length >= cfg.cleanRoomsWeek ? 'ok' : ''}">${wk.rooms.length} / ${cfg.cleanRoomsWeek} esta semana</span></div><div class="rooms">${ROOMS.map(([id, nm]) => `<button class="room ${mine.includes(id) ? 'sel' : ''} ${taken.includes(id) ? 'taken' : ''}" ${locked ? 'disabled' : `data-act="roomtap" data-r="${id}"`}>${roomTile(id)}<b>${nm}</b>${mine.includes(id) || taken.includes(id) ? '<span class="ck">✓</span>' : ''}</button>`).join('')}</div></div>`;
+    b += `<div class="card slim"><button class="mrow ${inp.read ? 'on' : ''}" ${locked ? 'disabled' : 'data-act="readtog"'}><span class="mic">${iconTag('I', 2)}</span><span class="mtx"><b>Leí hoy</b><small>10 páginas alcanzan</small></span><span class="chk">${inp.read ? '✓' : ''}</span></button></div>`;
+    // Corrección manual: solo al editar un día anterior
+    if (!pre && viewDate < today) b += `<div class="card slim"><h2>Corregir este día</h2><div class="row" style="margin:8px 0 4px"><input id="gm" type="text" inputmode="numeric" placeholder="Minutos de gimnasio" autocomplete="off"><button class="btn sm" data-act="gymset">Fijar</button></div><div class="row"><input id="gh" type="text" inputmode="decimal" placeholder="Horas de videojuegos (ej.: 1,5)" autocomplete="off"><button class="btn sm" data-act="gameadd">Sumar</button></div>${(inp.gameH || 0) > 0 ? `<button class="undo" data-act="gamezero">Borrar las de ese día</button>` : ''}</div>`;
+    h += b;
   } else if (mtab === 'sem') {
     const need = needSessions(st.k), avg = wk.food.length ? wk.food.reduce((a, x) => a + x, 0) / wk.food.length : 0;
     h += `<div class="card slim"><div class="row"><h2>Esta semana</h2><span class="pill ${e.weekType(pre ? 0 : idx) === 'descarga' ? 'gold' : ''}">semana de ${e.weekType(pre ? 0 : idx)}</span></div>`;
@@ -401,7 +407,7 @@ function campMascota(e, pre) {
     return `<div class="mrow static ${got ? 'on' : ''}"><span class="mic">${got ? pic('titulo', '♛', 24) : '·'}</span><span class="mtx"><b>${t.name}</b><small>${got ? 'desde el ' + pretty(addDays(S.startDate, st.petTitles[g])) : `nivel ${t.lvl}`}</small></span><span class="chk">${got ? '✓' : ''}</span></div>`;
   }).join('') + `</div>`;
   b += `<p class="mute">${PET_NAME} sube de nivel con tu constancia en el gimnasio y cuando mejorás tus pesos o repeticiones.</p>`;
-  return figCard('pet', has('sombra_' + sc[0]) ? 'sombra_' + sc[0] : 'sombra_bestia', e.petTitleName(), `${PET_NAME} · Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, false, b, true);
+  return figCard('pet', has('sombra_' + sc[0]) ? 'sombra_' + sc[0] : 'sombra_bestia', e.petTitleName(), `${PET_NAME} · Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, false, b);
 }
 
 function campGimnasio(e, pre) {
@@ -568,6 +574,7 @@ document.addEventListener('click', async ev => {
   else if (a === 'sub') { SUB[el.dataset.k] = el.dataset.v; if (el.dataset.k === 'camp' && el.dataset.v === 'pet') rerollScene(); render(); }
   else if (a === 'roomtap') actDay(viewDate, i => { const r = el.dataset.r, s = new Set(roomsOf(i)); if (s.has(r)) s.delete(r); else s.add(r); delete i.room; i.rooms = [...s]; if (!i.rooms.length) delete i.rooms; });
   else if (a === 'readtog') actDay(viewDate, i => { i.read = !i.read; });
+  else if (a === 'waterq') { const d = waterQ?.date || todayISO(); waterQ = null; if (el.dataset.v === '1') actDay(d, i => { i.waterMl = (i.waterMl || 0) + 250; }); else render(); }
   else if (a === 'water') actDay(viewDate, i => { const v = Math.max(0, (i.waterMl || 0) + (+el.dataset.v)); if (v) i.waterMl = v; else delete i.waterMl; });
   else if (a === 'gymset') {
     const v = parseInt(document.getElementById('gm')?.value, 10);

@@ -323,7 +323,7 @@ function normalize(r, c = RISE) {
     else if (r.meals)
       o.foodPct = 0.5;
   }
-  if (o.water === undefined && (r.waterMl ?? 0) >= 2500)
+  if (o.water === undefined && (r.waterMl ?? 0) >= 1000)
     o.water = true;
   return o;
 }
