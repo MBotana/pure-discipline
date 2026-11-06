@@ -370,7 +370,7 @@ function campHeroe(e, pre) {
   let b = `<div class="card slim"><div class="row"><h2>Estadísticas</h2><span class="pill">total ${e.totalLevel()}</span></div>`;
   for (const c of CATS) {
     const p = e.statProgress(c), a = st.petAlloc[c], bad = nt && e.eff(c) < nt.min;
-    b += `<div style="margin-top:10px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}${bad ? ' <span class="pill bad">baja</span>' : ''}</b><b class="lv">${p.level}/99</b></div><div class="bar"><i style="width:${(p.pct * 100).toFixed(1)}%"></i></div><small class="mute">${p.max ? 'máximo' : `${fmt(p.into)} / ${fmt(p.cost)} XP para el nivel ${p.level + 1}`}</small></div>`;
+    b += `<div style="margin-top:10px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="upar">↑</span>' : ''}${bad ? ' <span class="pill bad">baja</span>' : ''}</b><b class="lv">${p.level}/99</b></div><div class="bar"><i style="width:${(p.pct * 100).toFixed(1)}%"></i></div><small class="mute">${p.max ? 'máximo' : `${fmt(p.into)} / ${fmt(p.cost)} XP para el nivel ${p.level + 1}`}</small></div>`;
   }
   b += `</div>`;
   return figHead('l', e.titleName(), `${HERO_NAME} · Nivel ${lv}`, nt ? Math.min(100, lv / nt.avg * 100) : 100) + b;
@@ -475,8 +475,11 @@ async function ensurePlan() {
 }
 /** Un récord por ejercicio: el máximo peso con las repeticiones que hiciste. */
 const LIFTS = ['Press de pecho', 'Sentadilla', 'Peso muerto convencional', 'Prensa', 'Press de hombros'];
+/** Valores de referencia para ver cómo queda la pantalla; desaparecen al empezar (lunes 9/11). */
+const REF = { 'Press de pecho': 60, 'Sentadilla': 80, 'Peso muerto convencional': 90, 'Prensa': 160, 'Press de hombros': 30 };
 function liftSets() {
   const out = [];
+  if (S.startDate && dayIdx(todayISO()) < 0) for (const [n, w] of Object.entries(REF)) out.push({ d: S.startDate, n, w, r: 10 });
   for (const [d, v] of Object.entries(S.days)) {
     for (const [n, arr] of Object.entries(v.input?.lifts ?? {})) for (const x of arr || []) if (x && x.ok && x.w > 0) out.push({ d, n, w: +x.w, r: +x.r });
   }

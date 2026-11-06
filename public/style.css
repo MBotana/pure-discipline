@@ -176,3 +176,6 @@ select{font:inherit;font-size:15px;color:var(--ink);background:var(--field);bord
 .gm-row .gm-n{font:700 14px var(--fd);letter-spacing:.04em}.gm-wt{font-size:12px;color:var(--mute)}
 .gm-row.ok .gm-n{text-decoration:line-through;opacity:.6}.gm-row.ok{border-color:var(--hi)}
 #gymmode{gap:8px}.gm-rows{gap:5px}.gm-row{padding:5px 12px;min-height:42px;gap:0}.fig.l{left:-32%}
+
+.upar{font-weight:800;color:var(--hi)}
+.rtab.two{display:grid;grid-template-columns:1fr auto;justify-content:end;gap:10px;text-align:right}
