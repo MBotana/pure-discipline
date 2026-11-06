@@ -337,7 +337,7 @@ function lvlSeen() {
 }
 function viewCamp() {
   if (!S.startDate) return `<h1>Guarida</h1><div class="card mute">Disponibles al ingresar.</div>`;
-  const head = `<h1>Guarida</h1>` + subtabs('camp', [['her', 'Stats'], ['pet', 'Récords'], ['gim', 'Gimnasio']]) + '<!--fit-->';
+  const head = `<h1>Guarida</h1>` + subtabs('camp', [['her', 'Stats'], ['pet', 'Récords'], ['gim', 'GYM']]) + '<!--fit-->';
   const { e, pre } = current();
   return head + `<div class="iscroll">${SUB.camp === 'pet' ? campMascota(e, pre) : SUB.camp === 'gim' ? campGimnasio(e, pre) : campHeroe(e, pre)}</div>`;
 }
@@ -392,7 +392,7 @@ function viewLogros(hi) {
     ['🐾', `${PET_NAME} nivel 25`, 'Bestia', e.petLevel(), 25], ['🐾', `${PET_NAME} nivel 100`, 'Bestia', e.petLevel(), 100],
   ];
   const got = M.filter(m => m[3] >= m[4]).length;
-  return `<div class="card slim"><div class="row"><h2>${pic('logro', '')} Logros</h2><span class="pill ${got ? 'gold' : ''}">${got} / ${M.length}</span></div><div class="medals">${M.map(([ic, nm, ds, n, g]) => `<div class="medal ${n >= g ? 'on' : ''}"><span class="mi">${ic}</span><b>${nm}</b><small>${ds}</small><span class="mini"><i style="width:${Math.min(100, Math.max(0, n) / g * 100)}%"></i></span><small>${Math.min(Math.max(0, n), g)} / ${g}</small></div>`).join('')}</div></div>`;
+  return `<div class="card slim"><div class="row"><h2>${pic('logro', '')} Medallas</h2><span class="pill ${got ? 'gold' : ''}">${got} / ${M.length}</span></div><div class="medals">${M.map(([ic, nm, ds, n, g]) => `<div class="medal ${n >= g ? 'on' : ''}"><span class="mi">${ic}</span><b>${nm}</b><small>${ds}</small><span class="mini"><i style="width:${Math.min(100, Math.max(0, n) / g * 100)}%"></i></span><small>${Math.min(Math.max(0, n), g)} / ${g}</small></div>`).join('')}</div></div>`;
 }
 
 function campMascota(e, pre) {
