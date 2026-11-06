@@ -1,6 +1,7 @@
 /**
- * Rise — motor v2 (especificación v2.0). Estadísticas por XP, nivel = suma, puertas cada 10 pisos con mínimo
- * en cada estadística (héroe + mascota), mascota que sube por constancia y progreso en el gimnasio.
+ * Rise — motor v3 (especificación v3.0). Estadísticas de 1 a 99 con curva tipo RuneScape, nivel del héroe = promedio
+ * de las estadísticas efectivas (héroe + puntos de la mascota), títulos que piden un mínimo en las cinco estadísticas,
+ * mascota que sube por constancia y progreso en el gimnasio y tiene sus propios títulos.
  * Nada baja nunca. Es determinista: se rehace desde el día 0 con las entradas diarias guardadas.
  */
 import { dateOfDay } from './calendar.ts';
@@ -30,7 +31,7 @@ export interface RiseInput {
 
 export interface RiseConfig {
   startDate: string;               // lunes ISO
-  statA: number; statR: number; statMax: number;
+  xpA: number; xpB: number; xpScale: number; statMax: number; balanceGap: number;
   sessionMin: number;              // minutos para que una visita cuente como sesión
   fuerzaPerMin: number; fuerzaCapMin: number; fuerzaWeekMin: number; fuerzaMonthMin: number; fuerzaW: number; fuerzaM: number;
   readXp: number; bookFirst: number; bookNext: number;
@@ -39,12 +40,11 @@ export interface RiseConfig {
   gameCapH: number; discW: number; discM: number;
   petA: number; petR: number; petMax: number; petStatMax: number;
   sessXp: number; sessMax: number; progXp: number; progWeekBonus: number; cycleBonus: number; cycleNeed: number; cycleWeeks: number;
-  gates: Record<number, number>;
 }
 
 export const RISE: RiseConfig = {
-  startDate: '2026-11-02',
-  statA: 1000, statR: 1.10, statMax: 20,
+  startDate: '2026-11-09',
+  xpA: 300, xpB: 15, xpScale: 2, statMax: 99, balanceGap: 15,
   sessionMin: 40,
   fuerzaPerMin: 1.6, fuerzaCapMin: 120, fuerzaWeekMin: 360, fuerzaMonthMin: 1440, fuerzaW: 250, fuerzaM: 650,
   readXp: 60, bookFirst: 2500, bookNext: 1250,
@@ -53,8 +53,21 @@ export const RISE: RiseConfig = {
   gameCapH: 15, discW: 750, discM: 1100,
   petA: 369.1, petR: 1.03, petMax: 100, petStatMax: 20,
   sessXp: 100, sessMax: 5, progXp: 150, progWeekBonus: 300, cycleBonus: 1000, cycleNeed: 4, cycleWeeks: 4,
-  gates: { 10: 3, 20: 6, 30: 9, 40: 13, 50: 16, 60: 20, 70: 24, 80: 27, 90: 32, 100: 40 },
 };
+
+/** Títulos del héroe: piden promedio de estadísticas efectivas ≥ avg y ninguna más de balanceGap niveles por debajo. */
+export const HERO_TITLES: readonly { avg: number; name: string }[] = [
+  { avg: 1, name: 'Recién despertado' }, { avg: 10, name: 'Aprendiz' }, { avg: 20, name: 'Constante' },
+  { avg: 30, name: 'Templado' }, { avg: 40, name: 'Curtido' }, { avg: 50, name: 'Veterano' },
+  { avg: 60, name: 'Forjado' }, { avg: 70, name: 'Imparable' }, { avg: 80, name: 'Maestro' },
+  { avg: 90, name: 'Leyenda' }, { avg: 99, name: 'Inmortal' },
+];
+/** Títulos de la mascota: por nivel. */
+export const PET_TITLES: readonly { lvl: number; name: string }[] = [
+  { lvl: 1, name: 'Cría de sombra' }, { lvl: 10, name: 'Sombra joven' }, { lvl: 20, name: 'Cazadora' },
+  { lvl: 35, name: 'Bestia curtida' }, { lvl: 50, name: 'Devoradora' }, { lvl: 65, name: 'Terror nocturno' },
+  { lvl: 80, name: 'Señora del abismo' }, { lvl: 100, name: 'Bahamut' },
+];
 
 const zero = (): Record<Cat, number> => ({ F: 0, I: 0, V: 0, D: 0, O: 0 });
 
@@ -73,10 +86,8 @@ export interface RiseState {
   petXp: number;
   petAlloc: Record<Cat, number>;
   k: number;                       // semana de racha
-  floor: number;
-  blocked: number | null;
-  cleared: number[];
-  clearedDay: Record<number, number>;
+  titles: Record<number, number>;  // índice de título del héroe → día en que se obtuvo
+  petTitles: Record<number, number>;
   wk: { sess: number; min: number; cleanDays: number; rooms: string[]; food: number[]; gameH: number; prog: number };
   mo: { ym: string; min: number; food: number[]; books: number; repairs: number; discOk: boolean };
   cyc: string[];                   // ejercicios distintos con progreso en el ciclo de 4 semanas
@@ -85,11 +96,11 @@ export interface RiseState {
 
 export type EvKind = 'D' | 'W' | 'M';
 export interface RiseEvent { day: number; cat: Cat | 'pet'; kind: EvKind; label: string; amount: number }
-export interface RiseDay { day: number; date: string; events: RiseEvent[]; floor: number; level: number; blocked: number | null; unlocked: number[] }
+export interface RiseDay { day: number; date: string; events: RiseEvent[]; level: number; unlocked: number[]; petUnlocked: number[] }
 
 export function initialRise(cfg: RiseConfig = RISE): RiseState {
   return {
-    day: 0, xp: zero(), petXp: 0, petAlloc: zero(), k: 1, floor: 0, blocked: null, cleared: [], clearedDay: {},
+    day: 0, xp: zero(), petXp: 0, petAlloc: zero(), k: 1, titles: {}, petTitles: {},
     wk: { sess: 0, min: 0, cleanDays: 0, rooms: [], food: [], gameH: 0, prog: 0 },
     mo: { ym: dateOfDay(cfg.startDate, 0).slice(0, 7), min: 0, food: [], books: 0, repairs: 0, discOk: true },
     cyc: [], totals: { gym: 0, books: 0, repairs: 0 },
@@ -108,19 +119,36 @@ export class Rise {
     this.cfg = { ...RISE, ...cfg };
     this.state = state ? structuredClone(state) : initialRise(this.cfg);
     const c = this.cfg;
-    this.cumStat = [0]; for (let n = 0; n < c.statMax; n++) this.cumStat.push(this.cumStat[n] + c.statA * Math.pow(c.statR, n));
+    // cumStat[L] = XP necesaria para ser nivel L (nivel 1 = 0 XP). Fórmula clásica de RuneScape con duplicación cada xpB niveles.
+    this.cumStat = [0, 0]; let pts = 0;
+    for (let L = 1; L < c.statMax; L++) { pts += Math.floor(L + c.xpA * Math.pow(2, L / c.xpB)); this.cumStat.push(Math.floor(pts / 4) * c.xpScale); }
     this.cumPet = [0]; for (let n = 0; n < c.petMax; n++) this.cumPet.push(this.cumPet[n] + c.petA * Math.pow(c.petR, n));
   }
 
   // ---------- consultas ----------
-  statCost(n: number): number { return this.cfg.statA * Math.pow(this.cfg.statR, n); }       // costo del nivel n → n+1
-  statLevel(c: Cat): number { let n = 0; while (n < this.cfg.statMax && this.state.xp[c] >= this.cumStat[n + 1] - 1e-9) n++; return n; }
+  /** XP total necesaria para llegar al nivel L (1..statMax). */
+  xpForLevel(L: number): number { return this.cumStat[Math.max(1, Math.min(L, this.cfg.statMax))]; }
+  statCost(L: number): number { return this.cumStat[L + 1] - this.cumStat[L]; }               // costo del nivel L → L+1
+  statLevel(c: Cat): number { let L = 1; while (L < this.cfg.statMax && this.state.xp[c] >= this.cumStat[L + 1] - 1e-9) L++; return L; }
   statProgress(c: Cat) {
-    const n = this.statLevel(c), max = n >= this.cfg.statMax, into = this.state.xp[c] - this.cumStat[n];
-    return { level: n, max, into, cost: max ? 0 : this.statCost(n), pct: max ? 1 : into / this.statCost(n) };
+    const L = this.statLevel(c), max = L >= this.cfg.statMax, into = this.state.xp[c] - this.cumStat[L];
+    return { level: L, max, into, cost: max ? 0 : this.statCost(L), pct: max ? 1 : into / this.statCost(L) };
   }
-  floor(): number { return Math.max(1, this.state.floor); }
-  level(): number { return CATS.reduce((a, c) => a + this.statLevel(c), 0); }
+  /** Nivel del héroe: promedio de las estadísticas efectivas (héroe + mascota), de 1 a 99. */
+  level(): number { return Math.min(this.cfg.statMax, Math.floor(CATS.reduce((a, c) => a + Math.min(this.cfg.statMax, this.eff(c)), 0) / CATS.length)); }
+  /** Suma de los niveles de las cinco estadísticas (nivel total). */
+  totalLevel(): number { return CATS.reduce((a, c) => a + this.statLevel(c), 0); }
+  /** Título del héroe más alto obtenido (índice en HERO_TITLES). */
+  titleIndex(): number { const ks = Object.keys(this.state.titles).map(Number); return ks.length ? Math.max(...ks) : 0; }
+  titleName(): string { return HERO_TITLES[this.titleIndex()].name; }
+  /** Qué falta para el próximo título: promedio requerido, mínimo por estadística y cuáles están por debajo. */
+  nextTitle(): { index: number; name: string; avg: number; min: number; low: Cat[]; missingAvg: number } | null {
+    const i = this.titleIndex() + 1; if (i >= HERO_TITLES.length) return null;
+    const t = HERO_TITLES[i], min = Math.max(1, t.avg - this.cfg.balanceGap);
+    return { index: i, name: t.name, avg: t.avg, min, low: CATS.filter(c => this.eff(c) < min), missingAvg: Math.max(0, t.avg - this.level()) };
+  }
+  petTitleIndex(): number { const ks = Object.keys(this.state.petTitles).map(Number); return ks.length ? Math.max(...ks) : -1; }
+  petTitleName(): string { const i = this.petTitleIndex(); return i < 0 ? 'Huevo' : PET_TITLES[i].name; }
   petLevel(): number { let n = 0; while (n < this.cfg.petMax && this.state.petXp >= this.cumPet[n + 1] - 1e-9) n++; return n; }
   petProgress() {
     const n = this.petLevel(), max = n >= this.cfg.petMax, into = this.state.petXp - this.cumPet[n];
@@ -128,11 +156,8 @@ export class Rise {
     return { level: n, max, into, cost: max ? 0 : cost, pct: max ? 1 : into / cost };
   }
   petPending(): number { return this.petLevel() - CATS.reduce((a, c) => a + this.state.petAlloc[c], 0); }
-  /** Estadística efectiva para las puertas: héroe + puntos de mascota (máx. 40 en total, 20 + 20). */
+  /** Estadística efectiva: nivel del héroe + puntos que la mascota te dio en ella (hasta 20 por estadística). */
   eff(c: Cat): number { return this.statLevel(c) + this.state.petAlloc[c]; }
-  gateReq(g: number): number | undefined { return this.cfg.gates[g]; }
-  gateOk(g: number): boolean { const r = this.cfg.gates[g]; return r === undefined || CATS.every(c => this.eff(c) >= r); }
-  nextGate(): number | null { for (const g of Object.keys(this.cfg.gates).map(Number).sort((a, b) => a - b)) if (!this.state.cleared.includes(g)) return g; return null; }
   /** Semana de ciclo: 3 de carga y 1 de descarga. */
   weekType(day: number): 'carga' | 'descarga' { return Math.floor(day / 7) % this.cfg.cycleWeeks === this.cfg.cycleWeeks - 1 ? 'descarga' : 'carga'; }
   streakMult(): number { return ladder(this.state.k, Math.min(this.state.wk.sess, this.cfg.sessMax - 1)); }
@@ -212,20 +237,19 @@ export class Rise {
 
     // puntos de la mascota que elegiste asignar
     for (const cat of inp.alloc ?? []) {
-      if (this.petPending() > 0 && S.petAlloc[cat] < c.petStatMax && this.statLevel(cat) + S.petAlloc[cat] < 2 * c.statMax) S.petAlloc[cat]++;
+      if (this.petPending() > 0 && S.petAlloc[cat] < c.petStatMax) S.petAlloc[cat]++;
     }
-    // piso y puertas: el piso es el nivel hasta la primera puerta sin cumplir
-    const unlocked: number[] = [];
+    // títulos: el del héroe pide promedio y un mínimo en cada estadística; el de la mascota, nivel
+    const unlocked: number[] = [], petUnlocked: number[] = [];
     const level = this.level();
-    let floor = level, blocked: number | null = null;
-    for (const g of Object.keys(c.gates).map(Number).sort((a, b) => a - b)) {
-      if (level < g) break;
-      if (this.gateOk(g)) { if (!S.cleared.includes(g)) { S.cleared.push(g); S.clearedDay[g] = i; unlocked.push(g); } }
-      else { blocked = g; floor = g === 100 ? 99 : g; break; }
-    }
-    S.floor = Math.max(S.floor, floor); S.blocked = blocked;
+    HERO_TITLES.forEach((t, k) => {
+      if (S.titles[k] !== undefined) return;
+      if (level >= t.avg && CATS.every(cat => this.eff(cat) >= Math.max(1, t.avg - c.balanceGap))) { S.titles[k] = i; unlocked.push(k); }
+    });
+    const pl = this.petLevel();
+    PET_TITLES.forEach((t, k) => { if (S.petTitles[k] === undefined && pl >= t.lvl) { S.petTitles[k] = i; petUnlocked.push(k); } });
     S.day = i + 1;
-    return { day: i, date, events: ev, floor: S.floor, level, blocked, unlocked };
+    return { day: i, date, events: ev, level, unlocked, petUnlocked };
   }
 }
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Rise, RISE, ROOMS, CATS, ladder, needSessions, normalize } from '../src/engine/rise.ts';
+import { Rise, RISE, ROOMS, CATS, HERO_TITLES, PET_TITLES, ladder, needSessions, normalize } from '../src/engine/rise.ts';
 import type { RiseInput, Cat } from '../src/engine/rise.ts';
 import { dateOfDay } from '../src/engine/calendar.ts';
 
@@ -30,13 +30,16 @@ function run(days: number, f: (i: number, e: Rise) => RiseInput) {
   return { e, log };
 }
 
-test('costos: nivel 1 = 1.000 XP, nivel 20 = unos 6.100 XP, y el XP nunca baja', () => {
+test('curva de niveles: nivel 1 con 0 XP, 99 como tope, cada nivel cuesta más que el anterior, y el XP nunca baja', () => {
   const e = new Rise();
-  assert.equal(Math.round(e.statCost(0)), 1000);
-  assert.ok(Math.abs(e.statCost(19) - 1000 * 1.1 ** 19) < 1e-6);
+  assert.equal(e.xpForLevel(1), 0); assert.equal(e.statLevel('F'), 1);
+  for (let L = 1; L < 98; L++) assert.ok(e.statCost(L + 1) > e.statCost(L), 'nivel ' + L);
+  assert.ok(e.xpForLevel(99) > 200_000 && e.xpForLevel(99) < 400_000, 'XP del nivel 99: ' + e.xpForLevel(99));
+  assert.ok(e.xpForLevel(92) < e.xpForLevel(99) * 0.8);
+  e.state.xp.F = 1e12; assert.equal(e.statLevel('F'), 99); assert.ok(e.statProgress('F').max);
   const { log } = run(120, (i, r) => perfect(i, r));
   let prev = 0;
-  for (const d of log) { assert.ok(d.floor >= prev); prev = d.floor; }
+  for (const d of log) { assert.ok(d.level >= prev); prev = d.level; }
 });
 
 test('multiplicadores de la mascota: no se suman y tienen tope x6', () => {
@@ -45,17 +48,17 @@ test('multiplicadores de la mascota: no se suman y tienen tope x6', () => {
   assert.equal(needSessions(1), 5); assert.equal(needSessions(3), 4); assert.equal(needSessions(5), 3);
 });
 
-test('jugando perfecto: piso 100 hacia el 20-dic-2027, parejo entre las cinco estadísticas', () => {
-  const { e, log } = run(7 * 120, (i, r) => perfect(i, r));
-  const at = (g: number) => dateOfDay(START, e.state.clearedDay[g]);
-  assert.ok(e.state.cleared.includes(100), 'no llegó al piso 100');
-  const d100 = at(100);
-  assert.ok(d100 >= '2027-12-10' && d100 <= '2028-01-05', 'piso 100 el ' + d100);
-  assert.equal(log.find(d => d.date === '2027-12-31')!.floor, 100);
+test('jugando perfecto: Maestro al año, Inmortal a los 2-3 años, y las cinco estadísticas parejas', () => {
+  const { e, log } = run(7 * 180, (i, r) => perfect(i, r));
+  const at = (k: number) => dateOfDay(START, e.state.titles[k]);
+  const idx = (name: string) => HERO_TITLES.findIndex(t => t.name === name);
+  assert.ok(at(idx('Aprendiz')) <= '2026-12-01', 'Aprendiz: ' + at(idx('Aprendiz')));
+  assert.ok(at(idx('Maestro')) >= '2027-09-01' && at(idx('Maestro')) <= '2027-12-31', 'Maestro: ' + at(idx('Maestro')));
+  assert.ok(at(idx('Inmortal')) >= '2028-12-01' && at(idx('Inmortal')) <= '2029-07-01', 'Inmortal: ' + at(idx('Inmortal')));
+  assert.equal(e.titleName(), 'Inmortal'); assert.equal(e.level(), 99);
   assert.ok(e.petLevel() === 100, 'mascota nivel ' + e.petLevel());
-  assert.ok(at(10) >= '2026-11-20' && at(10) <= '2026-12-02', 'puerta 10: ' + at(10));
-  assert.ok(at(50) >= '2027-02-20' && at(50) <= '2027-03-10', 'puerta 50: ' + at(50));
-  for (const c of CATS) assert.equal(e.statLevel(c), 20);
+  const lv = CATS.map(c => e.statLevel(c)); assert.ok(Math.max(...lv) - Math.min(...lv) <= 3, lv.join(','));
+  assert.equal(log.length, 7 * 180);
 });
 
 test('semana típica perfecta: ~1.000 XP por estadística', () => {
@@ -122,16 +125,28 @@ test('Disciplina: pasarse del tope esa semana no paga, y el mes se pierde', () =
   assert.ok(!bad.log.flatMap(d => d.events).some(x => x.cat === 'D' && x.kind === 'M'), 'no debería cobrar el mes');
 });
 
-test('puertas: con nivel suficiente pero una estadística floja, el piso se queda en la puerta y el XP sigue sumando', () => {
+test('títulos: piden promedio y un mínimo en cada estadística; una estadística olvidada frena el título pero no el XP', () => {
   const e = new Rise();
-  e.state.xp = { F: 1e6, I: 1e6, V: 1e6, D: 1e6, O: 0 };                // nivel 80, Orden en 0
+  e.state.xp = { F: 1e6, I: 1e6, V: 1e6, D: 1e6, O: 0 };                  // cuatro en 99 y Orden en 1
   const d = e.processDay({});
-  assert.equal(d.level, 80); assert.equal(d.blocked, 10); assert.equal(d.floor, 10);
+  assert.equal(d.level, 79);                                                // (4×99 + 1) / 5
+  assert.equal(e.titleName(), 'Aprendiz');                                  // el mínimo de Constante (5) no se cumple con Orden en 1
+  const nt = e.nextTitle()!; assert.equal(nt.name, 'Constante'); assert.deepEqual(nt.low, ['O']);
   e.processDay({ read: true }); assert.ok(e.state.xp.I > 1e6);
   e.state.xp.O = 1e6; const d2 = e.processDay({});
-  assert.equal(d2.level, 100); assert.equal(d2.blocked, 70); assert.equal(d2.floor, 70);   // todo en 20, pero la puerta 70 pide 24: faltan puntos de la mascota
-  e.state.petXp = 1e9; e.processDay({ alloc: ['F', 'F', 'F', 'F', 'I', 'I', 'I', 'I', 'V', 'V', 'V', 'V', 'D', 'D', 'D', 'D', 'O', 'O', 'O', 'O'] });
-  const d3 = e.processDay({}); assert.equal(d3.blocked, 80); assert.equal(d3.floor, 80);                // con 24 en cada una pasa la 70, pero la 80 pide 27
+  assert.equal(d2.level, 99); assert.equal(e.titleName(), 'Inmortal');
+  assert.ok(d2.unlocked.length >= 8, 'se desbloquean todos los títulos intermedios juntos');
+  assert.equal(e.nextTitle(), null);
+  const again = e.processDay({}); assert.equal(again.unlocked.length, 0);   // nunca se pierden ni se repiten
+});
+
+test('títulos de la mascota: por nivel', () => {
+  const e = new Rise();
+  assert.equal(e.petTitleName(), 'Huevo');
+  e.state.petXp = 400; const d = e.processDay({});
+  assert.deepEqual(d.petUnlocked, [0]); assert.equal(e.petTitleName(), PET_TITLES[0].name);
+  e.state.petXp = 1e9; const d2 = e.processDay({});
+  assert.equal(e.petTitleName(), 'Bahamut'); assert.equal(d2.petUnlocked.length, PET_TITLES.length - 1);
 });
 
 test('mascota: el punto se asigna a elección, máximo 20 por estadística y sin pasar de los puntos ganados', () => {

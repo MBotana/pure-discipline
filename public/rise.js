@@ -11,10 +11,12 @@ function dateOfDay(startDate, day) {
 var CATS = ["F", "I", "V", "D", "O"];
 var ROOMS = ["cocina", "bano", "habitacion", "living", "oficina", "patio"];
 var RISE = {
-  startDate: "2026-11-02",
-  statA: 1000,
-  statR: 1.1,
-  statMax: 20,
+  startDate: "2026-11-09",
+  xpA: 300,
+  xpB: 15,
+  xpScale: 2,
+  statMax: 99,
+  balanceGap: 15,
   sessionMin: 40,
   fuerzaPerMin: 1.6,
   fuerzaCapMin: 120,
@@ -50,9 +52,31 @@ var RISE = {
   progWeekBonus: 300,
   cycleBonus: 1000,
   cycleNeed: 4,
-  cycleWeeks: 4,
-  gates: { 10: 3, 20: 6, 30: 9, 40: 13, 50: 16, 60: 20, 70: 24, 80: 27, 90: 32, 100: 40 }
+  cycleWeeks: 4
 };
+var HERO_TITLES = [
+  { avg: 1, name: "Recién despertado" },
+  { avg: 10, name: "Aprendiz" },
+  { avg: 20, name: "Constante" },
+  { avg: 30, name: "Templado" },
+  { avg: 40, name: "Curtido" },
+  { avg: 50, name: "Veterano" },
+  { avg: 60, name: "Forjado" },
+  { avg: 70, name: "Imparable" },
+  { avg: 80, name: "Maestro" },
+  { avg: 90, name: "Leyenda" },
+  { avg: 99, name: "Inmortal" }
+];
+var PET_TITLES = [
+  { lvl: 1, name: "Cría de sombra" },
+  { lvl: 10, name: "Sombra joven" },
+  { lvl: 20, name: "Cazadora" },
+  { lvl: 35, name: "Bestia curtida" },
+  { lvl: 50, name: "Devoradora" },
+  { lvl: 65, name: "Terror nocturno" },
+  { lvl: 80, name: "Señora del abismo" },
+  { lvl: 100, name: "Bahamut" }
+];
 var zero = () => ({ F: 0, I: 0, V: 0, D: 0, O: 0 });
 function ladder(k, idx) {
   if (k <= 1)
@@ -69,10 +93,8 @@ function initialRise(cfg = RISE) {
     petXp: 0,
     petAlloc: zero(),
     k: 1,
-    floor: 0,
-    blocked: null,
-    cleared: [],
-    clearedDay: {},
+    titles: {},
+    petTitles: {},
     wk: { sess: 0, min: 0, cleanDays: 0, rooms: [], food: [], gameH: 0, prog: 0 },
     mo: { ym: dateOfDay(cfg.startDate, 0).slice(0, 7), min: 0, food: [], books: 0, repairs: 0, discOk: true },
     cyc: [],
@@ -90,31 +112,59 @@ class Rise {
     this.cfg = { ...RISE, ...cfg };
     this.state = state ? structuredClone(state) : initialRise(this.cfg);
     const c = this.cfg;
-    this.cumStat = [0];
-    for (let n = 0;n < c.statMax; n++)
-      this.cumStat.push(this.cumStat[n] + c.statA * Math.pow(c.statR, n));
+    this.cumStat = [0, 0];
+    let pts = 0;
+    for (let L = 1;L < c.statMax; L++) {
+      pts += Math.floor(L + c.xpA * Math.pow(2, L / c.xpB));
+      this.cumStat.push(Math.floor(pts / 4) * c.xpScale);
+    }
     this.cumPet = [0];
     for (let n = 0;n < c.petMax; n++)
       this.cumPet.push(this.cumPet[n] + c.petA * Math.pow(c.petR, n));
   }
-  statCost(n) {
-    return this.cfg.statA * Math.pow(this.cfg.statR, n);
+  xpForLevel(L) {
+    return this.cumStat[Math.max(1, Math.min(L, this.cfg.statMax))];
+  }
+  statCost(L) {
+    return this.cumStat[L + 1] - this.cumStat[L];
   }
   statLevel(c) {
-    let n = 0;
-    while (n < this.cfg.statMax && this.state.xp[c] >= this.cumStat[n + 1] - 0.000000001)
-      n++;
-    return n;
+    let L = 1;
+    while (L < this.cfg.statMax && this.state.xp[c] >= this.cumStat[L + 1] - 0.000000001)
+      L++;
+    return L;
   }
   statProgress(c) {
-    const n = this.statLevel(c), max = n >= this.cfg.statMax, into = this.state.xp[c] - this.cumStat[n];
-    return { level: n, max, into, cost: max ? 0 : this.statCost(n), pct: max ? 1 : into / this.statCost(n) };
-  }
-  floor() {
-    return Math.max(1, this.state.floor);
+    const L = this.statLevel(c), max = L >= this.cfg.statMax, into = this.state.xp[c] - this.cumStat[L];
+    return { level: L, max, into, cost: max ? 0 : this.statCost(L), pct: max ? 1 : into / this.statCost(L) };
   }
   level() {
+    return Math.min(this.cfg.statMax, Math.floor(CATS.reduce((a, c) => a + Math.min(this.cfg.statMax, this.eff(c)), 0) / CATS.length));
+  }
+  totalLevel() {
     return CATS.reduce((a, c) => a + this.statLevel(c), 0);
+  }
+  titleIndex() {
+    const ks = Object.keys(this.state.titles).map(Number);
+    return ks.length ? Math.max(...ks) : 0;
+  }
+  titleName() {
+    return HERO_TITLES[this.titleIndex()].name;
+  }
+  nextTitle() {
+    const i = this.titleIndex() + 1;
+    if (i >= HERO_TITLES.length)
+      return null;
+    const t = HERO_TITLES[i], min = Math.max(1, t.avg - this.cfg.balanceGap);
+    return { index: i, name: t.name, avg: t.avg, min, low: CATS.filter((c) => this.eff(c) < min), missingAvg: Math.max(0, t.avg - this.level()) };
+  }
+  petTitleIndex() {
+    const ks = Object.keys(this.state.petTitles).map(Number);
+    return ks.length ? Math.max(...ks) : -1;
+  }
+  petTitleName() {
+    const i = this.petTitleIndex();
+    return i < 0 ? "Huevo" : PET_TITLES[i].name;
   }
   petLevel() {
     let n = 0;
@@ -132,19 +182,6 @@ class Rise {
   }
   eff(c) {
     return this.statLevel(c) + this.state.petAlloc[c];
-  }
-  gateReq(g) {
-    return this.cfg.gates[g];
-  }
-  gateOk(g) {
-    const r = this.cfg.gates[g];
-    return r === undefined || CATS.every((c) => this.eff(c) >= r);
-  }
-  nextGate() {
-    for (const g of Object.keys(this.cfg.gates).map(Number).sort((a, b) => a - b))
-      if (!this.state.cleared.includes(g))
-        return g;
-    return null;
   }
   weekType(day) {
     return Math.floor(day / 7) % this.cfg.cycleWeeks === this.cfg.cycleWeeks - 1 ? "descarga" : "carga";
@@ -252,31 +289,28 @@ class Rise {
         add("D", "M", "Mes sin pasarse de horas", c.discM);
     }
     for (const cat of inp.alloc ?? []) {
-      if (this.petPending() > 0 && S.petAlloc[cat] < c.petStatMax && this.statLevel(cat) + S.petAlloc[cat] < 2 * c.statMax)
+      if (this.petPending() > 0 && S.petAlloc[cat] < c.petStatMax)
         S.petAlloc[cat]++;
     }
-    const unlocked = [];
+    const unlocked = [], petUnlocked = [];
     const level = this.level();
-    let floor = level, blocked = null;
-    for (const g of Object.keys(c.gates).map(Number).sort((a, b) => a - b)) {
-      if (level < g)
-        break;
-      if (this.gateOk(g)) {
-        if (!S.cleared.includes(g)) {
-          S.cleared.push(g);
-          S.clearedDay[g] = i;
-          unlocked.push(g);
-        }
-      } else {
-        blocked = g;
-        floor = g === 100 ? 99 : g;
-        break;
+    HERO_TITLES.forEach((t, k) => {
+      if (S.titles[k] !== undefined)
+        return;
+      if (level >= t.avg && CATS.every((cat) => this.eff(cat) >= Math.max(1, t.avg - c.balanceGap))) {
+        S.titles[k] = i;
+        unlocked.push(k);
       }
-    }
-    S.floor = Math.max(S.floor, floor);
-    S.blocked = blocked;
+    });
+    const pl = this.petLevel();
+    PET_TITLES.forEach((t, k) => {
+      if (S.petTitles[k] === undefined && pl >= t.lvl) {
+        S.petTitles[k] = i;
+        petUnlocked.push(k);
+      }
+    });
     S.day = i + 1;
-    return { day: i, date, events: ev, floor: S.floor, level, blocked, unlocked };
+    return { day: i, date, events: ev, level, unlocked, petUnlocked };
   }
 }
 function normalize(r, c = RISE) {
@@ -302,6 +336,8 @@ function replayRise(inputs, cfg = {}) {
 }
 export {
   CATS,
+  HERO_TITLES,
+  PET_TITLES,
   RISE,
   ROOMS,
   Rise,
