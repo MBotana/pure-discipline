@@ -119,7 +119,6 @@ S.log = S.log || {}; S.verdict = S.verdict || {};
 const pic = (n, fb, k = 22) => has('icono_' + n) ? `<img class="ico" alt="" src="${url('icono_' + n)}" width="${k}" height="${k}">` : fb;
 const hrs = x => String(+Number(x).toFixed(2)).replace('.', ',') + ' h';
 const roomsOf = inp => inp.rooms ?? (inp.room ? [inp.room] : []);
-const entries = date => S.log[date] || [];
 const hhmm = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 const mealName = t => { const h = +t.slice(0, 2); return h < 11 ? 'Desayuno' : h < 16 ? 'Almuerzo' : h < 20 ? 'Merienda' : 'Cena'; };
 let txOpen = false, txDraft = '', vDraft = '', bkDraft = { t: '', a: '', d: '' };
@@ -129,7 +128,6 @@ const idb = () => dbp || (dbp = new Promise((res, rej) => { try { const r = inde
 const fotoTx = async (mode, fn) => { const db = await idb(); return new Promise((res, rej) => { const t = db.transaction('f', mode), q = fn(t.objectStore('f')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }); };
 const fotoPut = (id, blob) => fotoTx('readwrite', s => s.put(blob, id));
 const fotoGet = id => fotoTx('readonly', s => s.get(id));
-const fotoDel = id => fotoTx('readwrite', s => s.delete(id));
 async function shrink(file, max = 1024) {
   const bmp = await createImageBitmap(file), k = Math.min(1, max / Math.max(bmp.width, bmp.height));
   const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
@@ -324,10 +322,7 @@ function entryHTML(e, date) {
 // ---------- Guarida: Héroe · La bestia · Gimnasio ----------
 const TITLES_ON = false;   // los títulos nuevos se cargan más adelante
 const PET_NAME = 'La bestia';
-const HERO_NAME = 'El Discípulo';
-const SCENES = [['saco', 'Golpeando el saco', '🥊'], ['asador', 'Asando una presa', '🍖'], ['metal', 'Cabeceando heavy metal', '🤘'], ['grimorio', 'Leyendo el libro oscuro', '📕'], ['ki', 'Cargando energía', '⚡'], ['agua', 'Bebiendo agua', '💧'], ['martillo', 'Martillando', '🔨']];
-let petScene = Math.floor(Math.random() * SCENES.length), rpDraft = { t: '', d: '' };
-const rerollScene = () => { petScene = Math.floor(Math.random() * SCENES.length); };
+let rpDraft = { t: '', d: '' };
 
 /** Marca los niveles ya vistos (para el aviso ¡sube!): se hace al dibujar la solapa, no al armar su HTML. */
 function lvlSeen() {
@@ -343,9 +338,8 @@ function viewCamp() {
 }
 
 /** Cabecera de personaje: título, nombre y nivel, y barra de progreso. El personaje va de fondo (ver stageSet). */
-let statOpen = { pet: false };
-function figHead(side, title, sub, pct, btn, dot) {
-  return `<div class="figtxt ${side}">${btn ? `<button class="scrollbtn ${statOpen.pet ? 'on' : ''}" data-act="statopen" data-k="pet" aria-label="Títulos">${pic('pergamino', '📜', 26)}${dot ? '<i class="pdot"></i>' : ''}</button>` : ''}<div class="ttl">${title}</div><div class="sub">${sub}</div><div class="bar gold"><i style="width:${Math.max(0, Math.min(100, pct)).toFixed(1)}%"></i></div></div>`;
+function figHead(side, title, sub, pct) {
+  return `<div class="figtxt ${side}"><div class="ttl">${title}</div><div class="sub">${sub}</div><div class="bar gold"><i style="width:${Math.max(0, Math.min(100, pct)).toFixed(1)}%"></i></div></div>`;
 }
 /** Personaje de fondo, fusionado con la pantalla: peleador a la derecha, bestia a la izquierda, del borde inferior al 70 % de la altura. */
 function stageSet() {
@@ -353,7 +347,7 @@ function stageSet() {
   const on = tab === 'camp' && S.startDate && (SUB.camp === 'her' || SUB.camp === 'pet');
   const ap = document.getElementById('app'); ap.classList.toggle('stage', !!on); ap.classList.toggle('pet', !!on && SUB.camp === 'pet');
   if (!on) { el.innerHTML = ''; return; }
-  const her = SUB.camp === 'her', sc = SCENES[petScene % SCENES.length], img = her ? 'sombra_heroe' : (has('sombra_' + sc[0]) ? 'sombra_' + sc[0] : 'sombra_bestia');
+  const her = SUB.camp === 'her', img = her ? 'sombra_heroe' : 'sombra_bestia';
   el.innerHTML = `<div class="fig ${her ? 'r' : 'l'}"><img alt="" src="${url(img)}"></div>`;
 }
 function campHeroe(e, pre) {
@@ -397,7 +391,7 @@ function viewLogros(hi) {
 
 function campMascota(e, pre) {
   const pp = e.petProgress(), hi = pre ? null : history();
-  return figHead('r', 'La bestia', `Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, false, false) + (hi ? viewRecords(hi) : '') + viewLifts();
+  return figHead('r', 'La bestia', `Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100) + (hi ? viewRecords(hi) : '') + viewLifts();
 }
 
 /** Rutina fija. Series con repeticiones por serie (r) y peso que se anota en el modo gimnasio. */
@@ -608,7 +602,6 @@ addEventListener('resize', fit); addEventListener('orientationchange', () => set
 document.addEventListener('load', e => { if (e.target.tagName === 'IMG') fit(); }, true);
 document.fonts?.ready.then(fit);
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
 /** Texto de XP ganada que sube y se desvanece. */
 function fx(delta) {
   if (delta > 0) { const t = document.createElement('div'); t.className = 'dmg'; t.textContent = '+' + delta; document.body.appendChild(t); setTimeout(() => t.remove(), 950); }
@@ -618,7 +611,6 @@ function fx(delta) {
 let gymForce = false, gymRest = 0, gymTick = null, gymI = -1;
 const gymArrive = () => +(S.settings?.gym_arrive || 0);
 const gymActive = () => { const a = gymArrive(); return gymForce || (a > 0 && Date.now() - a < 6 * 3600e3 && S.gymHide !== a); };
-const lastW = (n, k) => prevW(n, k, wkOf(todayISO()) + 1) ?? '';
 const gymSets = x => (wkOf(todayISO()) % 4 === 3 && dayIdx(todayISO()) >= 0) ? x.r.slice(0, Math.ceil(x.r.length / 2)) : x.r;
 function gymScreen(force) {
   let el = document.getElementById('gymmode');
@@ -668,7 +660,6 @@ function tickGym() {
   const r = document.getElementById('gmr');
   if (r) { if (gymRest > 0 && Date.now() >= gymRest) { gymRest = 0; navigator.vibrate?.(300); } r.textContent = gymRest ? Math.max(0, Math.ceil((gymRest - Date.now()) / 1000)) : 60; r.parentElement.classList.toggle('on', !!gymRest); }
 }
-const spotifyBar = () => '';
 
 // ---------- acciones ----------
 async function login() {
@@ -695,7 +686,7 @@ document.addEventListener('click', async ev => {
   const el = ev.target.closest('[data-act]'); if (!el) return;
   if (el.tagName === 'A') ev.preventDefault();
   const a = el.dataset.act;
-  if (a === 'tab') { tab = el.dataset.t; if (tab === 'camp') rerollScene(); render(); }
+  if (a === 'tab') { tab = el.dataset.t; render(); }
   else if (a === 'gset') {
     const r = RUTINA[wkdayOf(todayISO())], x = r[2][+el.dataset.i], k = +el.dataset.k;
     if (wkOf(todayISO()) % 4 === 3 && dayIdx(todayISO()) >= 0) {
@@ -720,7 +711,7 @@ document.addEventListener('click', async ev => {
   else if (a === 'closemodal') { announce = null; render(); }
   else if (a === 'gear') { if (tab !== 'ajustes') { lastTab = tab; tab = 'ajustes'; errMsg = ''; } render(); }
   else if (a === 'back') { tab = lastTab || 'hoy'; render(); }
-  else if (a === 'sub') { SUB[el.dataset.k] = el.dataset.v; if (el.dataset.k === 'camp' && el.dataset.v === 'pet') rerollScene(); render(); }
+  else if (a === 'sub') { SUB[el.dataset.k] = el.dataset.v; render(); }
   else if (a === 'roomtap') actDay(viewDate, i => { const r = el.dataset.r, s = new Set(roomsOf(i)); if (s.has(r)) s.delete(r); else s.add(r); delete i.room; i.rooms = [...s]; if (!i.rooms.length) delete i.rooms; });
   else if (a === 'readtog') actDay(viewDate, i => { i.read = !i.read; });
   else if (a === 'waterq') { const d = waterQ?.date || todayISO(); waterQ = null; if (el.dataset.v === '1') actDay(d, i => { i.waterMl = (i.waterMl || 0) + 250; }); else render(); }

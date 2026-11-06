@@ -1,7 +1,7 @@
 {
   "name": "Rise",
   "short_name": "Rise",
-  "description": "Life Reset 66: tu torre de 100 pisos",
+  "description": "Hábitos gamificados: niveles, estadísticas y gimnasio",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
