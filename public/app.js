@@ -315,6 +315,7 @@ function viewRegistro() {
     return `<div class="mrow static ${got ? 'on' : ''}"><span class="mic">${got ? '🐾' : '·'}</span><span class="mtx"><b>${t.name}</b><small>${got ? 'desde el ' + pretty(addDays(S.startDate, st.petTitles[g])) : `nivel ${t.lvl}`}</small></span><span class="chk">${got ? '✓' : ''}</span></div>`;
   }).join('') + `</div>`;
   void tIdx;
+  h += viewRecords(h0) + viewLogros(h0);
   // Diario
   const recent = log.slice(-40).reverse();
   h += `<div class="card slim"><h2>Diario</h2>${recent.length ? recent.map(x => `<div class="mrow static"><span class="mic">${logIcon(x.ic)}</span><span class="mtx"><b>${esc(x.t)}</b><small>${pretty(x.date)}</small></span></div>`).join('') : '<p class="mute">Todavía no pasó nada: sumá XP y se va a ir llenando.</p>'}</div>`;
@@ -328,7 +329,7 @@ function entryHTML(e, date) {
 const PET_NAME = 'La bestia';
 const HERO_NAME = 'El Discípulo';
 const SCENES = [['saco', 'Golpeando el saco', '🥊'], ['asador', 'Asando una presa', '🍖'], ['metal', 'Cabeceando heavy metal', '🤘'], ['grimorio', 'Leyendo el libro oscuro', '📕'], ['ki', 'Cargando energía', '⚡'], ['agua', 'Bebiendo agua', '💧'], ['martillo', 'Martillando', '🔨']];
-let petOpen = false, petScene = Math.floor(Math.random() * SCENES.length), rpDraft = { t: '', d: '' };
+let petScene = Math.floor(Math.random() * SCENES.length), rpDraft = { t: '', d: '' };
 const rerollScene = () => { petScene = Math.floor(Math.random() * SCENES.length); };
 
 /** Marca los niveles ya vistos (para el aviso ¡sube!): se hace al dibujar la solapa, no al armar su HTML. */
@@ -344,23 +345,24 @@ function viewCamp() {
   return head + `<div class="iscroll">${SUB.camp === 'pet' ? campMascota(e, pre) : SUB.camp === 'gim' ? campGimnasio(e, pre) : campHeroe(e, pre)}</div>`;
 }
 
+/** Tarjeta de personaje, igual para el luchador y la bestia: imagen, título, nombre y nivel, y un pergamino que abre las estadísticas. */
+let statOpen = { her: false, pet: false };
+function figCard(k, img, title, sub, pct, dot, body) {
+  return `<div class="card hero"><button class="scrollbtn ${statOpen[k] ? 'on' : ''}" data-act="statopen" data-k="${k}" aria-label="Estadísticas">${pic('pergamino', '📜', 26)}${dot ? '<i class="pdot"></i>' : ''}</button><div class="sil"><img class="scene" alt="" src="${url(img)}"></div><div class="ttl">${title}</div><div class="sub">${sub}</div><div class="bar gold"><i style="width:${Math.max(0, Math.min(100, pct)).toFixed(1)}%"></i></div></div>${statOpen[k] ? body : ''}`;
+}
 function campHeroe(e, pre) {
   const st = e.state, seen = S.seenLv || {}, up = CATS.filter(c => e.statLevel(c) > (seen[c] ?? e.statLevel(c))), nt = e.nextTitle(), lv = e.level();
-  const img = `<img class="scene" alt="" src="${url('sombra_heroe')}">`;
-  let h = `<div class="card hero"><div class="sil">${img}</div><div class="ttl">${e.titleName()}</div><div class="sub">${HERO_NAME} · Nivel ${lv} / 99</div></div>`;
-  h += `<div class="card slim"><div class="row"><h2>Estadísticas</h2><span class="pill">total ${e.totalLevel()}</span></div>`;
+  let b = `<div class="card slim"><div class="row"><h2>Estadísticas</h2><span class="pill">total ${e.totalLevel()}</span></div>`;
   for (const c of CATS) {
     const p = e.statProgress(c), a = st.petAlloc[c], bad = nt && e.eff(c) < nt.min;
-    h += `<div style="margin-top:10px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}${bad ? ' <span class="pill bad">baja</span>' : ''}</b><b>${p.level}${a ? ` <small class="mute">+${a}</small>` : ''} / 99</b></div><div class="bar"><i style="width:${(p.pct * 100).toFixed(1)}%"></i></div><small class="mute">${p.max ? 'máximo' : `${fmt(p.into)} / ${fmt(p.cost)} XP para el nivel ${p.level + 1}`}</small></div>`;
+    b += `<div style="margin-top:10px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}${bad ? ' <span class="pill bad">baja</span>' : ''}</b><b>${p.level}${a ? ` <small class="mute">+${a}</small>` : ''} / 99</b></div><div class="bar"><i style="width:${(p.pct * 100).toFixed(1)}%"></i></div><small class="mute">${p.max ? 'máximo' : `${fmt(p.into)} / ${fmt(p.cost)} XP para el nivel ${p.level + 1}`}</small></div>`;
   }
-  h += `<p class="mute">El número chico (+) es lo que suma la bestia.</p></div>`;
+  b += `<p class="mute">El número chico (+) es lo que suma ${PET_NAME}.</p></div>`;
   if (nt) {
-    h += `<div class="card slim"><div class="row"><h2>Próximo título</h2><span class="pill">${nt.name}</span></div><p class="mute" style="margin-top:8px">Pide nivel ${nt.avg} de promedio (te faltan ${nt.missingAvg}) y que ninguna estadística quede por debajo de ${nt.min}.</p>`
+    b += `<div class="card slim"><div class="row"><h2>Próximo título</h2><span class="pill">${nt.name}</span></div><p class="mute" style="margin-top:8px">Pide nivel ${nt.avg} de promedio (te faltan ${nt.missingAvg}) y que ninguna estadística quede por debajo de ${nt.min}.</p>`
       + CATS.map(c => `<div class="row" style="margin-top:6px"><span>${iconTag(c)} ${NAMES[c]}</span><b class="${e.eff(c) < nt.min ? 'lowv' : ''}">${e.eff(c)} / ${nt.min}</b></div><div class="bar"><i style="width:${Math.min(100, e.eff(c) / nt.min * 100)}%"></i></div>`).join('') + `</div>`;
-  } else h += `<div class="card slim"><h2>Inmortal</h2><p class="mute">Llegaste al último título.</p></div>`;
-  const hi = pre ? null : history();
-  if (hi) h += viewRecords(hi) + viewLogros(hi);
-  return h;
+  } else b += `<div class="card slim"><h2>Inmortal</h2><p class="mute">Llegaste al último título.</p></div>`;
+  return figCard('her', 'sombra_heroe', e.titleName(), `${HERO_NAME} · Nivel ${lv}`, nt ? Math.min(100, lv / nt.avg * 100) : 100, false, b);
 }
 function viewRecords(hi) {
   const { e, days, weeks, kMax } = hi, w = weeks[weeks.length - 1], best = k => Math.max(...weeks.map(x => x[k])), sum = k => weeks.reduce((a, x) => a + x[k], 0);
@@ -394,17 +396,12 @@ function viewLogros(hi) {
 
 function campMascota(e, pre) {
   const pp = e.petProgress(), pend = e.petPending(), st = e.state, sc = SCENES[petScene % SCENES.length];
-  let h = `<div class="card slim"><button class="petlvl" data-act="petopen"><div class="row"><h2>${e.petTitleName()} · Nivel ${pp.level}${pend > 0 ? '<i class="pdot"></i>' : ''}</h2><span class="pill gold">${pp.max ? 'máximo' : (pp.pct * 100).toFixed(1).replace('.', ',') + ' %'}</span></div><div class="bar gold"><i style="width:${(pp.pct * 100).toFixed(1)}%"></i></div></button>`;
-  if (petOpen) {
-    h += `<div class="pstats">${pend > 0 ? `<p class="mute">Tenés ${pend} ${pend === 1 ? 'punto' : 'puntos'} para asignar. Una vez asignado no se puede cambiar.</p>` : '<p class="mute">Sin puntos para asignar. Cada nivel de la bestia da 1 punto.</p>'}`
-      + CATS.map(c => { const a = st.petAlloc[c], can = pend > 0 && a < 20 && !pre; return `<div class="prow"><span class="mic">${iconTag(c, 1)}</span><span class="nm"><b>${NAMES[c]}</b><small class="mute"> héroe ${e.statLevel(c)} + mascota ${a} = ${e.eff(c)}</small></span>${can ? `<button class="btn sm" data-act="alloc" data-c="${c}">+1</button>` : `<span class="pill">${a} / 20</span>`}</div>`; }).join('') + `</div>`;
-  }
-  h += `</div>`;
-  const img = `<img class="px scene" alt="${sc[1]}" src="${url(has('sombra_' + sc[0]) ? 'sombra_' + sc[0] : 'sombra_bestia')}">`;
-  h += `<div class="card tama"><div class="pan">${img}</div><span class="cap">${PET_NAME}</span></div>`;
-  { const nx = PET_TITLES.find(t => t.lvl > pp.level); if (nx) h += `<div class="card slim"><div class="row"><h2>Próximo título</h2><span class="pill">${nx.name}</span></div><p class="mute" style="margin-top:8px">Al llegar al nivel ${nx.lvl} (te faltan ${nx.lvl - pp.level}).</p></div>`; }
-  h += `<p class="mute">${PET_NAME} sube de nivel con tu constancia en el gimnasio y cuando mejorás tus pesos o repeticiones. Sus puntos se suman a los tuyos para ganar títulos.</p>`;
-  return h;
+  let b = `<div class="card slim"><div class="row"><h2>Estadísticas</h2><span class="pill gold">${pend} ${pend === 1 ? 'punto' : 'puntos'}</span></div><div class="pstats">${pend > 0 ? `<p class="mute">Tenés ${pend} ${pend === 1 ? 'punto' : 'puntos'} para asignar. Una vez asignado no se puede cambiar.</p>` : '<p class="mute">Sin puntos para asignar. Cada nivel de la bestia da 1 punto.</p>'}`
+    + CATS.map(c => { const a = st.petAlloc[c], can = pend > 0 && a < 20 && !pre; return `<div class="prow"><span class="mic">${iconTag(c, 1)}</span><span class="nm"><b>${NAMES[c]}</b><small class="mute"> luchador ${e.statLevel(c)} + bestia ${a} = ${e.eff(c)}</small></span>${can ? `<button class="btn sm" data-act="alloc" data-c="${c}">+1</button>` : `<span class="pill">${a} / 20</span>`}</div>`; }).join('') + `</div></div>`;
+  const nx = PET_TITLES.find(t => t.lvl > pp.level);
+  if (nx) b += `<div class="card slim"><div class="row"><h2>Próximo título</h2><span class="pill">${nx.name}</span></div><p class="mute" style="margin-top:8px">Al llegar al nivel ${nx.lvl} (te faltan ${nx.lvl - pp.level}).</p></div>`;
+  b += `<p class="mute">${PET_NAME} sube de nivel con tu constancia en el gimnasio y cuando mejorás tus pesos o repeticiones. Sus puntos se suman a los tuyos para ganar títulos.</p>`;
+  return figCard('pet', has('sombra_' + sc[0]) ? 'sombra_' + sc[0] : 'sombra_bestia', e.petTitleName(), `${PET_NAME} · Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, pend > 0, b);
 }
 
 function campGimnasio(e, pre) {
@@ -590,7 +587,7 @@ document.addEventListener('click', async ev => {
     if (wkdayOf(d) < 5 && mealsOf(d).length && !inp.meals) mealClose(d);
   }
   else if (a === 'reopen') setInput(viewDate, i => { i.closed = false; i.meals = false; });
-  else if (a === 'petopen') { petOpen = !petOpen; render(); }
+  else if (a === 'statopen') { statOpen[el.dataset.k] = !statOpen[el.dataset.k]; render(); }
   else if (a === 'alloc') {
     if (dayIdx(todayISO()) < 0) return;
     const before = dayGain(todayISO()); setInput(todayISO(), i => { i.alloc = [...(i.alloc || []), el.dataset.c]; }); void before; fx(0);
