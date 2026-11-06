@@ -238,7 +238,7 @@ test('mascota que habla: Gemini redacta con los hechos y Telegram entrega; error
       const b = JSON.parse(init.body); assert.equal(b.chat_id, '123'); assert.ok(b.text.length > 0);
       return tgStatus === 200 ? new Response('{"ok":true}', { status: 200 }) : new Response(JSON.stringify({ ok: false, description: 'chat not found' }), { status: 400 });
     }
-    const body = JSON.parse(init.body); assert.match(body.systemInstruction.parts[0].text, /bestia/i); assert.match(body.contents[0].parts[0].text, /gimnasio/);
+    const body = JSON.parse(init.body); assert.match(body.systemInstruction.parts[0].text, /Behemot/); assert.match(body.contents[0].parts[0].text, /gimnasio/);
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '"Dale, levantate y andá al gimnasio."' }] } }] }), { status: 200 });
   }) as any;
   try {
@@ -251,56 +251,5 @@ test('mascota que habla: Gemini redacta con los hechos y Telegram entrega; error
     tgStatus = 400;
     r = await call(e, 'POST', '/api/push/test', { pet: 'behemot' }, T).then(x => x.json());
     assert.equal(r.telegram, false); assert.match(r.error, /chat not found/);
-  } finally { globalThis.fetch = real; }
-});
-
-import { decide, parseMacros, type Ctx } from '../src/avisos.ts';
-const ctxBase = (o: Partial<Ctx> = {}): Ctx => ({ date: '2026-11-12', hour: 15, dow: 4, weekStart: '2026-11-09', gymMinSem: 200, ambientesSem: 5, leyoHoy: true, protHoy: 120,
-  nivel: { h: 5, p: 3, stats: { F: 5, I: 5, V: 5, D: 5, O: 5 } }, nivelPrev: { h: 5, p: 3, stats: { F: 5, I: 5, V: 5, D: 5, O: 5 } }, ...o });
-
-test('avisos: lectura de macros del texto de Gemini', () => {
-  assert.deepEqual(parseMacros('Esta comida: ~600 kcal · 40 g de proteína\nAcumulado hoy: ~1.250 kcal · 95 g de proteína (meta 150 g)'), { kcal: 1250, prot: 95 });
-  assert.deepEqual(parseMacros('PUNTAJE: 90%\nMacros del día (aprox.): proteína 148 g · carbohidratos 200 g · grasas 60 g · ~2100 kcal'), { kcal: 2100, prot: 148 });
-  assert.equal(parseMacros('sin datos'), null);
-});
-
-test('avisos: qué dice la bestia y qué dice el hombre', () => {
-  assert.deepEqual(decide(ctxBase()), [], 'tarde y todo bien: no dice nada');
-  assert.deepEqual(decide(ctxBase({ hour: 8, protHoy: 0, leyoHoy: false })), [], 'de madrugada no molesta');
-  let a = decide(ctxBase({ hour: 22, protHoy: 60 }));
-  assert.deepEqual(a.map(x => [x.kind, x.voz]), [['b_prot', 'behemot']]); assert.match(a[0].fallback, /FALTA PROTEEE/);
-  assert.equal(decide(ctxBase({ hour: 22, protHoy: null })).filter(x => x.kind === 'b_prot').length, 1, 'sin comidas cargadas también reclama');
-  assert.ok(decide(ctxBase({ hour: 22, protHoy: 100 })).every(x => x.kind !== 'b_prot'), 'con 90 g o más no grita');
-  a = decide(ctxBase({ hour: 20, gymMinSem: 100 }));
-  assert.deepEqual(a.map(x => x.kind), ['b_gym_poco']); assert.equal(a[0].date, '2026-11-09', 'una vez por semana');
-  assert.deepEqual(decide(ctxBase({ dow: 6, hour: 13, gymMinSem: 300 })).map(x => x.kind), ['b_gym_sab']);
-  a = decide(ctxBase({ dow: 2, gymMinSem: 370 }));
-  assert.deepEqual(a.map(x => x.kind), ['b_gym_listo']); assert.match(a[0].hechos, /antes de que termine/);
-  a = decide(ctxBase({ nivel: { h: 5, p: 4, stats: { F: 5, I: 5, V: 5, D: 5, O: 5 } } }));
-  assert.deepEqual(a.map(x => x.kind), ['b_nivel:4']); assert.match(a[0].hechos, /SOY UNA BESTIAAAA/);
-  a = decide(ctxBase({ hour: 21, leyoHoy: false }));
-  assert.deepEqual(a.map(x => [x.kind, x.voz]), [['h_leer', 'hombre']]);
-  a = decide(ctxBase({ dow: 5, hour: 18, ambientesSem: 2 }));
-  assert.deepEqual(a.map(x => x.kind), ['h_ordenar']); assert.match(a[0].hechos, /2 de 5/);
-  a = decide(ctxBase({ nivel: { h: 6, p: 3, stats: { F: 7, I: 5, V: 5, D: 5, O: 5 } } }));
-  assert.equal(a.length, 1); assert.equal(a[0].voz, 'hombre'); assert.match(a[0].hechos, /Fuerza 7/);
-  assert.deepEqual(decide(ctxBase({ nivelPrev: null, nivel: { h: 9, p: 9, stats: { F: 9, I: 9, V: 9, D: 9, O: 9 } } })), [], 'la primera lectura es solo el punto de partida');
-});
-
-test('avisos: se envían una sola vez, solo con Telegram configurado, y guardan la proteína del día', async () => {
-  const { runAvisos } = await import('../src/worker.ts');
-  const e: any = env(); const T = 'clave-larga-1';
-  await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-02' });
-  await call(e, 'POST', '/api/sync', { device: 'x', changes: [{ date: '2026-11-04', input: { acc: { kcal: 900, prot: 40 } }, updated_at: 1 }] }, T);
-  const at = Date.UTC(2026, 10, 4, 22, 0) + 3 * 3600e3 - 0;            // 22:00 hora local (UTC-3)
-  assert.deepEqual(await runAvisos(e, at, true), ['b_prot', 'h_leer'], 'vista previa: solo lista');
-  assert.deepEqual(await runAvisos(e, at), [], 'sin Telegram no envía');
-  const real = globalThis.fetch; const tg: string[] = [];
-  globalThis.fetch = (async (url: any, init: any) => { if (String(url).includes('telegram')) { tg.push(String(url).split('/')[3] + ':' + JSON.parse(init.body).text); return new Response('{"ok":true}'); } return new Response('{}', { status: 500 }); }) as any;
-  try {
-    e.TELEGRAM_BOT_BEHEMOT = 'b1'; e.TELEGRAM_BOT_HOMBRE = 'h1'; e.TELEGRAM_CHAT_ID = '123';
-    assert.deepEqual(await runAvisos(e, at), ['b_prot', 'h_leer']);
-    assert.equal(tg.length, 2); assert.match(tg[0], /^botb1:FALTA PROTEEE/); assert.match(tg[1], /^both1:Hoy no leíste/, 'sin IA usa el texto fijo');
-    assert.deepEqual(await runAvisos(e, at), [], 'no repite');
   } finally { globalThis.fetch = real; }
 });

@@ -94,14 +94,10 @@ async function gemini(env: Env, system: string, parts: unknown[], temperature = 
   }
   throw Object.assign(new Error('La IA no respondió (' + last + ')'), { status: 502 });
 }
-import { decide, parseMacros, type Ctx } from './avisos.ts';
-import { Rise, CATS } from '../engine/src/engine/rise.ts';
-
 // ---------- Mascotas que hablan (Gemini redacta, Telegram entrega) ----------
 // El servidor decide SI hay algo que decir y qué hechos pasaron; Gemini solo decide CÓMO decirlo, con la voz de la mascota.
 const PERSONAS: Record<string, string> = {
-  behemot: 'Sos La bestia, una criatura de fuerza bruta que entrena junto a su dueño. Hablás directo, seco y exigente, con respeto y algo de orgullo; nunca humillás. Cuando los hechos piden un grito, gritás en MAYÚSCULAS con letras alargadas (por ejemplo FALTA PROTEEE). Rioplatense, tuteo con "vos".',
-  hombre: 'Sos El hombre, el personaje del propio usuario: su versión más disciplinada. Hablás sereno, firme y breve, como quien se exige a sí mismo, sin gritar. Rioplatense, tuteo con "vos".',
+  behemot: 'Sos Behemot, una bestia de fuerza bruta que entrena junto a su dueño. Hablás directo, seco y exigente, con respeto y algo de orgullo; nunca humillás. Rioplatense, tuteo con "vos".',
 };
 const PET_RULES = 'Escribí UN mensaje de 1 o 2 frases, máximo 220 caracteres, en español rioplatense. Usá SOLO los hechos que te paso: no inventes números, horas, ejercicios ni logros. Sin comillas, sin hashtags, como mucho un emoji. Si hay un reproche, que sea firme pero que deje una salida concreta para hoy.';
 async function petMessage(env: Env, pet: string, facts: string): Promise<string> {
@@ -150,7 +146,6 @@ async function saveVerdict(env: Env, date: string, text: string, fin: boolean) {
   const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
   const input = row ? JSON.parse(row.input as string) : {}, score = parseScore(text), weekday = dowOf(date) >= 1 && dowOf(date) <= 5;
   if (text) input.verdictTx = text; else delete input.verdictTx;
-  const mac = parseMacros(text); if (mac) input.acc = mac;
   if (weekday && score !== null) input.foodPct = Math.round(score) / 100;
   const closed = fin && weekday && score !== null;
   if (closed) { input.meals = true; delete input.food; delete input.meat; delete input.veg; }
@@ -191,40 +186,6 @@ export async function runReminders(env: Env, origin: string, now = Date.now()) {
     await once('feed', 'Rise', 'Cargá el veredicto de alimentación de hoy y revisá tus horas de videojuegos.');
   if (hour >= Number(st.reminder_hour) && isEmptyInput(row ? (row.input as string) : null))
     await once('daily', 'Rise', 'Todavía no registraste nada hoy. ¿Cómo te fue?');
-  return sent;
-}
-
-/** Revisa si hay algo que decir por Telegram (el hombre o la bestia) y lo envía una sola vez. Sin Telegram configurado no hace nada. */
-export async function runAvisos(env: Env, now = Date.now(), dry = false) {
-  const st = await readSettings(env);
-  if (!st.start_date) return [];
-  const local = new Date(now + Number(st.tz_offset) * 60000), date = local.toISOString().slice(0, 10), hour = local.getUTCHours(), dow = local.getUTCDay();
-  const idx = Math.round((Date.parse(date) - Date.parse(st.start_date)) / 864e5);
-  if (idx < 0) return [];
-  const rows = (await env.DB.prepare('SELECT date, input FROM day_inputs WHERE date >= ? AND date <= ?').bind(st.start_date, date).all()).results as { date: string; input: string }[];
-  const by: Record<string, any> = {}; for (const r of rows) { try { by[r.date] = JSON.parse(r.input); } catch { /* ignorar */ } }
-  const e = new Rise({ startDate: st.start_date });
-  for (let i = 0; i <= idx; i++) e.processDay(by[new Date(Date.parse(st.start_date) + i * 864e5).toISOString().slice(0, 10)] ?? {});
-  const hoy = by[date] ?? {};
-  const nivel = { h: e.level(), p: e.petLevel(), stats: Object.fromEntries(CATS.map(c => [c, e.statLevel(c)])) as Record<string, number> };
-  const prevRaw = await getSetting(env, 'av_nivel');
-  const wd = (dow + 6) % 7, weekStart = new Date(Date.parse(date) - wd * 864e5).toISOString().slice(0, 10);
-  const ctx: Ctx = { date, hour, dow, weekStart, gymMinSem: e.state.wk.min, ambientesSem: e.state.wk.rooms.length, leyoHoy: !!hoy.read, protHoy: hoy.acc ? Number(hoy.acc.prot) : null, nivel, nivelPrev: prevRaw ? JSON.parse(prevRaw) : null };
-  const avisos = decide(ctx);
-  if (!dry) await putSetting(env, 'av_nivel', JSON.stringify(nivel));
-  const sent: string[] = [];
-  for (const a of avisos) {
-    if (await env.DB.prepare('SELECT 1 AS x FROM notification_log WHERE kind = ? AND date = ?').bind(a.kind, a.date).first()) continue;
-    if (dry) { sent.push(a.kind); continue; }
-    const token = env[`TELEGRAM_BOT_${a.voz.toUpperCase()}` as `TELEGRAM_BOT_${string}`];
-    if (!token || !env.TELEGRAM_CHAT_ID) continue;
-    let text = a.fallback;
-    try { text = await petMessage(env, a.voz, a.hechos); } catch { /* sin IA: queda el texto fijo */ }
-    const r = await sendTelegram(env, a.voz, text);
-    if (!r.ok) continue;
-    await env.DB.prepare('INSERT OR IGNORE INTO notification_log (kind, date, sent_at) VALUES (?, ?, ?)').bind(a.kind, a.date, now).run();
-    sent.push(a.kind);
-  }
   return sent;
 }
 
@@ -454,8 +415,6 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     await env.DB.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(b.endpoint ?? '').run();
     return json({ ok: true });
   }
-  // Qué avisos de Telegram saltarían ahora (sin enviar nada).
-  if (path === '/api/avisos/preview' && m === 'GET') return json({ avisos: await runAvisos(env, Date.now(), true) });
   if (path === '/api/push/test' && m === 'POST') {
     const b: any = await req.json().catch(() => ({}));
     // Con ?pet=behemot: la mascota habla por Telegram (Gemini redacta con hechos de ejemplo). Sin Telegram configurado, cae al aviso web normal.
@@ -506,7 +465,6 @@ export default {
   scheduled: async (_e: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }) => {
     const origin = (await getSetting(env, 'origin')) ?? 'https://pure-discipline.workers.dev';
     ctx.waitUntil(runReminders(env, origin));
-    ctx.waitUntil(runAvisos(env).then(() => undefined, () => undefined));
     ctx.waitUntil(runSteam(env).then(() => undefined, () => undefined));
   },
 };
