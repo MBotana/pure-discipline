@@ -146,7 +146,7 @@ test('títulos de la mascota: por nivel', () => {
   e.state.petXp = 400; const d = e.processDay({});
   assert.deepEqual(d.petUnlocked, [0]); assert.equal(e.petTitleName(), PET_TITLES[0].name);
   e.state.petXp = 1e9; const d2 = e.processDay({});
-  assert.equal(e.petTitleName(), 'Bahamut'); assert.equal(d2.petUnlocked.length, PET_TITLES.length - 1);
+  assert.equal(e.petTitleName(), 'Bestia suprema'); assert.equal(d2.petUnlocked.length, PET_TITLES.length - 1);
 });
 
 test('mascota: el punto se asigna a elección, máximo 20 por estadística y sin pasar de los puntos ganados', () => {

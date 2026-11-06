@@ -64,9 +64,9 @@ export const HERO_TITLES: readonly { avg: number; name: string }[] = [
 ];
 /** Títulos de la mascota: por nivel. */
 export const PET_TITLES: readonly { lvl: number; name: string }[] = [
-  { lvl: 1, name: 'Cría de sombra' }, { lvl: 10, name: 'Sombra joven' }, { lvl: 20, name: 'Cazadora' },
-  { lvl: 35, name: 'Bestia curtida' }, { lvl: 50, name: 'Devoradora' }, { lvl: 65, name: 'Terror nocturno' },
-  { lvl: 80, name: 'Señora del abismo' }, { lvl: 100, name: 'Bahamut' },
+  { lvl: 1, name: 'Cría de sombra' }, { lvl: 10, name: 'Sombra joven' }, { lvl: 20, name: 'Cazador' },
+  { lvl: 35, name: 'Bestia curtida' }, { lvl: 50, name: 'Devorador' }, { lvl: 65, name: 'Terror nocturno' },
+  { lvl: 80, name: 'Señor del abismo' }, { lvl: 100, name: 'Bestia suprema' },
 ];
 
 const zero = (): Record<Cat, number> => ({ F: 0, I: 0, V: 0, D: 0, O: 0 });

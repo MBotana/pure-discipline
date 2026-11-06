@@ -228,8 +228,8 @@ function viewHoy() {
     h += infoRow('V', 'Vitalidad', `comida L–V: promedio ${wk.food.length ? pc(avg) : '—'} (hace falta ${pc(cfg.foodThr)})`, miniBar(avg, cfg.foodThr), wk.food.length > 0 && avg >= cfg.foodThr - 1e-9);
     h += infoRow('O', 'Orden', `${wk.rooms.length} de ${cfg.cleanRoomsWeek} ambientes distintos de ${ROOMS.length}`, pips(wk.rooms.length, cfg.cleanRoomsWeek), wk.rooms.length >= cfg.cleanRoomsWeek);
     h += infoRow('D', 'Disciplina', `juegos ${hrs(gH)} de ${hrs(cap)}`, '', gH <= cap);
-    h += infoRow('P', 'Mascota · constancia', `${wk.sess} sesiones · mínimo ${need} para mantener la racha`, pips(Math.min(wk.sess, 5), 5), wk.sess >= need);
-    h += infoRow('P', 'Mascota · progreso', `${wk.prog} ejercicio${wk.prog === 1 ? '' : 's'} mejorado${wk.prog === 1 ? '' : 's'} (${e.weekType(pre ? 0 : idx) === 'carga' ? 'más peso' : '1 repetición más'})`, '', wk.prog > 0);
+    h += infoRow('P', 'La bestia · constancia', `${wk.sess} sesiones · mínimo ${need} para mantener la racha`, pips(Math.min(wk.sess, 5), 5), wk.sess >= need);
+    h += infoRow('P', 'La bestia · progreso', `${wk.prog} ejercicio${wk.prog === 1 ? '' : 's'} mejorado${wk.prog === 1 ? '' : 's'} (${e.weekType(pre ? 0 : idx) === 'carga' ? 'más peso' : '1 repetición más'})`, '', wk.prog > 0);
     h += `<p class="mute">Racha: semana ${st.k} · ×${String(+mult.toFixed(2)).replace('.', ',')}. Fuerza, Vitalidad, Orden y Disciplina pagan al cerrar la semana (domingo).</p></div>`;
   } else {
     const avg = mo.food.length ? mo.food.reduce((a, x) => a + x, 0) / mo.food.length : 0;
@@ -239,7 +239,7 @@ function viewHoy() {
     h += infoRow('I', 'Inteligencia', `${mo.books} libro${mo.books === 1 ? '' : 's'} este mes · el primero vale el doble (se cargan en Registro)`, '', mo.books > 0);
     h += infoRow('O', 'Orden', `${mo.repairs} arreglo${mo.repairs === 1 ? '' : 's'} este mes · el primero vale el doble (Registro)`, '', mo.repairs > 0);
     h += infoRow('D', 'Disciplina', mo.discOk ? 'todas las semanas dentro del tope de juegos' : 'una semana se pasó del tope: este mes no suma', '', mo.discOk);
-    h += infoRow('P', 'Mascota · ciclo de 4 semanas', `${st.cyc.length} de ${cfg.cycleNeed} ejercicios distintos con progreso`, miniBar(st.cyc.length, cfg.cycleNeed), st.cyc.length >= cfg.cycleNeed);
+    h += infoRow('P', 'La bestia · ciclo de 4 semanas', `${st.cyc.length} de ${cfg.cycleNeed} ejercicios distintos con progreso`, miniBar(st.cyc.length, cfg.cycleNeed), st.cyc.length >= cfg.cycleNeed);
     h += `</div>`;
   }
   return h;
@@ -292,7 +292,7 @@ function viewRegistro() {
     const d = `${ym}-${pad(q + 1)}`, inp = S.days[d]?.input ?? {};
     return `<span class="${isSess(inp) ? 'on' : (inp.gymMin || inp.gym) ? 'some' : ''} ${d === today ? 'today' : ''}">${q + 1}</span>`;
   }).join('');
-  let h = `<div class="card slim"><div class="row"><h2>Racha de la mascota</h2><span class="pill gold">semana ${st.k} · ×${String(+mult.toFixed(2)).replace('.', ',')}</span></div><div class="mute">Sesiones esta semana: ${st.wk.sess} (mínimo ${needSessions(st.k)} para no cortarla) · mejor racha: ${h0.kMax} semanas</div><div class="cal">${'LMXJVSD'.split('').map(x => `<span class="blank">${x}</span>`).join('')}${cells}</div></div>`;
+  let h = `<div class="card slim"><div class="row"><h2>Racha de la bestia</h2><span class="pill gold">semana ${st.k} · ×${String(+mult.toFixed(2)).replace('.', ',')}</span></div><div class="mute">Sesiones esta semana: ${st.wk.sess} (mínimo ${needSessions(st.k)} para no cortarla) · mejor racha: ${h0.kMax} semanas</div><div class="cal">${'LMXJVSD'.split('').map(x => `<span class="blank">${x}</span>`).join('')}${cells}</div></div>`;
   // Libros
   const books = [], reps = [];
   for (const [d, v] of Object.entries(S.days)) { (v.input?.books ?? []).forEach((b, k) => books.push({ d, k, ...b })); (v.input?.repairs ?? []).forEach((b, k) => reps.push({ d, k, ...b })); }
@@ -322,8 +322,9 @@ function viewRegistro() {
 function entryHTML(e, date) {
   return `<div class="entry">${e.kind === 'photo' ? `<img class="thumb" data-ph="${e.id}" alt="">` : '<span class="mic">✍️</span>'}<span class="mtx"><b>${e.t} · ${mealName(e.t)}</b><small class="dsc">${esc(e.descr)}</small></span></div>`;
 }
-// ---------- Campamento: Héroe · Mascota · Gimnasio ----------
-const PET_NAME = 'Bahamut';
+// ---------- Guarida: Héroe · La bestia · Gimnasio ----------
+const PET_NAME = 'La bestia';
+const HERO_NAME = 'El Discípulo';
 const SCENES = [['saco', 'Golpeando el saco', '🥊'], ['asador', 'Asando una presa', '🍖'], ['metal', 'Cabeceando heavy metal', '🤘'], ['grimorio', 'Leyendo el libro oscuro', '📕'], ['ki', 'Cargando energía', '⚡'], ['agua', 'Bebiendo agua', '💧'], ['martillo', 'Martillando', '🔨']];
 let petOpen = false, petScene = Math.floor(Math.random() * SCENES.length), rpDraft = { t: '', d: '' };
 const rerollScene = () => { petScene = Math.floor(Math.random() * SCENES.length); };
@@ -335,23 +336,22 @@ function lvlSeen() {
   if (up.length || !S.seenLv) { S.seenLv = Object.fromEntries(CATS.map(c => [c, e.statLevel(c)])); save(); }
 }
 function viewCamp() {
-  if (!S.startDate) return `<h1>Campamento</h1><div class="card mute">Disponibles al ingresar.</div>`;
-  const head = `<h1>Campamento</h1>` + subtabs('camp', [['her', 'Héroe'], ['pet', 'Mascota'], ['gim', 'Gimnasio']]) + '<!--fit-->';
+  if (!S.startDate) return `<h1>Guarida</h1><div class="card mute">Disponibles al ingresar.</div>`;
+  const head = `<h1>Guarida</h1>` + subtabs('camp', [['her', 'Luchador'], ['pet', 'Bestia'], ['gim', 'Gimnasio']]) + '<!--fit-->';
   const { e, pre } = current();
   return head + `<div class="iscroll">${SUB.camp === 'pet' ? campMascota(e, pre) : SUB.camp === 'gim' ? campGimnasio(e, pre) : campHeroe(e, pre)}</div>`;
 }
 
-const SIL = `<svg viewBox="0 0 120 150" class="silsvg" aria-hidden="true"><defs><radialGradient id="sg" cx="50%" cy="35%" r="70%"><stop offset="0" stop-color="#3a3a3a"/><stop offset="1" stop-color="#050505"/></radialGradient></defs><path d="M60 8c-16 0-26 11-26 26 0 8 3 14 7 18-18 8-30 24-32 48l-4 42h110l-4-42c-2-24-14-40-32-48 4-4 7-10 7-18 0-15-10-26-26-26z" fill="url(#sg)" stroke="#bdbdbd" stroke-width="1.2"/><rect x="46" y="31" width="10" height="2.4" fill="#fff"/><rect x="64" y="31" width="10" height="2.4" fill="#fff"/></svg>`;
 function campHeroe(e, pre) {
   const st = e.state, seen = S.seenLv || {}, up = CATS.filter(c => e.statLevel(c) > (seen[c] ?? e.statLevel(c))), nt = e.nextTitle(), lv = e.level();
-  const img = has('sombra_heroe') ? `<img class="scene" alt="" src="${url('sombra_heroe')}">` : SIL;
-  let h = `<div class="card hero"><div class="sil">${img}</div><div class="ttl">${e.titleName()}</div><div class="sub">Nivel ${lv} / 99</div></div>`;
+  const img = `<img class="scene" alt="" src="${url('sombra_heroe')}">`;
+  let h = `<div class="card hero"><div class="sil">${img}</div><div class="ttl">${e.titleName()}</div><div class="sub">${HERO_NAME} · Nivel ${lv} / 99</div></div>`;
   h += `<div class="card slim"><div class="row"><h2>Estadísticas</h2><span class="pill">total ${e.totalLevel()}</span></div>`;
   for (const c of CATS) {
     const p = e.statProgress(c), a = st.petAlloc[c], bad = nt && e.eff(c) < nt.min;
     h += `<div style="margin-top:10px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}${bad ? ' <span class="pill bad">baja</span>' : ''}</b><b>${p.level}${a ? ` <small class="mute">+${a}</small>` : ''} / 99</b></div><div class="bar"><i style="width:${(p.pct * 100).toFixed(1)}%"></i></div><small class="mute">${p.max ? 'máximo' : `${fmt(p.into)} / ${fmt(p.cost)} XP para el nivel ${p.level + 1}`}</small></div>`;
   }
-  h += `<p class="mute">El número chico (+) es lo que suma tu mascota.</p></div>`;
+  h += `<p class="mute">El número chico (+) es lo que suma la bestia.</p></div>`;
   if (nt) {
     h += `<div class="card slim"><div class="row"><h2>Próximo título</h2><span class="pill">${nt.name}</span></div><p class="mute" style="margin-top:8px">Pide nivel ${nt.avg} de promedio (te faltan ${nt.missingAvg}) y que ninguna estadística quede por debajo de ${nt.min}.</p>`
       + CATS.map(c => `<div class="row" style="margin-top:6px"><span>${iconTag(c)} ${NAMES[c]}</span><b class="${e.eff(c) < nt.min ? 'lowv' : ''}">${e.eff(c)} / ${nt.min}</b></div><div class="bar"><i style="width:${Math.min(100, e.eff(c) / nt.min * 100)}%"></i></div>`).join('') + `</div>`;
@@ -367,7 +367,7 @@ function viewRecords(hi) {
     ['Sesiones', 'sesiones', w.sess, best('sess'), days.filter(d => isSess(d.inp)).length],
     ['XP ganada', 'XP', Math.round(w.xp), Math.round(best('xp')), Math.round(sum('xp'))],
     ['Progresos de peso o repeticiones', 'ejercicios', w.prog, best('prog'), sum('prog')],
-    ['Racha de la mascota', 'semanas', e.state.k, kMax, null],
+    ['Racha de la bestia', 'semanas', e.state.k, kMax, null],
   ];
   let t = `<div class="card slim"><div class="rtab rhead"><span></span><span>Esta semana</span><span>Histórico</span></div>`;
   for (const [nm, u, now, bst, tot] of rows) t += `<div class="rtab"><span class="rl"><b>${nm}</b><small>${u}</small></span><span class="rv ${now > 0 && now >= bst ? 'rec' : ''}">${fmt(now)}${now > 0 && now >= bst ? ' 🏅' : ''}</span><span class="rh"><small>mejor</small> ${fmt(bst)}${tot === null ? '' : `<br><small>total</small> ${fmt(tot)}`}</span></div>`;
@@ -378,13 +378,13 @@ function viewLogros(hi) {
   const sess = days.filter(d => isSess(d.inp)).length, bestWeek = Math.max(...weeks.map(x => x.sess)), prog = weeks.reduce((a, x) => a + x.prog, 0), nT = Object.keys(st.titles).length;
   const M = [
     ['🥊', '10 sesiones', 'Gimnasio y boxeo', sess, 10], ['🥊', '50 sesiones', 'Gimnasio y boxeo', sess, 50], ['🥊', '100 sesiones', 'Gimnasio y boxeo', sess, 100], ['🔥', 'Semana de 5', 'Cinco sesiones en una semana', bestWeek, 5],
-    ['📆', '4 semanas seguidas', 'Racha de la mascota', kMax - 1, 4], ['📆', '12 semanas', 'Racha de la mascota', kMax - 1, 12], ['🌙', '26 semanas', 'Racha de la mascota', kMax - 1, 26],
+    ['📆', '4 semanas seguidas', 'Racha de la bestia', kMax - 1, 4], ['📆', '12 semanas', 'Racha de la bestia', kMax - 1, 12], ['🌙', '26 semanas', 'Racha de la bestia', kMax - 1, 26],
     ['📈', 'Primer progreso', 'Peso o repeticiones', prog, 1], ['📈', '25 progresos', 'Peso o repeticiones', prog, 25],
     ['📚', 'Primer libro', 'Libros leídos', st.totals.books, 1], ['📚', '6 libros', 'Libros leídos', st.totals.books, 6], ['📚', '12 libros', 'Libros leídos', st.totals.books, 12],
     ['🔧', 'Primer arreglo', 'Arreglos', st.totals.repairs, 1],
     ['▲', 'Nivel 10', 'Nivel del héroe', e.level(), 10], ['▲', 'Nivel 25', 'Nivel del héroe', e.level(), 25], ['▲', 'Nivel 50', 'Nivel del héroe', e.level(), 50], ['▲', 'Nivel 75', 'Nivel del héroe', e.level(), 75], ['▲', 'Nivel 99', 'Nivel del héroe', e.level(), 99],
     ['♛', '3 títulos', 'Títulos del héroe', nT, 3], ['♛', '6 títulos', 'Títulos del héroe', nT, 6], ['♛', '11 títulos', 'Todos los títulos', nT, 11],
-    ['🐾', `${PET_NAME} nivel 25`, 'Mascota', e.petLevel(), 25], ['🐾', `${PET_NAME} nivel 100`, 'Mascota', e.petLevel(), 100],
+    ['🐾', `${PET_NAME} nivel 25`, 'Bestia', e.petLevel(), 25], ['🐾', `${PET_NAME} nivel 100`, 'Bestia', e.petLevel(), 100],
   ];
   const got = M.filter(m => m[3] >= m[4]).length;
   return `<div class="card slim"><div class="row"><h2>Logros</h2><span class="pill ${got ? 'gold' : ''}">${got} / ${M.length}</span></div><div class="medals">${M.map(([ic, nm, ds, n, g]) => `<div class="medal ${n >= g ? 'on' : ''}"><span class="mi">${ic}</span><b>${nm}</b><small>${ds}</small><span class="mini"><i style="width:${Math.min(100, Math.max(0, n) / g * 100)}%"></i></span><small>${Math.min(Math.max(0, n), g)} / ${g}</small></div>`).join('')}</div></div>`;
@@ -394,12 +394,12 @@ function campMascota(e, pre) {
   const pp = e.petProgress(), pend = e.petPending(), st = e.state, sc = SCENES[petScene % SCENES.length];
   let h = `<div class="card slim"><button class="petlvl" data-act="petopen"><div class="row"><h2>${e.petTitleName()} · Nivel ${pp.level}${pend > 0 ? '<i class="pdot"></i>' : ''}</h2><span class="pill gold">${pp.max ? 'máximo' : (pp.pct * 100).toFixed(1).replace('.', ',') + ' %'}</span></div><div class="bar gold"><i style="width:${(pp.pct * 100).toFixed(1)}%"></i></div></button>`;
   if (petOpen) {
-    h += `<div class="pstats">${pend > 0 ? `<p class="mute">Tenés ${pend} ${pend === 1 ? 'punto' : 'puntos'} para asignar. Una vez asignado no se puede cambiar.</p>` : '<p class="mute">Sin puntos para asignar. Cada nivel de la mascota da 1 punto.</p>'}`
+    h += `<div class="pstats">${pend > 0 ? `<p class="mute">Tenés ${pend} ${pend === 1 ? 'punto' : 'puntos'} para asignar. Una vez asignado no se puede cambiar.</p>` : '<p class="mute">Sin puntos para asignar. Cada nivel de la bestia da 1 punto.</p>'}`
       + CATS.map(c => { const a = st.petAlloc[c], can = pend > 0 && a < 20 && !pre; return `<div class="prow"><span class="mic">${iconTag(c, 1)}</span><span class="nm"><b>${NAMES[c]}</b><small class="mute"> héroe ${e.statLevel(c)} + mascota ${a} = ${e.eff(c)}</small></span>${can ? `<button class="btn sm" data-act="alloc" data-c="${c}">+1</button>` : `<span class="pill">${a} / 20</span>`}</div>`; }).join('') + `</div>`;
   }
   h += `</div>`;
-  const img = has('sombra_' + sc[0]) ? `<img class="px scene" alt="${sc[1]}" src="${url('sombra_' + sc[0])}">` : `<div class="scenefb"><span>${sc[2]}</span></div>`;
-  h += `<div class="card tama">${img}<span class="cap">${PET_NAME} · ${sc[1]}</span></div>`;
+  const img = `<img class="px scene" alt="${sc[1]}" src="${url(has('sombra_' + sc[0]) ? 'sombra_' + sc[0] : 'sombra_bestia')}">`;
+  h += `<div class="card tama"><div class="pan">${img}</div><span class="cap">${PET_NAME}</span></div>`;
   { const nx = PET_TITLES.find(t => t.lvl > pp.level); if (nx) h += `<div class="card slim"><div class="row"><h2>Próximo título</h2><span class="pill">${nx.name}</span></div><p class="mute" style="margin-top:8px">Al llegar al nivel ${nx.lvl} (te faltan ${nx.lvl - pp.level}).</p></div>`; }
   h += `<p class="mute">${PET_NAME} sube de nivel con tu constancia en el gimnasio y cuando mejorás tus pesos o repeticiones. Sus puntos se suman a los tuyos para ganar títulos.</p>`;
   return h;
@@ -444,7 +444,7 @@ function viewAjustes() {
 }
 
 const VIEWS = { hoy: viewHoy, reg: viewReg, camp: viewCamp, ajustes: viewAjustes };
-const NAV = [['hoy', '◉', 'Objetivos'], ['reg', '☰', 'Registro'], ['camp', '☾', 'Campamento']];
+const NAV = [['hoy', '◉', 'Objetivos'], ['reg', '☰', 'Registro'], ['camp', '☾', 'Guarida']];
 /** Aviso de título nuevo (héroe o mascota), una sola vez. */
 let announce = null;
 function titleSeen() {

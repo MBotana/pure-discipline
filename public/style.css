@@ -4,7 +4,7 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;height:100dvh;overflow:hidden;overscroll-behavior:none;touch-action:manipulation;-webkit-text-size-adjust:100%;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;background:var(--bg);color:var(--ink);font:500 15px/1.4 var(--fb)}
 body{background:radial-gradient(120% 60% at 50% 0,var(--bg2) 0,var(--bg) 72%) fixed}
-img{filter:grayscale(1)}
+img:not(.scene){filter:grayscale(1)}
 #app{position:fixed;left:0;right:0;top:0;bottom:var(--bot,60px);overflow:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:calc(env(safe-area-inset-top) + 20px) max(14px,calc((100vw - 560px)/2 + 14px)) 6px}
 #app::-webkit-scrollbar{display:none}
 #fit,#fitp{display:flow-root}
@@ -93,10 +93,13 @@ img.ico{display:inline-block;vertical-align:middle;margin-right:6px;image-render
 .dmg{position:fixed;left:50%;top:38%;transform:translateX(-50%);font:900 26px var(--fd);color:var(--hi);text-shadow:0 0 14px var(--hi);animation:float .95s ease-out forwards;pointer-events:none;z-index:25}
 @keyframes float{from{transform:translate(-50%,0);opacity:1}to{transform:translate(-50%,-50px);opacity:0}}
 .hero{text-align:center;padding:18px 14px 14px;overflow:hidden}
+/* Baki oscuro: bordes duros, sombra seca, trazo grueso */
+.card{border-width:2px;border-color:var(--line2);box-shadow:4px 4px 0 #000}:root[data-theme=papel] .card{box-shadow:4px 4px 0 var(--line2)}
+.ttl,h1{text-shadow:2px 2px 0 #000}:root[data-theme=papel] .ttl,:root[data-theme=papel] h1{text-shadow:none}
 .hero::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 60% at 50% 38%,rgba(255,255,255,.10),transparent 70%);pointer-events:none}
 :root[data-theme=papel] .hero::before{background:radial-gradient(60% 60% at 50% 38%,rgba(0,0,0,.08),transparent 70%)}
-.sil{display:flex;justify-content:center;position:relative}.silsvg{width:120px;height:150px}.sil img.scene{max-height:200px;max-width:100%}
-:root[data-theme=papel] .silsvg{filter:invert(1)}
+.sil,.tama .pan{background:#efefef;border:2px solid var(--hi);box-shadow:5px 5px 0 var(--line2);display:flex;justify-content:center;position:relative;overflow:hidden}
+.sil img.scene,.tama img.scene{display:block;max-height:300px;max-width:100%;mix-blend-mode:multiply}
 .ttl{font:900 24px/1.1 var(--fd);letter-spacing:.16em;text-transform:uppercase;color:var(--hi);margin-top:8px}
 .sub{font:600 11px var(--fd);letter-spacing:.3em;text-transform:uppercase;color:var(--mute);margin-top:6px}
 .lowv{color:var(--mute);text-decoration:underline dotted}
@@ -104,10 +107,9 @@ img.ico{display:inline-block;vertical-align:middle;margin-right:6px;image-render
 .pdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--hi);margin-left:7px;vertical-align:middle;animation:blink 1.4s ease-in-out infinite}
 @keyframes blink{50%{opacity:.25}}
 .pstats .prow{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line)}.pstats .nm{flex:1;min-width:0}.pstats .btn.sm{padding:5px 12px}
-.tama{position:relative;min-height:200px;display:grid;place-items:center;text-align:center;overflow:hidden;padding:14px}
-.tama img.scene{max-width:100%;max-height:240px}
+.tama{padding:12px}
 .scenefb{display:flex;flex-direction:column;align-items:center;gap:8px}.scenefb>span{font-size:40px;filter:grayscale(1)}
-.tama .cap{position:absolute;left:10px;bottom:6px;font:600 10px var(--fd);letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.tama .cap{display:block;margin-top:8px;font:600 10px var(--fd);letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px}
 .cal span{aspect-ratio:1;display:grid;place-items:center;font-size:11px;background:var(--field);border:1px solid var(--line);color:var(--mute)}
 .cal span.on{background:var(--hi);border-color:var(--hi);color:var(--inv)}.cal span.some{border-color:var(--line2)}.cal span.today{outline:1px solid var(--hi)}.cal span.blank{background:none;border:0}

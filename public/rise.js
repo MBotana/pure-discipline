@@ -70,12 +70,12 @@ var HERO_TITLES = [
 var PET_TITLES = [
   { lvl: 1, name: "Cría de sombra" },
   { lvl: 10, name: "Sombra joven" },
-  { lvl: 20, name: "Cazadora" },
+  { lvl: 20, name: "Cazador" },
   { lvl: 35, name: "Bestia curtida" },
-  { lvl: 50, name: "Devoradora" },
+  { lvl: 50, name: "Devorador" },
   { lvl: 65, name: "Terror nocturno" },
-  { lvl: 80, name: "Señora del abismo" },
-  { lvl: 100, name: "Bahamut" }
+  { lvl: 80, name: "Señor del abismo" },
+  { lvl: 100, name: "Bestia suprema" }
 ];
 var zero = () => ({ F: 0, I: 0, V: 0, D: 0, O: 0 });
 function ladder(k, idx) {
