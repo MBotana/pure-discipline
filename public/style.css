@@ -156,3 +156,14 @@ ul.plan{margin:8px 0 0;padding-left:18px;font-size:14px}ul.plan li{margin:3px 0}
 select{font:inherit;font-size:15px;color:var(--ink);background:var(--field);border:1px solid var(--line2);padding:8px;height:40px;flex:1;min-width:0;border-radius:0}
 .fig.l{height:52%;left:-10%}
 #app.stage .scrollbtn{background:transparent;border:0;box-shadow:none;width:36px;height:36px}
+
+.rtab.two{grid-template-columns:1.6fr 1fr}
+#gymmode{overflow:hidden}.gm-list{display:none}
+.gm-step{display:flex;justify-content:space-between;align-items:center;font:600 12px var(--fd);letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}.gm-step b{color:var(--hi);font-size:15px}
+.gm-ex.col{gap:12px;padding:16px}.gm-ex.col .gm-n{font-size:18px}.gm-set{grid-template-columns:1fr 96px 24px 54px}.gm-set .gm-w{height:54px;font-size:22px}.gm-ok{width:54px;height:54px}.gm-rp b{font-size:26px}
+.gm-tg{height:54px;display:grid;place-items:center;font:800 24px var(--fd);border:2px dashed var(--line2)}
+.gm-ex.big{min-height:120px;justify-content:space-between;padding:18px}.gm-ex.big .gm-n{font-size:20px}
+.gm-feel{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center}.gm-feel span{grid-column:1/-1;font-size:12px}
+.gm-feel button{height:40px;border:2px solid var(--line2);background:transparent;color:var(--ink);font:700 12px var(--fd);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}.gm-feel button.on{background:var(--hi);border-color:var(--hi);color:var(--inv)}
+.gm-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px}.gm-nav .btn[disabled]{opacity:.3}
+.gm-foot{margin-top:auto;position:static}

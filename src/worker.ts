@@ -346,6 +346,25 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     const r = await saveVerdict(env, date, text, b.final === true || /^(si|sí|true|1)$/i.test(String(b.final ?? '')));
     return json({ ok: true, date, status: r.status, closed: r.closed });
   }
+  // ----- Plan de carga: la IA ajusta el aumento semanal de cada ejercicio, siempre dentro de un rango acotado -----
+  if (path === '/api/plan' && m === 'POST') {
+    const b: any = await req.json().catch(() => ({}));
+    const ex: any[] = Array.isArray(b.ejercicios) ? b.ejercicios.slice(0, 30) : [];
+    const base: Record<string, number> = {};
+    for (const e of ex) base[String(e.ejercicio)] = Number(e.aumento_base) || 2.5;
+    const plan: Record<string, { d: number }> = {};
+    for (const k of Object.keys(base)) plan[k] = { d: base[k] };
+    try {
+      const sys = 'Sos un entrenador que ajusta cargas de un adulto que busca tonificar y perder grasa. Recibís el historial de cada ejercicio (semanas anteriores, series con peso y repeticiones, y cómo se sintió: fácil, justo o duro). Para cada ejercicio decidí cuántos kg SUMAR sobre el peso de la semana anterior en esta fase. Reglas: si faltaron series o repeticiones, o se sintió duro, sumá 0 o la mitad del aumento base; si se sintió justo y se completó todo, el aumento base; si se sintió fácil y se completó todo, hasta el doble del aumento base. Si no hay dato de sensación, el aumento base. Respondé SOLO un JSON {"<ejercicio>": {"d": <kg>}} sin texto extra.';
+      const t = await gemini(env, sys, [{ text: `Fase: ${b.fase}\n${JSON.stringify(ex)}` }], 0.1);
+      const j = JSON.parse(t.replace(/^```(?:json)?|```$/gim, '').trim());
+      for (const k of Object.keys(base)) {
+        const d = Number(j?.[k]?.d);
+        if (Number.isFinite(d)) plan[k] = { d: Math.round(Math.min(Math.max(d, 0), base[k] * 2) * 2) / 2 };
+      }
+    } catch { /* si la IA falla queda el aumento base */ }
+    return json({ plan });
+  }
   // ----- Alimentación con IA: cada comida se describe, se guarda y se rehace el análisis de todo el día -----
   if (path === '/api/meals' && m === 'GET') {
     await ensureMeals(env); const date = url.searchParams.get('date') ?? '';

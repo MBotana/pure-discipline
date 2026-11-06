@@ -94,7 +94,7 @@ async function sync() {
     syncMsg = e.status === 401 ? 'Clave inválida: volvé a ingresar.' : 'Sin conexión: se sincroniza más tarde.';
     if (e.status === 401) S.token = '';
   }
-  syncing = false; save(); render(); autoClose();
+  syncing = false; save(); render(); autoClose(); ensurePlan();
 }
 /** Los días anteriores se cierran solos: se fija el puntaje final de la comida. */
 const closing = new Set();
@@ -406,14 +406,8 @@ function viewLogros(hi) {
 }
 
 function campMascota(e, pre) {
-  const pp = e.petProgress(), st = e.state, sc = SCENES[petScene % SCENES.length];
-  let b = `<div class="card slim"><div class="row"><h2>Títulos</h2><span class="pill gold">${Object.keys(st.petTitles).length} / ${PET_TITLES.length}</span></div>` + PET_TITLES.map((t, g) => {
-    const got = st.petTitles[g] !== undefined;
-    return `<div class="mrow static ${got ? 'on' : ''}"><span class="mic">${got ? pic('titulo', '♛', 24) : '·'}</span><span class="mtx"><b>${t.name}</b><small>${got ? 'desde el ' + pretty(addDays(S.startDate, st.petTitles[g])) : `nivel ${t.lvl}`}</small></span><span class="chk">${got ? '✓' : ''}</span></div>`;
-  }).join('') + `</div>`;
-  b += `<p class="mute">${PET_NAME} sube de nivel con tu constancia en el gimnasio y cuando mejorás tus pesos o repeticiones.</p>`;
-  const hi = pre ? null : history();
-  return figHead('r', e.petTitleName(), `${PET_NAME} · Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, true, false) + (hi ? viewRecords(hi) : '') + (statOpen.pet ? b : '') + viewLifts();
+  const pp = e.petProgress(), hi = pre ? null : history();
+  return figHead('r', e.petTitleName(), `${PET_NAME} · Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, false, false) + (hi ? viewRecords(hi) : '') + viewLifts();
 }
 
 /** Rutina fija. Series con repeticiones por serie (r) y peso que se anota en el modo gimnasio. */
@@ -435,8 +429,51 @@ function rutinaCards(pre) {
   return `<div class="card slim"><div class="row"><h2>Hoy · ${hoy[0]}</h2><span class="pill gold">${hoy[1]}</span></div>${lista(hoy)}<details><summary>Toda la semana</summary>${RUTINA.map(r => `<div class="row" style="margin-top:10px"><b>${r[0]}</b><span class="pill">${r[1]}</span></div>${lista(r)}`).join('')}</details></div>`
     + `<div class="card slim"><details><summary>Comidas del día · ~2.000 kcal</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: ~150 g de proteína y 2 litros de agua por día.</p></details></div>`;
 }
-/** Récords de peso: por cada levantamiento, el máximo con 12 repeticiones o más y el máximo absoluto. */
-const LIFTS = [['Banco plano', 'Press de pecho'], ['Sentadilla', 'Sentadilla'], ['Peso muerto', 'Peso muerto convencional'], ['Prensa', 'Prensa'], ['Press de hombros', 'Press de hombros']];
+/** Fases del bloque de 4 semanas: base, progresiva, máxima y descarga. */
+const FASES = ['Carga base', 'Carga progresiva', 'Carga máxima', 'Descarga'];
+const wkOf = d => Math.max(0, Math.floor(dayIdx(d) / 7));
+const wkMonday = wk => addDays(S.startDate, wk * 7);
+const incOf = n => RUTINA[4][2].some(x => x.n === n) ? 5 : 2.5;
+const r5 = x => Math.round(x * 2) / 2;
+/** Series hechas de un ejercicio en una semana (por número de serie). */
+function wkLift(n, wk) {
+  const out = [], s0 = wkMonday(wk);
+  for (let q = 0; q < 7; q++) { const a = S.days[addDays(s0, q)]?.input?.lifts?.[n]; if (a) a.forEach((x, k) => { if (x?.ok && x.w > 0) out[k] = { w: +x.w, r: +x.r }; }); }
+  return out;
+}
+const weekFeel = (n, wk) => { for (let q = 0; q < 7; q++) { const f = S.days[addDays(wkMonday(wk), q)]?.input?.feel?.[n]; if (f) return f; } return ''; };
+/** Último peso hecho en la serie k de semanas anteriores. */
+function prevW(n, k, wk) {
+  for (let j = wk - 1; j >= Math.max(0, wk - 8); j--) { const a = wkLift(n, j), f = a[k] || a.filter(Boolean).pop(); if (f) return f.w; }
+  return null;
+}
+/** Peso que corresponde a la serie k según la fase (vacío si no hay base). */
+function target(n, k, wk) {
+  const p = wk % 4, pw = prevW(n, k, wk);
+  if (pw === null) return '';
+  if (p === 0) return pw;
+  if (p === 3) return r5(pw * 0.8);
+  return r5(pw + (S.days[wkMonday(wk)]?.input?.plan?.[n]?.d ?? incOf(n)));
+}
+/** Al empezar una semana de carga progresiva o máxima, la IA ajusta el aumento (dentro de un rango) y queda fijo toda la semana. */
+const planAsked = new Set();
+async function ensurePlan() {
+  if (!S.token || !S.startDate || dayIdx(todayISO()) < 0) return;
+  const wk = wkOf(todayISO()), p = wk % 4, mon = wkMonday(wk);
+  if (p < 1 || p > 2 || S.days[mon]?.input?.plan || planAsked.has(wk)) return;
+  planAsked.add(wk);
+  const ex = [];
+  RUTINA.forEach(d => d[2].forEach(x => {
+    if (!x.r) return;
+    const hist = [];
+    for (let j = wk - 1; j >= Math.max(0, wk - 4); j--) { const a = wkLift(x.n, j); if (a.filter(Boolean).length) hist.push({ semana: j + 1, fase: FASES[j % 4], series: x.r.map((rp, k) => a[k] ? { reps_objetivo: rp, peso: a[k].w, reps: a[k].r } : { reps_objetivo: rp, hecha: false }), sensacion: weekFeel(x.n, j) || 'sin dato' }); }
+    if (hist.length) ex.push({ ejercicio: x.n, aumento_base: incOf(x.n), historial: hist });
+  }));
+  if (!ex.length) return;
+  try { const r = await api('/api/plan', 'POST', { fase: FASES[p], ejercicios: ex }); if (r.plan) { const cur = S.days[mon]; S.days[mon] = { input: { ...(cur?.input || {}), plan: r.plan }, updated_at: Date.now(), dirty: true }; save(); clearTimeout(timer); timer = setTimeout(sync, 1500); } } catch { planAsked.delete(wk); }
+}
+/** Un récord por ejercicio: el máximo peso con las repeticiones que hiciste. */
+const LIFTS = ['Press de pecho', 'Sentadilla', 'Peso muerto convencional', 'Prensa', 'Press de hombros'];
 function liftSets() {
   const out = [];
   for (const [d, v] of Object.entries(S.days)) {
@@ -445,24 +482,25 @@ function liftSets() {
   }
   return out;
 }
-function liftRecords(sets) {
-  return LIFTS.map(([nm, key]) => {
-    const l = sets.filter(x => x.n === key), r12 = l.filter(x => x.r >= 12).sort((a, b) => b.w - a.w || b.r - a.r)[0], mx = l.sort((a, b) => b.w - a.w || b.r - a.r)[0];
-    return { nm, key, r12, mx };
-  });
-}
+const liftRecords = sets => LIFTS.map(nm => ({ nm, mx: sets.filter(x => x.n === nm).sort((a, b) => b.w - a.w || b.r - a.r)[0] }));
 const kg = w => `${String(+(+w).toFixed(1)).replace('.', ',')} kg`;
 function viewLifts() {
   const rec = liftRecords(liftSets());
-  let h = `<div class="card slim"><div class="row"><h2>Récords de peso</h2></div><div class="rtab rhead"><span></span><span>A 12 reps</span><span>Máximo</span></div>`;
-  h += rec.map(r => `<div class="rtab"><span class="rl"><b>${r.nm}</b></span><span class="rv ${r.r12 ? 'rec' : ''}">${r.r12 ? kg(r.r12.w) : '—'}</span><span class="rh">${r.mx ? `<b>${kg(r.mx.w)}</b> × ${r.mx.r}` : '—'}</span></div>`).join('');
-  h += `<div class="row" style="margin-top:10px;gap:6px"><select id="rl">${LIFTS.map(l => `<option value="${esc(l[1])}">${l[0]}</option>`).join('')}</select><input id="rw" type="text" inputmode="decimal" placeholder="kg" style="width:64px"><input id="rr" type="text" inputmode="numeric" placeholder="reps" style="width:64px"><button class="btn sm" data-act="recadd">Anotar</button></div><p class="mute">Se actualizan solos con lo que anotás en el modo gimnasio. Acá podés cargar un récord anterior.</p></div>`;
+  let h = `<div class="card slim"><div class="row"><h2>Récords de peso</h2></div>`;
+  h += rec.map(r => `<div class="rtab two"><span class="rl"><b>${r.nm}</b></span><span class="rh">${r.mx ? `<b>${kg(r.mx.w)}</b> × ${r.mx.r}` : '—'}</span></div>`).join('');
+  h += `<div class="row" style="margin-top:10px;gap:6px"><select id="rl">${LIFTS.map(l => `<option value="${esc(l)}">${l}</option>`).join('')}</select><input id="rw" type="text" inputmode="decimal" placeholder="kg" style="width:64px"><input id="rr" type="text" inputmode="numeric" placeholder="reps" style="width:64px"><button class="btn sm" data-act="recadd">Anotar</button></div></div>`;
   return h;
 }
+const FASE_TXT = [
+  'Elegí tus pesos y hacé las repeticiones que corresponden, dejando 2 o 3 en el tanque. Lo que anotes es tu base.',
+  'Superá la semana anterior: el modo gimnasio te da el peso que corresponde a cada serie.',
+  'Semana más exigente, con un peso de partida sobre lo que hiciste en la progresiva. Técnica perfecta, 0 o 1 repetición de reserva.',
+  'Peso al 80% y la mitad de las series. No se anotan pesos: solo hacé lo que dice la pantalla.'
+];
 function campGimnasio(e, pre) {
-  const wt = e.weekType(pre ? 0 : dayIdx(todayISO()));
-  let h = `<button class="btn" style="width:100%;margin-bottom:12px" data-act="gopen">Abrir modo gimnasio</button>` + rutinaCards(pre) + `<div class="card slim"><div class="row"><h2>Semana de ${wt}</h2><span class="pill ${wt === 'descarga' ? 'gold' : ''}">${wt === 'carga' ? 'subí el peso' : 'una repetición más'}</span></div><div class="mute">${wt === 'carga' ? 'En las semanas de carga el progreso es usar más peso que tu mejor marca (llegando al mínimo del rango de repeticiones).' : 'En la descarga el progreso es una repetición más con el mismo peso que la última descarga. Un peso nuevo queda como base.'}</div></div>`;
-  return h;
+  const ph = (pre ? 0 : wkOf(todayISO())) % 4;
+  return `<button class="btn" style="width:100%;margin-bottom:12px" data-act="gopen">Abrir modo gimnasio</button>` + rutinaCards(pre)
+    + `<div class="card slim"><div class="row"><h2>${FASES[ph]}</h2><span class="pill ${ph === 3 ? 'gold' : ''}">semana ${ph + 1} de 4</span></div><div class="mute">${FASE_TXT[ph]}</div></div>`;
 }
 
 const SUB = { ajustes: 'gen', camp: 'her' };
@@ -587,36 +625,46 @@ function fx(delta) {
 }
 
 // ---------- Modo gimnasio ----------
-let gymForce = false, gymRest = 0, gymTick = null;
+let gymForce = false, gymRest = 0, gymTick = null, gymI = 0;
 const gymArrive = () => +(S.settings?.gym_arrive || 0);
 const gymActive = () => { const a = gymArrive(); return gymForce || (a > 0 && Date.now() - a < 6 * 3600e3 && S.gymHide !== a); };
-const lastW = (n, i) => { const f = Object.entries(S.days).filter(([d]) => d < todayISO()).sort((a, b) => b[0].localeCompare(a[0])).map(([, v]) => v.input?.lifts?.[n]).find(a => a && a.some(x => x?.ok)); return f ? (f[i]?.w ?? f.filter(x => x?.ok).pop()?.w ?? '') : ''; };
+const lastW = (n, k) => prevW(n, k, wkOf(todayISO()) + 1) ?? '';
+const gymSets = x => (wkOf(todayISO()) % 4 === 3 && dayIdx(todayISO()) >= 0) ? x.r.slice(0, Math.ceil(x.r.length / 2)) : x.r;
 function gymScreen(force) {
   let el = document.getElementById('gymmode');
   if (!gymActive() || !S.token) { el?.remove(); if (gymTick) { clearInterval(gymTick); gymTick = null; } return; }
   if (el && !force) return;                       // no se redibuja solo: así no se pierde lo que estás escribiendo
   if (!el) { el = document.createElement('div'); el.id = 'gymmode'; document.body.appendChild(el); }
-  const today = todayISO(), r = RUTINA[wkdayOf(today)], L = S.days[today]?.input?.lifts ?? {}, done = (S.gymDone ||= {})[today] ||= {};
-  const sets = r[2].filter(x => x.r), total = sets.reduce((a, x) => a + x.r.length, 0), made = sets.reduce((a, x) => a + x.r.filter((_, k) => L[x.n]?.[k]?.ok).length, 0);
-  el.innerHTML = `<div class="gm-head"><span>Modo gimnasio</span><b id="gmt"></b></div><h1>${r[0]} · ${r[1]}</h1><div class="bar gold"><i style="width:${total ? made / total * 100 : 0}%"></i></div>`
-    + `<div class="gm-list">${r[2].map((x, i) => {
-      if (!x.r) { const ok = !!done[i]; return `<button class="gm-ex ${ok ? 'ok' : ''}" data-act="gcheck" data-i="${i}"><span class="gm-n">${esc(x.n)}<small>${esc(x.t || '')}</small></span><span class="gm-dots"><i class="${ok ? 'f' : ''}"></i></span></button>`; }
-      const all = x.r.every((_, k) => L[x.n]?.[k]?.ok);
-      return `<div class="gm-ex col ${all ? 'ok' : ''}"><span class="gm-n">${esc(x.n)}</span>${x.r.map((rp, k) => { const c = L[x.n]?.[k], w = c?.w ?? lastW(x.n, k); return `<div class="gm-set ${c?.ok ? 'ok' : ''}"><span class="gm-rp"><b>${rp}</b> reps</span><input class="gm-w" type="text" inputmode="decimal" placeholder="kg" value="${w === '' || w === undefined ? '' : String(w).replace('.', ',')}" data-gw="${esc(x.n)}" data-k="${k}"><span class="mute">kg</span><button class="gm-ok" data-act="gset" data-i="${i}" data-k="${k}" aria-label="Serie hecha">${c?.ok ? '✓' : ''}</button></div>`; }).join('')}</div>`;
-    }).join('')}</div>`
-    + `<div class="gm-foot"><button class="btn" data-act="grest">Descanso <span id="gmr">60</span> s</button>${spotifyBar()}<button class="undo" data-act="gexit">Salir del modo</button></div>`;
+  const today = todayISO(), r = RUTINA[wkdayOf(today)], items = r[2], wk = wkOf(today), ph = wk % 4, des = ph === 3 && dayIdx(today) >= 0;
+  const inp = S.days[today]?.input ?? {}, L = inp.lifts ?? {}, D = inp.dl ?? {}, done = (S.gymDone ||= {})[today] ||= {};
+  gymI = Math.max(0, Math.min(gymI, items.length - 1));
+  const okEx = (x, i) => x.r ? gymSets(x).every((_, k) => des ? D[x.n]?.[k] : L[x.n]?.[k]?.ok) : !!done[i];
+  const made = items.filter((x, i) => okEx(x, i)).length, x = items[gymI];
+  let card;
+  if (x.r) {
+    const rows = gymSets(x).map((rp, k) => {
+      const c = L[x.n]?.[k], t = target(x.n, k, wk), w = c?.w ?? t, on = des ? D[x.n]?.[k] : c?.ok;
+      const mid = des ? `<span class="gm-tg">${t === '' ? '—' : String(t).replace('.', ',')}</span>` : `<input class="gm-w" type="text" inputmode="decimal" placeholder="kg" value="${w === '' || w === undefined ? '' : String(w).replace('.', ',')}" data-gw="${esc(x.n)}" data-k="${k}">`;
+      return `<div class="gm-set ${on ? 'ok' : ''}"><span class="gm-rp"><b>${rp}</b> reps</span>${mid}<span class="mute">kg</span><button class="gm-ok" data-act="gset" data-i="${gymI}" data-k="${k}" aria-label="Serie hecha">${on ? '✓' : ''}</button></div>`;
+    }).join('');
+    const f = inp.feel?.[x.n];
+    const feel = des ? '' : `<div class="gm-feel"><span class="mute">¿Cómo se sintió?</span>${[['f', 'Fácil'], ['j', 'Justo'], ['d', 'Duro']].map(([v, l]) => `<button class="${f === v ? 'on' : ''}" data-act="gfeel" data-v="${v}">${l}</button>`).join('')}</div>`;
+    card = `<div class="gm-ex col ${okEx(x, gymI) ? 'ok' : ''}"><span class="gm-n">${esc(x.n)}</span>${rows}${feel}</div>`;
+  } else card = `<button class="gm-ex big ${okEx(x, gymI) ? 'ok' : ''}" data-act="gcheck" data-i="${gymI}"><span class="gm-n">${esc(x.n)}<small>${esc(x.t || '')}</small></span><span class="gm-dots"><i class="${okEx(x, gymI) ? 'f' : ''}"></i></span></button>`;
+  el.innerHTML = `<div class="gm-head"><span>${dayIdx(today) >= 0 ? FASES[ph] : 'Modo gimnasio'}</span><b id="gmt"></b></div><h1>${r[0]} · ${r[1]}</h1><div class="bar gold"><i style="width:${made / items.length * 100}%"></i></div>`
+    + `<div class="gm-step"><span>Ejercicio <b>${gymI + 1}</b> / ${items.length}</span>${des ? '<span class="pill gold">solo seguí lo que dice</span>' : ''}</div>${card}`
+    + `<div class="gm-nav"><button class="btn ghost" data-act="gnav" data-d="-1" ${gymI === 0 ? 'disabled' : ''}>‹ Anterior</button><button class="btn" data-act="gnav" data-d="1" ${gymI === items.length - 1 ? 'disabled' : ''}>Siguiente ›</button></div>`
+    + `<div class="gm-foot"><button class="btn ghost" data-act="grest">Descanso <span id="gmr">60</span> s</button><button class="undo" data-act="gexit">Salir del modo</button></div>`;
   tickGym();
   if (!gymTick) gymTick = setInterval(tickGym, 1000);
 }
 /** Si en la semana superaste tu mejor marca anterior de un ejercicio, cuenta como progreso (una vez por ejercicio). */
 function autoProg(date, name) {
-  const wkS = addDays(date, -wkdayOf(date)), wt = dayIdx(date) >= 0 ? newRise().weekType(dayIdx(date)) : 'carga';
+  const wkS = addDays(date, -wkdayOf(date));
   const prev = liftSets0().filter(x => x.n === name && x.d < wkS), now = liftSets0().filter(x => x.n === name && x.d >= wkS && x.d <= addDays(wkS, 6));
   if (!prev.length || !now.length) return;
   const pw = Math.max(...prev.map(x => x.w)), best = now.sort((a, b) => b.w - a.w || b.r - a.r)[0];
-  const pr = Math.max(...prev.filter(x => x.w === best.w).map(x => x.r), 0);
-  const up = wt === 'carga' ? best.w > pw : (best.w > pw || (best.w === pw && best.r > pr));
-  if (up) setInput(date, i => { i.prog = [...new Set([...(i.prog || []), name])]; });
+  if (best.w > pw) setInput(date, i => { i.prog = [...new Set([...(i.prog || []), name])]; });
 }
 const liftSets0 = () => { const out = []; for (const [d, v] of Object.entries(S.days)) for (const [n, arr] of Object.entries(v.input?.lifts ?? {})) for (const x of arr || []) if (x?.ok && x.w > 0) out.push({ d, n, w: +x.w, r: +x.r }); return out; };
 function tickGym() {
@@ -654,12 +702,21 @@ document.addEventListener('click', async ev => {
   const a = el.dataset.act;
   if (a === 'tab') { tab = el.dataset.t; if (tab === 'camp') rerollScene(); render(); }
   else if (a === 'gset') {
-    const r = RUTINA[wkdayOf(todayISO())], x = r[2][+el.dataset.i], k = +el.dataset.k, inp = document.querySelector(`#gymmode input[data-gw="${CSS.escape(x.n)}"][data-k="${k}"]`);
+    const r = RUTINA[wkdayOf(todayISO())], x = r[2][+el.dataset.i], k = +el.dataset.k;
+    if (wkOf(todayISO()) % 4 === 3 && dayIdx(todayISO()) >= 0) {
+      const was = S.days[todayISO()]?.input?.dl?.[x.n]?.[k];
+      setInput(todayISO(), i => { const d = { ...(i.dl || {}) }, a2 = [...(d[x.n] || [])]; a2[k] = !was; d[x.n] = a2; i.dl = d; });
+      if (!was) gymRest = Date.now() + 60000;
+      gymScreen(true); return;
+    }
+    const inp = document.querySelector(`#gymmode input[data-gw="${CSS.escape(x.n)}"][data-k="${k}"]`);
     const w = parseFloat((inp?.value || '').replace(',', '.')) || 0, cur = S.days[todayISO()]?.input?.lifts?.[x.n]?.[k];
     setInput(todayISO(), i => { const a2 = ((i.lifts ||= {})[x.n] ||= []); a2[k] = cur?.ok ? { ...cur, ok: false } : { w, r: x.r[k], ok: true }; for (let q = 0; q < x.r.length; q++) a2[q] ||= null; });
     if (!cur?.ok) { gymRest = Date.now() + 60000; autoProg(todayISO(), x.n); }
     gymScreen(true);
   }
+  else if (a === 'gnav') { gymI += +el.dataset.d; gymScreen(true); }
+  else if (a === 'gfeel') { const r = RUTINA[wkdayOf(todayISO())], x = r[2][gymI], v = el.dataset.v; setInput(todayISO(), i => { const f = { ...(i.feel || {}) }; f[x.n] = f[x.n] === v ? undefined : v; i.feel = f; }); gymScreen(true); }
   else if (a === 'gcheck') { const g = (S.gymDone ||= {})[todayISO()] ||= {}; g[+el.dataset.i] = !g[+el.dataset.i]; save(); gymScreen(true); }
   else if (a === 'recadd') {
     const n = document.getElementById('rl').value, w = parseFloat(document.getElementById('rw').value.replace(',', '.')), rp = parseInt(document.getElementById('rr').value, 10);
@@ -694,8 +751,7 @@ document.addEventListener('click', async ev => {
     if (wkdayOf(d) < 5 && mealsOf(d).length && !inp.meals) mealClose(d);
   }
   else if (a === 'reopen') setInput(viewDate, i => { i.closed = false; i.meals = false; });
-  else if (a === 'statopen') { statOpen.pet = !statOpen.pet; render(); }
-  else if (a === 'alloc') {
+    else if (a === 'alloc') {
     if (dayIdx(todayISO()) < 0) return;
     const before = dayGain(todayISO()); setInput(todayISO(), i => { i.alloc = [...(i.alloc || []), el.dataset.c]; }); void before; fx(0);
   }
