@@ -104,6 +104,8 @@ const fmt = n => Math.round(n).toLocaleString('es-AR');
 
 // ---------- alimentación: comidas del día (foto o texto), evaluación y cierre ----------
 S.log = S.log || {}; S.verdict = S.verdict || {};
+/** Ícono propio (si existe el PNG) o el símbolo provisorio. */
+const pic = (n, fb, k = 22) => has('icono_' + n) ? `<img class="ico" alt="" src="${url('icono_' + n)}" width="${k}" height="${k}">` : fb;
 const hrs = x => String(+Number(x).toFixed(2)).replace('.', ',') + ' h';
 const roomsOf = inp => inp.rooms ?? (inp.room ? [inp.room] : []);
 const entries = date => S.log[date] || [];
@@ -175,10 +177,10 @@ const infoRow = (cat, label, meta, right, done) => `<div class="mrow static ${do
 
 /** Tarjeta de comidas del día: lista, carga (foto o texto) y el puntaje que va dando la IA. */
 function foodCard(date, inp, locked) {
-  if (wkdayOf(date) >= 5) return `<div class="card slim"><h2>Comidas</h2><p class="mute">Fin de semana: tus permitidos. La comida no puntúa.</p></div>`;
+  if (wkdayOf(date) >= 5) return `<div class="card slim"><h2>${pic('comida', '')} Comidas</h2><p class="mute">Fin de semana: tus permitidos. La comida no puntúa.</p></div>`;
   const list = mealsOf(date), isToday = date === todayISO(), pre = dayIdx(date) < 0, off = pre || !!busy || locked || !isToday;
   const sc = inp.foodPct, cls = sc >= 0.8 ? 'ok' : sc >= 0.5 ? 'gold' : sc !== undefined ? 'bad' : '';
-  let h = `<div class="card slim"><div class="row"><h2>Comidas</h2><span class="pill ${cls}">${sc === undefined ? 'sin puntuar' : (inp.meals ? 'final ' : 'va ') + pc(sc)}</span></div>`;
+  let h = `<div class="card slim"><div class="row"><h2>${pic('comida', '')} Comidas</h2><span class="pill ${cls}">${sc === undefined ? 'sin puntuar' : (inp.meals ? 'final ' : 'va ') + pc(sc)}</span></div>`;
   h += list.length ? list.map(x => entryHTML(x, date)).join('') : '<p class="mute">Todavía no cargaste ninguna comida.</p>';
   h += txOpen && isToday ? `<div class="row" style="margin-top:10px"><button class="btn sm ghost" data-act="pickfoto" ${busy ? 'disabled' : ''}>📷 ${pendBlob ? 'Cambiar foto' : 'Agregar foto'}</button>${pendBlob ? `<img class="thumb" src="${pendURL}" alt="">` : '<span class="mute">sin foto</span>'}</div><textarea id="txin" rows="3" placeholder="${pendBlob ? 'Descripción breve (opcional, por las dudas)' : 'Qué comiste (ej.: 2 milanesas con ensalada y agua)'}">${esc(txDraft)}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="txcancel" ${busy ? 'disabled' : ''}>Cancelar</button><button class="btn sm" data-act="mealsend" ${busy ? 'disabled' : ''}>Enviar</button></div>`
     : `<button class="btn" style="margin-top:10px;width:100%" ${off ? 'disabled' : 'data-act="txopen"'}>Cargar comida</button>`;
@@ -209,11 +211,11 @@ function viewHoy() {
     let b = `<div class="card slim"><div class="row"><h2>Automático</h2><span class="pill ${isSess(inp) ? 'ok' : ''}">${isSess(inp) ? 'sesión ✓' : 'sin sesión'}</span></div>`
       + infoRow('F', 'Gimnasio / boxeo', `${sessMin} min · se detecta por ubicación`, '', isSess(inp))
       + `<div class="row" style="margin:4px 0 8px"><input id="gm" type="text" inputmode="numeric" placeholder="Minutos (si falló el atajo)" ${locked ? 'disabled' : ''} autocomplete="off"><button class="btn sm" ${locked ? 'disabled' : 'data-act="gymset"'}>Fijar</button></div>`
-      + `<div class="row"><b>${iconTag('D', 1)} Juegos</b><span class="pill ${gs[0]}">${hrs(gH)} / ${hrs(cap)}</span></div><div class="bar gold"><i style="width:${Math.min(100, gH / cap * 100)}%"></i></div><div class="mute">${gs[1]} · hoy ${hrs(inp.gameH || 0)}</div>`
+      + `<div class="row"><b>${pic('juegos', iconTag('D', 1))} Juegos</b><span class="pill ${gs[0]}">${hrs(gH)} / ${hrs(cap)}</span></div><div class="bar gold"><i style="width:${Math.min(100, gH / cap * 100)}%"></i></div><div class="mute">${gs[1]} · hoy ${hrs(inp.gameH || 0)}</div>`
       + `<div class="row" style="margin-top:8px"><input id="gh" type="text" inputmode="decimal" placeholder="Horas de videojuegos (ej.: 1,5)" ${locked ? 'disabled' : ''} autocomplete="off"><button class="btn sm" ${locked ? 'disabled' : 'data-act="gameadd"'}>Sumar</button></div>${(inp.gameH || 0) > 0 && !locked ? `<button class="undo" data-act="gamezero">Borrar las de hoy</button>` : ''}</div>`;
     b += foodCard(viewDate, inp, locked);
     const ml = inp.waterMl ?? 0;
-    b += `<div class="card slim"><div class="row"><h2>Agua</h2><span class="pill ${waterOk(inp) ? 'ok' : ''}">${litros(ml)} / 2,5 L</span></div><div class="bar"><i style="width:${Math.min(100, ml / 25)}%"></i></div><div class="row"><button class="btn sm ghost" data-act="water" data-v="-250" ${locked || ml <= 0 ? 'disabled' : ''}>− vaso</button><button class="btn sm" data-act="water" data-v="250" ${locked ? 'disabled' : ''}>+ vaso (250 ml)</button></div></div>`;
+    b += `<div class="card slim"><div class="row"><h2>${pic('agua', '')} Agua</h2><span class="pill ${waterOk(inp) ? 'ok' : ''}">${litros(ml)} / 2,5 L</span></div><div class="bar"><i style="width:${Math.min(100, ml / 25)}%"></i></div><div class="row"><button class="btn sm ghost" data-act="water" data-v="-250" ${locked || ml <= 0 ? 'disabled' : ''}>− vaso</button><button class="btn sm" data-act="water" data-v="250" ${locked ? 'disabled' : ''}>+ vaso (250 ml)</button></div></div>`;
     const mine = roomsOf(inp), taken = wk.rooms.filter(x => !mine.includes(x));
     b += `<div class="card slim"><div class="row"><h2>Ambientes</h2><span class="pill ${wk.rooms.length >= cfg.cleanRoomsWeek ? 'ok' : ''}">${wk.rooms.length} / ${cfg.cleanRoomsWeek} esta semana</span></div><div class="rooms">${ROOMS.map(([id, nm]) => `<button class="room ${mine.includes(id) ? 'sel' : ''} ${taken.includes(id) ? 'taken' : ''}" ${locked ? 'disabled' : `data-act="roomtap" data-r="${id}"`}>${roomTile(id)}<b>${nm}</b>${mine.includes(id) || taken.includes(id) ? '<span class="ck">✓</span>' : ''}</button>`).join('')}</div><p class="mute">Tocá los que limpiaste hoy. La primera limpieza del día vale más; los otros ambientes suman menos. Cada ambiente cuenta una vez por semana.</p></div>`;
     b += `<div class="card slim"><button class="mrow ${inp.read ? 'on' : ''}" ${locked ? 'disabled' : 'data-act="readtog"'}><span class="mic">${iconTag('I', 2)}</span><span class="mtx"><b>Leí hoy</b><small>10 páginas alcanzan · suma XP de Inteligencia</small></span><span class="chk">${inp.read ? '✓' : ''}</span></button></div>`;
@@ -280,7 +282,7 @@ function history() {
   }
   return { e, days, log, weeks, kMax };
 }
-const logIcon = c => c === 'P' ? '🐾' : c === 'T' ? '♛' : c === 'H' ? '▲' : iconTag(c, 1);
+const logIcon = c => c === 'P' ? '🐾' : c === 'T' ? pic('titulo', '♛', 20) : c === 'H' ? '▲' : iconTag(c, 1);
 
 function viewRegistro() {
   const h0 = history(); if (!h0) return `<div class="card mute">Disponible desde el primer día.</div>`;
@@ -304,9 +306,9 @@ function viewRegistro() {
     + reps.map(b => `<div class="mrow static"><span class="mic">🔧</span><span class="mtx"><b>${esc(b.t)}</b><small>${pretty(b.d)}</small></span><button class="undo" data-act="repairdel" data-d="${b.d}" data-k="${b.k}">Borrar</button></div>`).join('') + `</div>`;
   // Títulos
   const tIdx = e.titleIndex();
-  h += `<div class="card slim"><div class="row"><h2>Títulos</h2><span class="pill gold">${Object.keys(st.titles).length} / ${HERO_TITLES.length}</span></div>` + HERO_TITLES.map((t, g) => {
+  h += `<div class="card slim"><div class="row"><h2>${pic('titulo', '')} Títulos</h2><span class="pill gold">${Object.keys(st.titles).length} / ${HERO_TITLES.length}</span></div>` + HERO_TITLES.map((t, g) => {
     const got = st.titles[g] !== undefined, min = Math.max(1, t.avg - cfg.balanceGap);
-    return `<div class="mrow static ${got ? 'on' : ''}"><span class="mic">${got ? '♛' : '·'}</span><span class="mtx"><b>${t.name}</b><small>${got ? 'desde el ' + pretty(addDays(S.startDate, st.titles[g])) : `nivel ${t.avg}${t.avg > 1 ? ` · ninguna estadística bajo ${min}` : ''}`}</small></span><span class="chk">${got ? '✓' : ''}</span></div>`;
+    return `<div class="mrow static ${got ? 'on' : ''}"><span class="mic">${got ? pic('titulo', '♛', 24) : '·'}</span><span class="mtx"><b>${t.name}</b><small>${got ? 'desde el ' + pretty(addDays(S.startDate, st.titles[g])) : `nivel ${t.avg}${t.avg > 1 ? ` · ninguna estadística bajo ${min}` : ''}`}</small></span><span class="chk">${got ? '✓' : ''}</span></div>`;
   }).join('') + `</div>`;
   h += `<div class="card slim"><div class="row"><h2>Títulos de ${PET_NAME}</h2><span class="pill gold">${Object.keys(st.petTitles).length} / ${PET_TITLES.length}</span></div>` + PET_TITLES.map((t, g) => {
     const got = st.petTitles[g] !== undefined;
@@ -387,7 +389,7 @@ function viewLogros(hi) {
     ['🐾', `${PET_NAME} nivel 25`, 'Bestia', e.petLevel(), 25], ['🐾', `${PET_NAME} nivel 100`, 'Bestia', e.petLevel(), 100],
   ];
   const got = M.filter(m => m[3] >= m[4]).length;
-  return `<div class="card slim"><div class="row"><h2>Logros</h2><span class="pill ${got ? 'gold' : ''}">${got} / ${M.length}</span></div><div class="medals">${M.map(([ic, nm, ds, n, g]) => `<div class="medal ${n >= g ? 'on' : ''}"><span class="mi">${ic}</span><b>${nm}</b><small>${ds}</small><span class="mini"><i style="width:${Math.min(100, Math.max(0, n) / g * 100)}%"></i></span><small>${Math.min(Math.max(0, n), g)} / ${g}</small></div>`).join('')}</div></div>`;
+  return `<div class="card slim"><div class="row"><h2>${pic('logro', '')} Logros</h2><span class="pill ${got ? 'gold' : ''}">${got} / ${M.length}</span></div><div class="medals">${M.map(([ic, nm, ds, n, g]) => `<div class="medal ${n >= g ? 'on' : ''}"><span class="mi">${ic}</span><b>${nm}</b><small>${ds}</small><span class="mini"><i style="width:${Math.min(100, Math.max(0, n) / g * 100)}%"></i></span><small>${Math.min(Math.max(0, n), g)} / ${g}</small></div>`).join('')}</div></div>`;
 }
 
 function campMascota(e, pre) {
