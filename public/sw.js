@@ -1,6 +1,6 @@
 // Service worker: funciona sin conexión (caché) y muestra las notificaciones push.
-const CACHE = 'pd-v95';
-const SHELL = ['/', '/index.html', '/app.js', '/rise.js', '/phrases.js', '/style.css', '/assets.js', '/manifest.webmanifest', '/icon-180.png', '/icon-192.png', '/icon-512.png'];
+const CACHE = 'pd-v96';
+const SHELL = ['/', '/index.html', '/app.js', '/rise.js', '/resumen.js', '/phrases.js', '/style.css', '/assets.js', '/manifest.webmanifest', '/icon-180.png', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {

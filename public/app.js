@@ -1,5 +1,6 @@
 import { Rise, ladder, needSessions, HERO_TITLES, PET_TITLES } from '/rise.js';
 import { frase } from '/phrases.js';
+import { semanas, meses, destacados, sugerencias, nombreMes } from '/resumen.js';
 import { ROOMS, roomTile, onAssets, has, url, iconTag } from '/assets.js';
 
 const NAMES = { F: 'Fuerza', I: 'Inteligencia', V: 'Vitalidad', D: 'Disciplina', O: 'Orden' };
@@ -260,7 +261,6 @@ function pesoSeries() {
 }
 function viewPeso() {
   const pts = pesoSeries(), fm = x => String(+x.toFixed(1)).replace('.', ',');
-  const waist = Object.entries(S.days).filter(([d, v]) => v.input?.waistCm > 0).sort((a, b) => a[0].localeCompare(b[0])).map(([d, v]) => +v.input.waistCm);
   let h = `<div class="card slim"><div class="row"><h2>${iconTag('V', 1)} Peso</h2><span class="pill">${pts.length ? fm(pts[pts.length - 1].w) + ' kg' : '—'}</span></div>`;
   if (pts.length >= 2) {
     const t0 = toUTC(pts[0].d), x = d => (toUTC(d) - t0) / 864e5, span = Math.max(6, x(pts[pts.length - 1].d));
@@ -283,8 +283,7 @@ function viewPeso() {
     }
     if (msg) h += `<div class="mute">${msg}</div>`;
   } else h += `<div class="mute">Anotá tu peso en ayunas todos los días en Objetivos. Mirá el promedio, no el número de un día.</div>`;
-  h += `<div class="row" style="margin-top:8px;gap:6px"><span class="mute" style="flex:1">Cintura (cm)${waist.length ? ' · última ' + fm(waist[waist.length - 1]) : ''}</span><input id="wst" type="text" inputmode="decimal" placeholder="cm" style="width:72px;margin:0;text-align:center"><button class="btn sm" data-act="wsavewaist">Anotar</button></div></div>`;
-  return h;
+  return h + `</div>`;
 }
 
 /** Frase del día según cómo viene la cosa. */
@@ -300,7 +299,7 @@ function dayPhrase(date, pre, idx, e, st) {
 // ---------- Registro ----------
 function viewReg() {
   if (!S.startDate) return `<h1>Registro</h1><div class="card mute">Disponible al ingresar.</div>`;
-  return `<h1>Registro</h1><!--fit--><div class="iscroll">${viewRegistro()}</div>`;
+  return `<h1>Registro</h1>${subtabs('reg', [['res', 'Resumen'], ['peso', 'Peso'], ['dia', 'Diario']])}<!--fit--><div class="iscroll">${viewRegistro()}</div>`;
 }
 
 // ---------- historial (para Registro, Récords y Logros) ----------
@@ -326,6 +325,41 @@ const logIcon = c => c === 'P' ? '🐾' : c === 'T' ? pic('titulo', '♛', 20) :
 
 function viewRegistro() {
   const h0 = history(); if (!h0) return `<div class="card mute">Disponible desde el primer día.</div>`;
+  if (SUB.reg === 'peso') return viewPeso();
+  if (SUB.reg === 'dia') return viewDiario(h0);
+  return viewResumen(h0);
+}
+const INPUTS = () => Object.fromEntries(Object.entries(S.days).map(([d, v]) => [d, v.input ?? {}]));
+/** Barras: valores 0..max, con rótulos abajo y una línea de meta opcional. */
+function barras(vals, labels, max, meta, fmtv) {
+  const n = vals.length, w = 300 / n, bw = Math.min(22, w * 0.7), H = 78;
+  return `<svg viewBox="0 0 300 ${H + 22}" width="100%" height="106" role="img">${vals.map((v, i) => {
+    const hh = v === null ? 0 : Math.max(1, Math.min(1, v / max) * H), x = i * w + (w - bw) / 2;
+    return `<rect x="${x.toFixed(1)}" y="${(H - hh + 10).toFixed(1)}" width="${bw.toFixed(1)}" height="${hh.toFixed(1)}" fill="var(--hi)" opacity="${i === n - 1 ? 1 : 0.6}"/><text x="${(x + bw / 2).toFixed(1)}" y="${H + 17}" font-size="8" text-anchor="middle" fill="var(--mute)">${labels[i]}</text>${v !== null && n <= 8 ? `<text x="${(x + bw / 2).toFixed(1)}" y="${Math.max(8, H - hh + 2).toFixed(1)}" font-size="8" text-anchor="middle" fill="var(--ink)">${fmtv(v)}</text>` : ''}`;
+  }).join('')}${meta ? `<line x1="0" x2="300" y1="${(H - meta / max * H + 10).toFixed(1)}" y2="${(H - meta / max * H + 10).toFixed(1)}" stroke="var(--ink)" stroke-dasharray="3 3" opacity=".5"/>` : ''}</svg>`;
+}
+function viewResumen(h0) {
+  const today = todayISO(), inp = INPUTS(), sug = sugerencias(inp, S.startDate, today), D = destacados(inp, S.startDate, today);
+  const Sm = semanas(inp, S.startDate, today).slice(-8), Mm = meses(inp, S.startDate, today), pc2 = x => Math.round(x * 100) + '%';
+  const dm = iso => `${+iso.slice(8)}/${+iso.slice(5, 7)}`, hh = m => `${Math.floor(m / 60)} h ${Math.round(m % 60)} min`;
+  let h = `<div class="card slim"><div class="row"><h2>Sugerencias</h2></div>${sug.length ? sug.map(x => `<div class="mrow static"><span class="mtx"><b>${x.tema}</b><small>${esc(x.texto)}</small></span></div>`).join('') : '<div class="mute">Aparecen cuando termina la primera semana. Cada lunes a primera hora te llegan por aviso.</div>'}</div>`;
+  const tile = (t, v, s2) => `<div class="medal on"><b>${t}</b><span class="rv">${v}</span><small>${s2}</small></div>`;
+  const tiles = [];
+  if (D.mejorSemana) tiles.push(tile('Mejor semana', pc2(D.mejorSemana.score), 'del ' + dm(D.mejorSemana.lunes)));
+  if (D.peorSemana) tiles.push(tile('Peor semana', pc2(D.peorSemana.score), 'del ' + dm(D.peorSemana.lunes)));
+  if (D.mejorMes) tiles.push(tile('Mejor mes', pc2(D.mejorMes.score), nombreMes(D.mejorMes.ym)));
+  if (D.peorMes) tiles.push(tile('Peor mes', pc2(D.peorMes.score), nombreMes(D.peorMes.ym)));
+  tiles.push(tile('Racha de días', D.rachaDias, 'con 80% o más'));
+  if (D.gymRecord) tiles.push(tile('Más gimnasio', hh(D.gymRecord.gymMin), 'semana del ' + dm(D.gymRecord.lunes)));
+  h += `<div class="card slim"><div class="row"><h2>Destacados</h2></div><div class="medals">${tiles.join('')}</div></div>`;
+  const done = Sm.map(s2 => s2.score), lab = Sm.map(s2 => dm(s2.lunes));
+  h += `<div class="card slim"><div class="row"><h2>Cumplimiento por semana</h2></div>${barras(done, lab, 1, 0.8, pc2)}<div class="mute">Línea punteada: 80%.</div></div>`;
+  h += `<div class="card slim"><div class="row"><h2>Gimnasio por semana</h2></div>${barras(Sm.map(s2 => s2.gymMin), lab, Math.max(400, ...Sm.map(s2 => s2.gymMin)), 360, m => Math.round(m / 6) / 10 + 'h')}<div class="mute">Línea punteada: meta de 6 h.</div></div>`;
+  if (Mm.length) h += `<div class="card slim"><div class="row"><h2>Meses</h2></div>${Mm.slice().reverse().map(m => `<div class="mrow static"><span class="mtx"><b>${nombreMes(m.ym)}${D.mejorMes && m.ym === D.mejorMes.ym ? ' ▲' : ''}${D.peorMes && m.ym === D.peorMes.ym ? ' ▼' : ''}</b><small>${pc2(m.score)} de cumplimiento · ${hh(m.gymMin)} de gimnasio · ${m.dias} días</small></span>${miniBar(m.score, 1)}</div>`).join('')}</div>`;
+  h += viewLogros(h0);
+  return h;
+}
+function viewDiario(h0) {
   const { e, days, log } = h0, st = e.state, today = todayISO(), cfg = e.cfg;
   const mult = ladder(st.k, Math.min(st.wk.sess, 4));
   // Racha + calendario del mes
@@ -340,13 +374,11 @@ function viewRegistro() {
   for (const [d, v] of Object.entries(S.days)) { (v.input?.books ?? []).forEach((b, k) => books.push({ d, k, ...b })); (v.input?.repairs ?? []).forEach((b, k) => reps.push({ d, k, ...b })); }
   const byDate = (a, b) => b.d.localeCompare(a.d) || b.k - a.k; books.sort(byDate); reps.sort(byDate);
   const mBooks = books.filter(b => b.d.slice(0, 7) === ym).length, mReps = reps.filter(b => b.d.slice(0, 7) === ym).length;
-  h += viewPeso();
   h += `<div class="card slim"><div class="row"><h2>Libros leídos</h2><span class="pill ${books.length ? 'ok' : ''}">${books.length}</span></div><div class="mute">Este mes: ${mBooks} · el primero del mes vale el doble</div><label>Título<input id="bt" value="${esc(bkDraft.t)}" autocomplete="off"></label><label>Autor (opcional)<input id="ba" value="${esc(bkDraft.a)}" autocomplete="off"></label><label>Lo terminé el<input id="bd" type="date" min="${S.startDate}" max="${today}" value="${bkDraft.d || today}"></label><button class="btn" style="margin-top:10px" data-act="bookadd">Agregar libro</button>`
     + books.map(b => `<div class="mrow static"><span class="mic">📖</span><span class="mtx"><b>${esc(b.t)}</b><small>${b.a ? esc(b.a) + ' · ' : ''}${pretty(b.d)}</small></span><button class="undo" data-act="bookdel" data-d="${b.d}" data-k="${b.k}">Borrar</button></div>`).join('') + `</div>`;
   h += `<div class="card slim"><div class="row"><h2>Arreglos en la casa</h2><span class="pill ${reps.length ? 'ok' : ''}">${reps.length}</span></div><div class="mute">Este mes: ${mReps} · el primero del mes vale el doble</div><label>Qué arreglaste<input id="rt" value="${esc(rpDraft.t)}" autocomplete="off"></label><label>Lo terminé el<input id="rd" type="date" min="${S.startDate}" max="${today}" value="${rpDraft.d || today}"></label><button class="btn" style="margin-top:10px" data-act="repairadd">Agregar arreglo</button>`
     + reps.map(b => `<div class="mrow static"><span class="mic">🔧</span><span class="mtx"><b>${esc(b.t)}</b><small>${pretty(b.d)}</small></span><button class="undo" data-act="repairdel" data-d="${b.d}" data-k="${b.k}">Borrar</button></div>`).join('') + `</div>`;
   // Títulos: se quitaron hasta definir los nuevos (TITLES_ON)
-  h += viewLogros(h0);
   // Diario
   const recent = log.slice(-40).reverse();
   h += `<div class="card slim"><h2>Diario</h2>${recent.length ? recent.map(x => `<div class="mrow static"><span class="mic">${logIcon(x.ic)}</span><span class="mtx"><b>${esc(x.t)}</b><small>${pretty(x.date)}</small></span></div>`).join('') : '<p class="mute">Todavía no pasó nada: sumá XP y se va a ir llenando.</p>'}</div>`;
@@ -524,7 +556,7 @@ function campGimnasio(e, pre) {
     + `<div class="card slim"><div class="row"><h2>${FASES[ph]}</h2><span class="pill ${ph === 3 ? 'gold' : ''}">semana ${ph + 1} de 4</span></div><div class="mute">${FASE_TXT[ph]}</div></div>`;
 }
 
-const SUB = { ajustes: 'gen', camp: 'her' };
+const SUB = { ajustes: 'gen', camp: 'her', reg: 'res' };
 const subtabs = (k, items) => `<div class="seg">${items.map(([v, l]) => `<button class="${SUB[k] === v ? 'on' : ''}" data-act="sub" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
 function viewAjustes() {
   let h = `<h1>Ajustes</h1>`;
@@ -751,7 +783,6 @@ document.addEventListener('click', async ev => {
   else if (a === 'sub') { SUB[el.dataset.k] = el.dataset.v; render(); }
   else if (a === 'roomtap') actDay(viewDate, i => { const r = el.dataset.r, s = new Set(roomsOf(i)); if (s.has(r)) s.delete(r); else s.add(r); delete i.room; i.rooms = [...s]; if (!i.rooms.length) delete i.rooms; });
   else if (a === 'wsave') { const w = parseFloat((document.getElementById('wgt')?.value || '').replace(',', '.')); if (w >= 30 && w <= 300) { actDay(viewDate, i => { i.weightKg = Math.round(w * 10) / 10; }); } else hint('Escribí tu peso en kg'); }
-  else if (a === 'wsavewaist') { const w = parseFloat((document.getElementById('wst')?.value || '').replace(',', '.')); if (w >= 40 && w <= 250) { actDay(todayISO(), i => { i.waistCm = Math.round(w * 10) / 10; }); hint('Cintura anotada'); } else hint('Escribí la cintura en cm'); }
   else if (a === 'readtog') actDay(viewDate, i => { i.read = !i.read; });
   else if (a === 'waterq') { const d = waterQ?.date || todayISO(); waterQ = null; if (el.dataset.v === '1') actDay(d, i => { i.waterMl = (i.waterMl || 0) + 250; }); else render(); }
   else if (a === 'water') actDay(viewDate, i => { const v = Math.max(0, (i.waterMl || 0) + (+el.dataset.v)); if (v) i.waterMl = v; else delete i.waterMl; });

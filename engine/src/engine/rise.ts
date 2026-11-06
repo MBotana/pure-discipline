@@ -21,7 +21,6 @@ export interface RiseInput {
   water?: boolean;                 // meta de agua cumplida
   waterMl?: number;                // agua tomada (la meta es 1 litro)
   weightKg?: number;               // peso en ayunas (misión diaria de Vitalidad)
-  waistCm?: number;                // cintura (semanal, solo seguimiento)
   closed?: boolean;                // el día fue confirmado a mano (solo la app lo usa)
   meals?: boolean;                 // el análisis de comida del día quedó cerrado
   gameH?: number;                  // horas de videojuegos

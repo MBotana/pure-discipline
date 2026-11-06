@@ -253,3 +253,17 @@ test('mascota que habla: Gemini redacta con los hechos y Telegram entrega; error
     assert.equal(r.telegram, false); assert.match(r.error, /chat not found/);
   } finally { globalThis.fetch = real; }
 });
+
+test('aviso del lunes: sugerencias de la semana que terminó, una sola vez, a primera hora', async () => {
+  const { runSemanal } = await import('../src/worker.ts');
+  const e: any = env(); const T = 'clave-larga-1';
+  await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-09' });
+  await call(e, 'POST', '/api/sync', { device: 'x', changes: [{ date: '2026-11-10', input: { gymMin: 50 }, updated_at: 1 }] }, T);
+  const at = (h: number) => Date.UTC(2026, 10, 16, h + 3, 0);   // lunes 16/11, hora local (UTC-3)
+  assert.deepEqual(await runSemanal(e, 'https://x.test', at(7)), [], 'antes de las 8 no manda');
+  assert.deepEqual(await runSemanal(e, 'https://x.test', Date.UTC(2026, 10, 17, 11, 0)), [], 'otro día no manda');
+  assert.deepEqual(await runSemanal(e, 'https://x.test', at(8)), ['semanal']);
+  assert.deepEqual(await runSemanal(e, 'https://x.test', at(9)), [], 'una sola vez');
+  const n: any = await (await call(e, 'GET', '/api/last-notification', undefined, T)).json();
+  assert.equal(n.title, 'Resumen de la semana'); assert.match(n.body, /Gimnasio|Hiciste/);
+});

@@ -6,6 +6,6 @@
   "scripts": {
     "test": "tsx --test engine/test/*.test.ts test/*.test.ts",
     "deploy": "wrangler deploy",
-    "build:rise": "bun build engine/src/engine/rise.ts --outfile public/rise.js --format esm --target browser"
+    "build:rise": "bun build engine/src/engine/rise.ts --outfile public/rise.js --format esm --target browser && bun build engine/src/engine/resumen.ts --outfile public/resumen.js --format esm --target browser"
   }
 }

@@ -94,6 +94,8 @@ async function gemini(env: Env, system: string, parts: unknown[], temperature = 
   }
   throw Object.assign(new Error('La IA no respondió (' + last + ')'), { status: 502 });
 }
+import { sugerencias, dowL } from '../engine/src/engine/resumen.ts';
+
 // ---------- Mascotas que hablan (Gemini redacta, Telegram entrega) ----------
 // El servidor decide SI hay algo que decir y qué hechos pasaron; Gemini solo decide CÓMO decirlo, con la voz de la mascota.
 const PERSONAS: Record<string, string> = {
@@ -187,6 +189,23 @@ export async function runReminders(env: Env, origin: string, now = Date.now()) {
   if (hour >= Number(st.reminder_hour) && isEmptyInput(row ? (row.input as string) : null))
     await once('daily', 'Rise', 'Todavía no registraste nada hoy. ¿Cómo te fue?');
   return sent;
+}
+
+/** Lunes a primera hora: aviso con las sugerencias de la semana que terminó (una sola vez por semana). */
+export async function runSemanal(env: Env, origin: string, now = Date.now()) {
+  const st = await readSettings(env);
+  if (st.reminders_on !== '1' || !st.start_date) return [];
+  const local = new Date(now + Number(st.tz_offset) * 60000), hoy = local.toISOString().slice(0, 10), hora = local.getUTCHours();
+  if (dowL(hoy) !== 0 || hora < 8 || hoy < st.start_date) return [];
+  const rows = (await env.DB.prepare('SELECT date, input FROM day_inputs WHERE date >= ? AND date <= ?').bind(st.start_date, hoy).all()).results as { date: string; input: string }[];
+  const inp: Record<string, any> = {}; for (const r of rows) { try { inp[r.date] = JSON.parse(r.input); } catch { /* ignorar */ } }
+  const sug = sugerencias(inp, st.start_date, hoy);
+  if (!sug.length) return [];
+  if (await env.DB.prepare('SELECT 1 AS x FROM notification_log WHERE kind = ? AND date = ?').bind('semanal', hoy).first()) return [];
+  await env.DB.prepare('INSERT OR IGNORE INTO notification_log (kind, date, sent_at) VALUES (?, ?, ?)').bind('semanal', hoy, now).run();
+  const body = sug.slice(0, 3).map(x => x.texto).join(' · ') + (sug.length > 3 ? ` (+${sug.length - 3} más en Registro)` : '');
+  await pushAll(env, origin, 'Resumen de la semana', body);
+  return ['semanal'];
 }
 
 // ---------- rutas ----------
@@ -465,6 +484,7 @@ export default {
   scheduled: async (_e: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }) => {
     const origin = (await getSetting(env, 'origin')) ?? 'https://pure-discipline.workers.dev';
     ctx.waitUntil(runReminders(env, origin));
+    ctx.waitUntil(runSemanal(env, origin).then(() => undefined, () => undefined));
     ctx.waitUntil(runSteam(env).then(() => undefined, () => undefined));
   },
 };
