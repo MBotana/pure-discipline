@@ -29,6 +29,7 @@ var RISE = {
   bookNext: 1250,
   foodDay: 105,
   waterXp: 15,
+  weighXp: 15,
   foodThr: 0.8,
   vitW: 250,
   vitM: 650,
@@ -257,6 +258,8 @@ class Rise {
     }
     if (inp.water)
       add("V", "D", "Agua", c.waterXp);
+    if ((inp.weightKg ?? 0) > 0)
+      add("V", "D", "Peso", c.weighXp);
     if (inp.gameH)
       S.wk.gameH += inp.gameH;
     const nextYm = dateOfDay(c.startDate, i + 1).slice(0, 7);

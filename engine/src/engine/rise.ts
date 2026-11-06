@@ -20,6 +20,8 @@ export interface RiseInput {
   food?: boolean;                  // v1.x: aprobado = 100 %, cerrado sin aprobar = 50 %
   water?: boolean;                 // meta de agua cumplida
   waterMl?: number;                // agua tomada (la meta es 1 litro)
+  weightKg?: number;               // peso en ayunas (misión diaria de Vitalidad)
+  waistCm?: number;                // cintura (semanal, solo seguimiento)
   closed?: boolean;                // el día fue confirmado a mano (solo la app lo usa)
   meals?: boolean;                 // el análisis de comida del día quedó cerrado
   gameH?: number;                  // horas de videojuegos
@@ -35,7 +37,7 @@ export interface RiseConfig {
   sessionMin: number;              // minutos para que una visita cuente como sesión
   fuerzaPerMin: number; fuerzaCapMin: number; fuerzaWeekMin: number; fuerzaMonthMin: number; fuerzaW: number; fuerzaM: number;
   readXp: number; bookFirst: number; bookNext: number;
-  foodDay: number; waterXp: number; foodThr: number; vitW: number; vitM: number;
+  foodDay: number; waterXp: number; weighXp: number; foodThr: number; vitW: number; vitM: number;
   cleanFirst: number; cleanExtra: number; cleanDaysMax: number; cleanRoomsWeek: number; ordenW: number; repairFirst: number; repairNext: number;
   gameCapH: number; discW: number; discM: number;
   petA: number; petR: number; petMax: number; petStatMax: number;
@@ -48,7 +50,7 @@ export const RISE: RiseConfig = {
   sessionMin: 40,
   fuerzaPerMin: 1.6, fuerzaCapMin: 1440, fuerzaWeekMin: 360, fuerzaMonthMin: 1440, fuerzaW: 250, fuerzaM: 650,
   readXp: 60, bookFirst: 2500, bookNext: 1250,
-  foodDay: 105, waterXp: 15, foodThr: 0.8, vitW: 250, vitM: 650,
+  foodDay: 105, waterXp: 15, weighXp: 15, foodThr: 0.8, vitW: 250, vitM: 650,
   cleanFirst: 100, cleanExtra: 40, cleanDaysMax: 5, cleanRoomsWeek: 5, ordenW: 250, repairFirst: 1100, repairNext: 550,
   gameCapH: 15, discW: 750, discM: 1100,
   petA: 369.1, petR: 1.03, petMax: 100, petStatMax: 0,   // la bestia ya no reparte puntos: solo nivel y títulos
@@ -211,6 +213,7 @@ export class Rise {
       S.wk.food.push(pct); S.mo.food.push(pct);
     }
     if (inp.water) add('V', 'D', 'Agua', c.waterXp);
+    if ((inp.weightKg ?? 0) > 0) add('V', 'D', 'Peso', c.weighXp);
     // Disciplina
     if (inp.gameH) S.wk.gameH += inp.gameH;
 

@@ -176,8 +176,8 @@ function gameStatus(h, cap) {
 const wkdayOf = d => (new Date(toUTC(d)).getUTCDay() + 6) % 7;
 const isSess = inp => (inp.gymMin ?? (inp.gym ? 60 : 0)) >= 40;
 const waterOk = inp => (inp.waterMl ?? 0) >= 1000 || !!inp.water;
-const dayDoneN = (inp, d) => [isSess(inp), !!inp.read, roomsOf(inp).length > 0, waterOk(inp), ...(wkdayOf(d) < 5 ? [inp.foodPct !== undefined] : [])].filter(Boolean).length;
-const dayNeed = d => (wkdayOf(d) < 5 ? 5 : 4);
+const dayDoneN = (inp, d) => [isSess(inp), !!inp.read, roomsOf(inp).length > 0, waterOk(inp), (inp.weightKg ?? 0) > 0, ...(wkdayOf(d) < 5 ? [inp.foodPct !== undefined] : [])].filter(Boolean).length;
+const dayNeed = d => (wkdayOf(d) < 5 ? 6 : 5);
 const pc = x => Math.round(x * 100) + ' %';
 const litros = ml => (ml / 1000).toFixed(2).replace(/0$/, '').replace('.', ',') + ' L';
 const pips = (n, max) => `<span class="pips">${Array.from({ length: max }, (_, q) => `<i class="${q < n ? 'f' : ''}"></i>`).join('')}</span>`;
@@ -224,6 +224,7 @@ function viewHoy() {
     const mine = roomsOf(inp), taken = wk.rooms.filter(x => !mine.includes(x));
     b += `<div class="card slim"><div class="row"><h2>Ambientes</h2><span class="pill ${wk.rooms.length >= cfg.cleanRoomsWeek ? 'ok' : ''}">${wk.rooms.length} / ${cfg.cleanRoomsWeek} esta semana</span></div><div class="rooms">${ROOMS.map(([id, nm]) => `<button class="room ${mine.includes(id) ? 'sel' : ''} ${taken.includes(id) ? 'taken' : ''}" ${locked ? 'disabled' : `data-act="roomtap" data-r="${id}"`}>${roomTile(id)}<b>${nm}</b>${mine.includes(id) || taken.includes(id) ? '<span class="ck">✓</span>' : ''}</button>`).join('')}</div></div>`;
     b += `<div class="card slim"><button class="mrow ${inp.read ? 'on' : ''}" ${locked ? 'disabled' : 'data-act="readtog"'}><span class="mic">${iconTag('I', 2)}</span><span class="mtx"><b>Leí hoy</b><small>10 páginas alcanzan</small></span><span class="chk">${inp.read ? '✓' : ''}</span></button></div>`;
+    b += `<div class="card slim"><div class="row"><b>${iconTag('V', 2)} Peso en ayunas</b><span class="row" style="gap:6px"><input id="wgt" type="text" inputmode="decimal" placeholder="kg" autocomplete="off" value="${inp.weightKg ? String(inp.weightKg).replace('.', ',') : ''}" ${locked ? 'disabled' : ''} style="width:76px;margin:0;text-align:center"><button class="btn sm" ${locked ? 'disabled' : 'data-act="wsave"'}>${inp.weightKg ? '✓' : 'Anotar'}</button></span></div></div>`;
     // Corrección manual: solo al editar un día anterior
     if (!pre && viewDate < today) b += `<div class="card slim"><h2>Corregir este día</h2><div class="row" style="margin:8px 0 4px"><input id="gm" type="text" inputmode="numeric" placeholder="Minutos de gimnasio" autocomplete="off"><button class="btn sm" data-act="gymset">Fijar</button></div><div class="row"><input id="gh" type="text" inputmode="decimal" placeholder="Horas de videojuegos (ej.: 1,5)" autocomplete="off"><button class="btn sm" data-act="gameadd">Sumar</button></div>${(inp.gameH || 0) > 0 ? `<button class="undo" data-act="gamezero">Borrar las de ese día</button>` : ''}</div>`;
     h += b;
@@ -248,6 +249,41 @@ function viewHoy() {
     h += infoRow('P', 'La bestia · ciclo de 4 semanas', `${st.cyc.length} de ${cfg.cycleNeed} ejercicios distintos con progreso`, miniBar(st.cyc.length, cfg.cycleNeed), st.cyc.length >= cfg.cycleNeed);
     h += `</div>`;
   }
+  return h;
+}
+
+
+/** Peso: promedio móvil de 7 días, comparación semanal y sugerencia de calorías. */
+function pesoSeries() {
+  if (!S.startDate) return [];
+  return Object.entries(S.days).filter(([d, v]) => d >= S.startDate && v.input?.weightKg > 0).map(([d, v]) => ({ d, w: +v.input.weightKg })).sort((a, b) => a.d.localeCompare(b.d));
+}
+function viewPeso() {
+  const pts = pesoSeries(), fm = x => String(+x.toFixed(1)).replace('.', ',');
+  const waist = Object.entries(S.days).filter(([d, v]) => v.input?.waistCm > 0).sort((a, b) => a[0].localeCompare(b[0])).map(([d, v]) => +v.input.waistCm);
+  let h = `<div class="card slim"><div class="row"><h2>${iconTag('V', 1)} Peso</h2><span class="pill">${pts.length ? fm(pts[pts.length - 1].w) + ' kg' : '—'}</span></div>`;
+  if (pts.length >= 2) {
+    const t0 = toUTC(pts[0].d), x = d => (toUTC(d) - t0) / 864e5, span = Math.max(6, x(pts[pts.length - 1].d));
+    const avg = pts.map(p => { const win = pts.filter(q => q.d <= p.d && toUTC(p.d) - toUTC(q.d) < 7 * 864e5); return { d: p.d, w: win.reduce((a, q) => a + q.w, 0) / win.length }; });
+    const all = [...pts.map(p => p.w), ...avg.map(p => p.w)], lo = Math.min(...all) - 0.5, hi = Math.max(...all) + 0.5;
+    const X = d => 6 + x(d) / span * 288, Y = w => 8 + (1 - (w - lo) / (hi - lo)) * 84;
+    h += `<svg viewBox="0 0 300 100" width="100%" height="96" aria-label="Peso diario y promedio de 7 días">${pts.map(p => `<circle cx="${X(p.d).toFixed(1)}" cy="${Y(p.w).toFixed(1)}" r="2.2" fill="var(--mute)"/>`).join('')}<polyline fill="none" stroke="var(--hi)" stroke-width="2" points="${avg.map(p => `${X(p.d).toFixed(1)},${Y(p.w).toFixed(1)}`).join(' ')}"/></svg>`;
+  }
+  // promedios por semana (lunes a domingo)
+  const wk = {}; for (const p of pts) { const m = addDays(p.d, -wkdayOf(p.d)); (wk[m] ||= []).push(p.w); }
+  const ks = Object.keys(wk).sort(), A = ks.map(k => ({ k, n: wk[k].length, a: wk[k].reduce((x, y) => x + y, 0) / wk[k].length }));
+  if (A.length) {
+    const cur = A[A.length - 1], prev = A.length > 1 ? A[A.length - 2] : null;
+    h += `<div class="mute">Promedio de la semana: <b>${fm(cur.a)} kg</b>${prev ? ` · ${cur.a - prev.a <= 0 ? 'bajó' : 'subió'} ${fm(Math.abs(cur.a - prev.a))} kg respecto de la anterior` : ''}</div>`;
+    const full = A.filter(x => x.n >= 3), dl = full.slice(1).map((x, i) => x.a - full[i].a);
+    let msg = '';
+    if (dl.length >= 2) {
+      const [a, b] = dl.slice(-2);
+      msg = a < -1 && b < -1 ? 'Bajás más de 1 kg por semana, dos semanas seguidas: sumá unas 200 kcal por día.' : a > -0.1 && b > -0.1 ? 'Dos semanas sin bajar: recortá unas 100-150 kcal por día.' : 'Vas en un ritmo razonable.';
+    }
+    if (msg) h += `<div class="mute">${msg}</div>`;
+  } else h += `<div class="mute">Anotá tu peso en ayunas todos los días en Objetivos. Mirá el promedio, no el número de un día.</div>`;
+  h += `<div class="row" style="margin-top:8px;gap:6px"><span class="mute" style="flex:1">Cintura (cm)${waist.length ? ' · última ' + fm(waist[waist.length - 1]) : ''}</span><input id="wst" type="text" inputmode="decimal" placeholder="cm" style="width:72px;margin:0;text-align:center"><button class="btn sm" data-act="wsavewaist">Anotar</button></div></div>`;
   return h;
 }
 
@@ -304,6 +340,7 @@ function viewRegistro() {
   for (const [d, v] of Object.entries(S.days)) { (v.input?.books ?? []).forEach((b, k) => books.push({ d, k, ...b })); (v.input?.repairs ?? []).forEach((b, k) => reps.push({ d, k, ...b })); }
   const byDate = (a, b) => b.d.localeCompare(a.d) || b.k - a.k; books.sort(byDate); reps.sort(byDate);
   const mBooks = books.filter(b => b.d.slice(0, 7) === ym).length, mReps = reps.filter(b => b.d.slice(0, 7) === ym).length;
+  h += viewPeso();
   h += `<div class="card slim"><div class="row"><h2>Libros leídos</h2><span class="pill ${books.length ? 'ok' : ''}">${books.length}</span></div><div class="mute">Este mes: ${mBooks} · el primero del mes vale el doble</div><label>Título<input id="bt" value="${esc(bkDraft.t)}" autocomplete="off"></label><label>Autor (opcional)<input id="ba" value="${esc(bkDraft.a)}" autocomplete="off"></label><label>Lo terminé el<input id="bd" type="date" min="${S.startDate}" max="${today}" value="${bkDraft.d || today}"></label><button class="btn" style="margin-top:10px" data-act="bookadd">Agregar libro</button>`
     + books.map(b => `<div class="mrow static"><span class="mic">📖</span><span class="mtx"><b>${esc(b.t)}</b><small>${b.a ? esc(b.a) + ' · ' : ''}${pretty(b.d)}</small></span><button class="undo" data-act="bookdel" data-d="${b.d}" data-k="${b.k}">Borrar</button></div>`).join('') + `</div>`;
   h += `<div class="card slim"><div class="row"><h2>Arreglos en la casa</h2><span class="pill ${reps.length ? 'ok' : ''}">${reps.length}</span></div><div class="mute">Este mes: ${mReps} · el primero del mes vale el doble</div><label>Qué arreglaste<input id="rt" value="${esc(rpDraft.t)}" autocomplete="off"></label><label>Lo terminé el<input id="rd" type="date" min="${S.startDate}" max="${today}" value="${rpDraft.d || today}"></label><button class="btn" style="margin-top:10px" data-act="repairadd">Agregar arreglo</button>`
@@ -713,6 +750,8 @@ document.addEventListener('click', async ev => {
   else if (a === 'back') { tab = lastTab || 'hoy'; render(); }
   else if (a === 'sub') { SUB[el.dataset.k] = el.dataset.v; render(); }
   else if (a === 'roomtap') actDay(viewDate, i => { const r = el.dataset.r, s = new Set(roomsOf(i)); if (s.has(r)) s.delete(r); else s.add(r); delete i.room; i.rooms = [...s]; if (!i.rooms.length) delete i.rooms; });
+  else if (a === 'wsave') { const w = parseFloat((document.getElementById('wgt')?.value || '').replace(',', '.')); if (w >= 30 && w <= 300) { actDay(viewDate, i => { i.weightKg = Math.round(w * 10) / 10; }); } else hint('Escribí tu peso en kg'); }
+  else if (a === 'wsavewaist') { const w = parseFloat((document.getElementById('wst')?.value || '').replace(',', '.')); if (w >= 40 && w <= 250) { actDay(todayISO(), i => { i.waistCm = Math.round(w * 10) / 10; }); hint('Cintura anotada'); } else hint('Escribí la cintura en cm'); }
   else if (a === 'readtog') actDay(viewDate, i => { i.read = !i.read; });
   else if (a === 'waterq') { const d = waterQ?.date || todayISO(); waterQ = null; if (el.dataset.v === '1') actDay(d, i => { i.waterMl = (i.waterMl || 0) + 250; }); else render(); }
   else if (a === 'water') actDay(viewDate, i => { const v = Math.max(0, (i.waterMl || 0) + (+el.dataset.v)); if (v) i.waterMl = v; else delete i.waterMl; });
