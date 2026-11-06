@@ -410,10 +410,27 @@ function campMascota(e, pre) {
   return figCard('pet', has('sombra_' + sc[0]) ? 'sombra_' + sc[0] : 'sombra_bestia', e.petTitleName(), `${PET_NAME} · Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, false, b);
 }
 
+/** Rutina fija: series de 12 a 15 con 60-75 s de descanso, una por vez. */
+const RUTINA = [
+  ['Lunes', 'Boxeo', ['Boxeo (sin pesas)', 'Si querés: 10 min de abdomen al final']],
+  ['Martes', 'Torso 1', ['Press de pecho en máquina · 3×12-15', 'Jalón al pecho · 3×12-15', 'Press de hombros en máquina · 3×12-15', 'Remo sentado · 3×12-15', 'Peck deck · 3×12-15', 'Curl de bíceps en polea · 3×12-15', 'Tríceps en polea · 3×12-15', 'Plancha · 3×40 s', 'Bici libre 30-45 min']],
+  ['Miércoles', 'Boxeo', ['Boxeo (sin pesas)']],
+  ['Jueves', 'Torso 2', ['Press inclinado en máquina · 3×12-15', 'Remo en polea baja · 3×12-15', 'Elevaciones laterales · 3×12-15', 'Peck deck invertido · 3×12-15', 'Fondos asistidos o máquina de tríceps · 3×12-15', 'Jalón con agarre cerrado · 3×12-15', 'Crunch en máquina · 3×15', 'Elevación de piernas · 3×12-15', 'Bici libre 30-45 min']],
+  ['Viernes', 'Piernas', ['Peso muerto convencional · 3×8-10, moderado', 'Sentadilla · 3×10-12', 'Prensa · 3×12-15', 'Curl femoral · 3×12-15', 'Extensión de cuádriceps · 3×12-15', 'Abductores y aductores · 3×15', 'Gemelos · 3×15', 'Puente de glúteos · 3×15', 'Bici suave 30 min']],
+  ['Sábado', 'Libre', ['Descanso o bici libre']],
+  ['Domingo', 'Libre', ['Descanso o bici libre']],
+];
+const COMIDAS = [['12:00', 'Milanesa grande al horno con pan integral y verduras'], ['17:00', 'Licuado: 2 bananas, 300 ml de leche proteica, 1 scoop de proteína y 1 de avena'], ['23:00', '1 taza de arroz, 3 huevos, queso rallado y zanahoria rallada']];
+function rutinaCards(pre) {
+  const hoy = RUTINA[wkdayOf(todayISO())];
+  const lista = r => `<ul class="plan">${r[2].map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  return `<div class="card slim"><div class="row"><h2>Hoy · ${hoy[0]}</h2><span class="pill gold">${hoy[1]}</span></div>${lista(hoy)}<details><summary>Toda la semana</summary>${RUTINA.map(r => `<div class="row" style="margin-top:10px"><b>${r[0]}</b><span class="pill">${r[1]}</span></div>${lista(r)}`).join('')}</details></div>`
+    + `<div class="card slim"><details><summary>Comidas del día · ~2.000 kcal</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: ~150 g de proteína y 2 litros de agua por día.</p></details></div>`;
+}
 function campGimnasio(e, pre) {
   const st = e.state, d = pre ? 0 : dayIdx(todayISO()), wt = e.weekType(d), mult = ladder(st.k, Math.min(st.wk.sess, 4)), wkStart = pre ? null : addDays(S.startDate, d - d % 7);
   const mine = []; if (wkStart) for (let q = 0; q < 7; q++) { const dt = addDays(wkStart, q); (S.days[dt]?.input?.prog ?? []).forEach((n, k) => mine.push({ d: dt, k, n })); }
-  let h = `<div class="card slim"><div class="row"><h2>Semana de ${wt}</h2><span class="pill ${wt === 'descarga' ? 'gold' : ''}">${wt === 'carga' ? 'subí el peso' : 'una repetición más'}</span></div><div class="mute">${wt === 'carga' ? 'En las semanas de carga el progreso es usar más peso que tu mejor marca (llegando al mínimo del rango de repeticiones).' : 'En la descarga el progreso es una repetición más con el mismo peso que la última descarga. Un peso nuevo queda como base.'}</div></div>`;
+  let h = rutinaCards(pre) + `<div class="card slim"><div class="row"><h2>Semana de ${wt}</h2><span class="pill ${wt === 'descarga' ? 'gold' : ''}">${wt === 'carga' ? 'subí el peso' : 'una repetición más'}</span></div><div class="mute">${wt === 'carga' ? 'En las semanas de carga el progreso es usar más peso que tu mejor marca (llegando al mínimo del rango de repeticiones).' : 'En la descarga el progreso es una repetición más con el mismo peso que la última descarga. Un peso nuevo queda como base.'}</div></div>`;
   h += `<div class="card slim"><div class="row"><h2>Constancia</h2><span class="pill gold">semana ${st.k} · ×${String(+mult.toFixed(2)).replace('.', ',')}</span></div><div class="mute">Sesiones esta semana: ${st.wk.sess} / ${needSessions(st.k)} mínimas · ciclo de 4 semanas: ${st.cyc.length} / ${e.cfg.cycleNeed} ejercicios distintos con progreso</div></div>`;
   h += `<div class="card slim"><div class="row"><h2>Progreso de la semana</h2><span class="pill ${mine.length ? 'ok' : ''}">${mine.length}</span></div><div class="row" style="margin-top:8px"><input id="px" type="text" placeholder="Ejercicio que mejoraste" ${pre ? 'disabled' : ''} autocomplete="off"><button class="btn sm" ${pre ? 'disabled' : 'data-act="progadd"'}>Registrar</button></div>`
     + mine.map(m => `<div class="mrow static"><span class="mic">📈</span><span class="mtx"><b>${esc(m.n)}</b><small>${pretty(m.d)}</small></span><button class="undo" data-act="progdel" data-d="${m.d}" data-k="${m.k}">Borrar</button></div>`).join('')

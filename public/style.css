@@ -125,3 +125,4 @@ img.tile{width:52px;height:52px;object-fit:contain;filter:grayscale(1) invert(1)
 .scrollbtn img.ico{margin:0}
 .wq{margin:8px 0;padding:8px 10px;border:1px solid var(--hi);background:var(--field)}.wq b{display:block;font-size:13px;margin-bottom:6px}.wq .row{justify-content:flex-start}
 .rooms{gap:6px}.room{min-height:64px;padding:5px 2px;gap:2px}.room .tile,img.tile{width:36px;height:36px;font-size:20px}
+ul.plan{margin:8px 0 0;padding-left:18px;font-size:14px}ul.plan li{margin:3px 0}details summary{cursor:pointer;font:700 12px var(--fd);letter-spacing:.14em;text-transform:uppercase;color:var(--hi);padding:6px 0;list-style:none}details summary::-webkit-details-marker{display:none}details summary::after{content:' ▾'}details[open] summary::after{content:' ▴'}
