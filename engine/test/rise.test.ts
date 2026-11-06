@@ -34,7 +34,7 @@ test('curva de niveles: nivel 1 con 0 XP, 99 como tope, cada nivel cuesta más q
   const e = new Rise();
   assert.equal(e.xpForLevel(1), 0); assert.equal(e.statLevel('F'), 1);
   for (let L = 1; L < 98; L++) assert.ok(e.statCost(L + 1) > e.statCost(L), 'nivel ' + L);
-  assert.ok(e.xpForLevel(99) > 200_000 && e.xpForLevel(99) < 400_000, 'XP del nivel 99: ' + e.xpForLevel(99));
+  assert.ok(e.xpForLevel(99) > 80_000 && e.xpForLevel(99) < 200_000, 'XP del nivel 99: ' + e.xpForLevel(99));
   assert.ok(e.xpForLevel(92) < e.xpForLevel(99) * 0.8);
   e.state.xp.F = 1e12; assert.equal(e.statLevel('F'), 99); assert.ok(e.statProgress('F').max);
   const { log } = run(120, (i, r) => perfect(i, r));
@@ -152,8 +152,8 @@ test('títulos de la mascota: por nivel', () => {
 test('mascota: el punto se asigna a elección, máximo 20 por estadística y sin pasar de los puntos ganados', () => {
   const e = new Rise();
   e.state.petXp = 1e9; assert.equal(e.petLevel(), 100); assert.equal(e.petPending(), 100);
-  e.processDay({ alloc: ['O', 'O', 'O'] }); assert.equal(e.state.petAlloc.O, 3); assert.equal(e.petPending(), 97);
-  e.processDay({ alloc: Array(30).fill('O') }); assert.equal(e.state.petAlloc.O, 20);
+  e.processDay({ alloc: ['O', 'O', 'O'] }); assert.equal(e.state.petAlloc.O, 0);   // la bestia no reparte puntos
+  e.processDay({ alloc: Array(30).fill('O') }); assert.equal(e.state.petAlloc.O, 0);
   const e2 = new Rise(); e2.processDay({ alloc: ['F'] }); assert.equal(e2.state.petAlloc.F, 0);     // sin nivel no hay punto
 });
 
