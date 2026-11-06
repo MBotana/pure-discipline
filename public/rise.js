@@ -19,7 +19,7 @@ var RISE = {
   balanceGap: 15,
   sessionMin: 40,
   fuerzaPerMin: 1.6,
-  fuerzaCapMin: 120,
+  fuerzaCapMin: 1440,
   fuerzaWeekMin: 360,
   fuerzaMonthMin: 1440,
   fuerzaW: 250,

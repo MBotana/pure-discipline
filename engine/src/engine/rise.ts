@@ -46,7 +46,7 @@ export const RISE: RiseConfig = {
   startDate: '2026-11-09',
   xpA: 300, xpB: 15, xpScale: 0.8, statMax: 99, balanceGap: 15,
   sessionMin: 40,
-  fuerzaPerMin: 1.6, fuerzaCapMin: 120, fuerzaWeekMin: 360, fuerzaMonthMin: 1440, fuerzaW: 250, fuerzaM: 650,
+  fuerzaPerMin: 1.6, fuerzaCapMin: 1440, fuerzaWeekMin: 360, fuerzaMonthMin: 1440, fuerzaW: 250, fuerzaM: 650,
   readXp: 60, bookFirst: 2500, bookNext: 1250,
   foodDay: 105, waterXp: 15, foodThr: 0.8, vitW: 250, vitM: 650,
   cleanFirst: 100, cleanExtra: 40, cleanDaysMax: 5, cleanRoomsWeek: 5, ordenW: 250, repairFirst: 1100, repairNext: 550,
