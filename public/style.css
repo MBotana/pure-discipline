@@ -167,3 +167,12 @@ select{font:inherit;font-size:15px;color:var(--ink);background:var(--field);bord
 .gm-feel button{height:40px;border:2px solid var(--line2);background:transparent;color:var(--ink);font:700 12px var(--fd);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}.gm-feel button.on{background:var(--hi);border-color:var(--hi);color:var(--inv)}
 .gm-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px}.gm-nav .btn[disabled]{opacity:.3}
 .gm-foot{margin-top:auto;position:static}
+
+.fig.l{height:66%;left:-26%}#app.stage.pet .iscroll,#app.stage.pet .figtxt{width:54%}
+.rtab.two{grid-template-columns:auto auto;justify-content:start;gap:16px;border-top-color:rgba(255,255,255,.12)}
+.lv{white-space:nowrap;flex:none}
+.gm-rows{display:flex;flex-direction:column;gap:6px}
+.gm-row{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--panel);border:2px solid var(--line2);color:var(--ink);padding:9px 12px;min-height:50px;cursor:pointer}
+.gm-row .gm-n{font:700 14px var(--fd);letter-spacing:.04em}.gm-wt{font-size:12px;color:var(--mute)}
+.gm-row.ok .gm-n{text-decoration:line-through;opacity:.6}.gm-row.ok{border-color:var(--hi)}
+#gymmode{gap:8px}.gm-rows{gap:5px}.gm-row{padding:5px 12px;min-height:42px;gap:0}.fig.l{left:-32%}

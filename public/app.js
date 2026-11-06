@@ -370,7 +370,7 @@ function campHeroe(e, pre) {
   let b = `<div class="card slim"><div class="row"><h2>Estadísticas</h2><span class="pill">total ${e.totalLevel()}</span></div>`;
   for (const c of CATS) {
     const p = e.statProgress(c), a = st.petAlloc[c], bad = nt && e.eff(c) < nt.min;
-    b += `<div style="margin-top:10px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}${bad ? ' <span class="pill bad">baja</span>' : ''}</b><b>${p.level} / 99</b></div><div class="bar"><i style="width:${(p.pct * 100).toFixed(1)}%"></i></div><small class="mute">${p.max ? 'máximo' : `${fmt(p.into)} / ${fmt(p.cost)} XP para el nivel ${p.level + 1}`}</small></div>`;
+    b += `<div style="margin-top:10px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}${bad ? ' <span class="pill bad">baja</span>' : ''}</b><b class="lv">${p.level}/99</b></div><div class="bar"><i style="width:${(p.pct * 100).toFixed(1)}%"></i></div><small class="mute">${p.max ? 'máximo' : `${fmt(p.into)} / ${fmt(p.cost)} XP para el nivel ${p.level + 1}`}</small></div>`;
   }
   b += `</div>`;
   return figHead('l', e.titleName(), `${HERO_NAME} · Nivel ${lv}`, nt ? Math.min(100, lv / nt.avg * 100) : 100) + b;
@@ -412,12 +412,13 @@ function campMascota(e, pre) {
 
 /** Rutina fija. Series con repeticiones por serie (r) y peso que se anota en el modo gimnasio. */
 const R = (n, r = [15, 12, 12]) => ({ n, r });
+const B = [12, 10, 10];   // los cinco ejercicios de récord
 const RUTINA = [
   ['Lunes', 'Boxeo', [{ n: 'Boxeo (sin pesas)' }]],
-  ['Martes', 'Torso 1', [R('Press de pecho'), R('Jalón al pecho'), R('Press de hombros'), R('Remo sentado'), R('Peck deck'), R('Curl de bíceps en polea'), R('Tríceps en polea'), { n: 'Plancha', t: '3 × 40 s' }, { n: 'Bici libre 30-45 min' }]],
+  ['Martes', 'Torso 1', [R('Press de pecho', B), R('Jalón al pecho'), R('Press de hombros', B), R('Remo sentado'), R('Peck deck'), R('Curl de bíceps en polea'), R('Tríceps en polea'), { n: 'Plancha', t: '3 × 40 s' }, { n: 'Bici libre 30-45 min' }]],
   ['Miércoles', 'Boxeo', [{ n: 'Boxeo (sin pesas)' }]],
   ['Jueves', 'Torso 2', [R('Press inclinado en máquina'), R('Remo en polea baja'), R('Elevaciones laterales'), R('Peck deck invertido'), R('Fondos asistidos o máquina de tríceps'), R('Jalón con agarre cerrado'), R('Crunch en máquina'), R('Elevación de piernas'), { n: 'Bici libre 30-45 min' }]],
-  ['Viernes', 'Piernas', [R('Peso muerto convencional', [12, 10, 10]), R('Sentadilla'), R('Prensa'), R('Curl femoral'), R('Extensión de cuádriceps'), R('Abductores y aductores'), R('Gemelos'), R('Puente de glúteos'), { n: 'Bici suave 30 min' }]],
+  ['Viernes', 'Piernas', [R('Peso muerto convencional', B), R('Sentadilla', B), R('Prensa', B), R('Curl femoral'), R('Extensión de cuádriceps'), R('Abductores y aductores'), R('Gemelos'), R('Puente de glúteos'), { n: 'Bici suave 30 min' }]],
   ['Sábado', 'Libre', [{ n: 'Descanso o bici libre' }]],
   ['Domingo', 'Libre', [{ n: 'Descanso o bici libre' }]],
 ];
@@ -478,18 +479,14 @@ function liftSets() {
   const out = [];
   for (const [d, v] of Object.entries(S.days)) {
     for (const [n, arr] of Object.entries(v.input?.lifts ?? {})) for (const x of arr || []) if (x && x.ok && x.w > 0) out.push({ d, n, w: +x.w, r: +x.r });
-    for (const x of v.input?.liftsM ?? []) if (x.w > 0) out.push({ d, n: x.n, w: +x.w, r: +x.r });
   }
   return out;
 }
-const liftRecords = sets => LIFTS.map(nm => ({ nm, mx: sets.filter(x => x.n === nm).sort((a, b) => b.w - a.w || b.r - a.r)[0] }));
+const liftRecords = sets => LIFTS.map(nm => ({ nm, mx: sets.filter(x => x.n === nm && x.r >= 10).sort((a, b) => b.w - a.w || b.r - a.r)[0] }));
 const kg = w => `${String(+(+w).toFixed(1)).replace('.', ',')} kg`;
 function viewLifts() {
   const rec = liftRecords(liftSets());
-  let h = `<div class="card slim"><div class="row"><h2>Récords de peso</h2></div>`;
-  h += rec.map(r => `<div class="rtab two"><span class="rl"><b>${r.nm}</b></span><span class="rh">${r.mx ? `<b>${kg(r.mx.w)}</b> × ${r.mx.r}` : '—'}</span></div>`).join('');
-  h += `<div class="row" style="margin-top:10px;gap:6px"><select id="rl">${LIFTS.map(l => `<option value="${esc(l)}">${l}</option>`).join('')}</select><input id="rw" type="text" inputmode="decimal" placeholder="kg" style="width:64px"><input id="rr" type="text" inputmode="numeric" placeholder="reps" style="width:64px"><button class="btn sm" data-act="recadd">Anotar</button></div></div>`;
-  return h;
+  return `<div class="card slim"><div class="row"><h2>Récords a 10 reps</h2></div>` + rec.map(r => `<div class="rtab two"><span class="rl"><b>${r.nm}</b></span><span class="rv ${r.mx ? 'rec' : ''}">${r.mx ? kg(r.mx.w) : '—'}</span></div>`).join('') + `</div>`;
 }
 const FASE_TXT = [
   'Elegí tus pesos y hacé las repeticiones que corresponden, dejando 2 o 3 en el tanque. Lo que anotes es tu base.',
@@ -625,7 +622,7 @@ function fx(delta) {
 }
 
 // ---------- Modo gimnasio ----------
-let gymForce = false, gymRest = 0, gymTick = null, gymI = 0;
+let gymForce = false, gymRest = 0, gymTick = null, gymI = -1;
 const gymArrive = () => +(S.settings?.gym_arrive || 0);
 const gymActive = () => { const a = gymArrive(); return gymForce || (a > 0 && Date.now() - a < 6 * 3600e3 && S.gymHide !== a); };
 const lastW = (n, k) => prevW(n, k, wkOf(todayISO()) + 1) ?? '';
@@ -637,11 +634,20 @@ function gymScreen(force) {
   if (!el) { el = document.createElement('div'); el.id = 'gymmode'; document.body.appendChild(el); }
   const today = todayISO(), r = RUTINA[wkdayOf(today)], items = r[2], wk = wkOf(today), ph = wk % 4, des = ph === 3 && dayIdx(today) >= 0;
   const inp = S.days[today]?.input ?? {}, L = inp.lifts ?? {}, D = inp.dl ?? {}, done = (S.gymDone ||= {})[today] ||= {};
-  gymI = Math.max(0, Math.min(gymI, items.length - 1));
   const okEx = (x, i) => x.r ? gymSets(x).every((_, k) => des ? D[x.n]?.[k] : L[x.n]?.[k]?.ok) : !!done[i];
-  const made = items.filter((x, i) => okEx(x, i)).length, x = items[gymI];
-  let card;
-  if (x.r) {
+  const made = items.filter((x, i) => okEx(x, i)).length;
+  const head = `<div class="gm-head"><span>${dayIdx(today) >= 0 ? FASES[ph] : 'Modo gimnasio'}</span><b id="gmt"></b></div><h1>${r[0]} · ${r[1]}</h1><div class="bar gold"><i style="width:${made / items.length * 100}%"></i></div>`;
+  const foot = `<div class="gm-foot"><button class="btn ghost" data-act="grest">Descanso <span id="gmr">60</span> s</button><button class="undo" data-act="gexit">Salir del modo</button></div>`;
+  if (gymI < 0 || gymI >= items.length) {
+    const rows = items.map((x, i) => {
+      const ok = okEx(x, i);
+      if (!x.r) return `<button class="gm-row ${ok ? 'ok' : ''}" data-act="gcheck" data-i="${i}"><span class="gm-n">${esc(x.n)}</span><span class="gm-wt">${esc(x.t || '')}</span></button>`;
+      const wt = gymSets(x).map((rp, k) => { const c = L[x.n]?.[k], on = des ? D[x.n]?.[k] : c?.ok, w = des ? target(x.n, k, wk) : c?.w; return on && w !== '' && w !== undefined ? `${rp} × ${String(w).replace('.', ',')}` : null; }).filter(Boolean);
+      return `<button class="gm-row ${ok ? 'ok' : ''}" data-act="gopenex" data-i="${i}"><span class="gm-n">${esc(x.n)}</span><span class="gm-wt">${wt.length ? wt.join(' · ') + ' kg' : gymSets(x).join('-') + ' reps'}</span></button>`;
+    }).join('');
+    el.innerHTML = head + `<div class="gm-rows">${rows}</div>` + foot;
+  } else {
+    const x = items[gymI];
     const rows = gymSets(x).map((rp, k) => {
       const c = L[x.n]?.[k], t = target(x.n, k, wk), w = c?.w ?? t, on = des ? D[x.n]?.[k] : c?.ok;
       const mid = des ? `<span class="gm-tg">${t === '' ? '—' : String(t).replace('.', ',')}</span>` : `<input class="gm-w" type="text" inputmode="decimal" placeholder="kg" value="${w === '' || w === undefined ? '' : String(w).replace('.', ',')}" data-gw="${esc(x.n)}" data-k="${k}">`;
@@ -649,12 +655,8 @@ function gymScreen(force) {
     }).join('');
     const f = inp.feel?.[x.n];
     const feel = des ? '' : `<div class="gm-feel"><span class="mute">¿Cómo se sintió?</span>${[['f', 'Fácil'], ['j', 'Justo'], ['d', 'Duro']].map(([v, l]) => `<button class="${f === v ? 'on' : ''}" data-act="gfeel" data-v="${v}">${l}</button>`).join('')}</div>`;
-    card = `<div class="gm-ex col ${okEx(x, gymI) ? 'ok' : ''}"><span class="gm-n">${esc(x.n)}</span>${rows}${feel}</div>`;
-  } else card = `<button class="gm-ex big ${okEx(x, gymI) ? 'ok' : ''}" data-act="gcheck" data-i="${gymI}"><span class="gm-n">${esc(x.n)}<small>${esc(x.t || '')}</small></span><span class="gm-dots"><i class="${okEx(x, gymI) ? 'f' : ''}"></i></span></button>`;
-  el.innerHTML = `<div class="gm-head"><span>${dayIdx(today) >= 0 ? FASES[ph] : 'Modo gimnasio'}</span><b id="gmt"></b></div><h1>${r[0]} · ${r[1]}</h1><div class="bar gold"><i style="width:${made / items.length * 100}%"></i></div>`
-    + `<div class="gm-step"><span>Ejercicio <b>${gymI + 1}</b> / ${items.length}</span>${des ? '<span class="pill gold">solo seguí lo que dice</span>' : ''}</div>${card}`
-    + `<div class="gm-nav"><button class="btn ghost" data-act="gnav" data-d="-1" ${gymI === 0 ? 'disabled' : ''}>‹ Anterior</button><button class="btn" data-act="gnav" data-d="1" ${gymI === items.length - 1 ? 'disabled' : ''}>Siguiente ›</button></div>`
-    + `<div class="gm-foot"><button class="btn ghost" data-act="grest">Descanso <span id="gmr">60</span> s</button><button class="undo" data-act="gexit">Salir del modo</button></div>`;
+    el.innerHTML = head + `<div class="gm-ex col ${okEx(x, gymI) ? 'ok' : ''}"><span class="gm-n">${esc(x.n)}</span>${rows}${feel}</div>` + `<button class="btn" data-act="glist">‹ Volver a la lista</button>` + foot;
+  }
   tickGym();
   if (!gymTick) gymTick = setInterval(tickGym, 1000);
 }
@@ -715,16 +717,13 @@ document.addEventListener('click', async ev => {
     if (!cur?.ok) { gymRest = Date.now() + 60000; autoProg(todayISO(), x.n); }
     gymScreen(true);
   }
-  else if (a === 'gnav') { gymI += +el.dataset.d; gymScreen(true); }
+  else if (a === 'gopenex') { gymI = +el.dataset.i; gymScreen(true); }
+  else if (a === 'glist') { gymI = -1; gymScreen(true); }
   else if (a === 'gfeel') { const r = RUTINA[wkdayOf(todayISO())], x = r[2][gymI], v = el.dataset.v; setInput(todayISO(), i => { const f = { ...(i.feel || {}) }; f[x.n] = f[x.n] === v ? undefined : v; i.feel = f; }); gymScreen(true); }
   else if (a === 'gcheck') { const g = (S.gymDone ||= {})[todayISO()] ||= {}; g[+el.dataset.i] = !g[+el.dataset.i]; save(); gymScreen(true); }
-  else if (a === 'recadd') {
-    const n = document.getElementById('rl').value, w = parseFloat(document.getElementById('rw').value.replace(',', '.')), rp = parseInt(document.getElementById('rr').value, 10);
-    if (w > 0 && rp > 0) { setInput(todayISO(), i => { (i.liftsM ||= []).push({ n, w, r: rp }); }); hint('Récord anotado'); }
-  }
   else if (a === 'grest') { gymRest = gymRest ? 0 : Date.now() + 60000; tickGym(); }
   else if (a === 'gexit') { S.gymHide = gymArrive(); gymForce = false; save(); gymScreen(true); }
-  else if (a === 'gopen') { gymForce = true; gymScreen(true); }
+  else if (a === 'gopen') { gymForce = true; gymI = -1; gymScreen(true); }
   else if (a === 'closemodal') { announce = null; render(); }
   else if (a === 'gear') { if (tab !== 'ajustes') { lastTab = tab; tab = 'ajustes'; errMsg = ''; } render(); }
   else if (a === 'back') { tab = lastTab || 'hoy'; render(); }
