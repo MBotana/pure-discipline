@@ -321,7 +321,7 @@ function viewRegistro() {
     return `<div class="mrow static ${got ? 'on' : ''}"><span class="mic">${got ? '🐾' : '·'}</span><span class="mtx"><b>${t.name}</b><small>${got ? 'desde el ' + pretty(addDays(S.startDate, st.petTitles[g])) : `nivel ${t.lvl}`}</small></span><span class="chk">${got ? '✓' : ''}</span></div>`;
   }).join('') + `</div>`;
   void tIdx;
-  h += viewRecords(h0) + viewLogros(h0);
+  h += viewLogros(h0);
   // Diario
   const recent = log.slice(-40).reverse();
   h += `<div class="card slim"><h2>Diario</h2>${recent.length ? recent.map(x => `<div class="mrow static"><span class="mic">${logIcon(x.ic)}</span><span class="mtx"><b>${esc(x.t)}</b><small>${pretty(x.date)}</small></span></div>`).join('') : '<p class="mute">Todavía no pasó nada: sumá XP y se va a ir llenando.</p>'}</div>`;
@@ -351,10 +351,19 @@ function viewCamp() {
   return head + `<div class="iscroll">${SUB.camp === 'pet' ? campMascota(e, pre) : SUB.camp === 'gim' ? campGimnasio(e, pre) : campHeroe(e, pre)}</div>`;
 }
 
-/** Tarjeta de personaje, igual para el luchador y la bestia: imagen, título, nombre y nivel, y un pergamino que abre las estadísticas. */
-let statOpen = { her: false, pet: false };
-function figCard(k, img, title, sub, pct, dot, body, noBtn) {
-  return `<div class="card hero">${noBtn ? '' : `<button class="scrollbtn ${statOpen[k] ? 'on' : ''}" data-act="statopen" data-k="${k}" aria-label="Estadísticas">${pic('pergamino', '📜', 26)}${dot ? '<i class="pdot"></i>' : ''}</button>`}<div class="sil"><img class="scene" alt="" src="${url(img)}"></div><div class="ttl">${title}</div><div class="sub">${sub}</div><div class="bar gold"><i style="width:${Math.max(0, Math.min(100, pct)).toFixed(1)}%"></i></div></div>${noBtn || statOpen[k] ? body : ''}`;
+/** Cabecera de personaje: título, nombre y nivel, y barra de progreso. El personaje va de fondo (ver stageSet). */
+let statOpen = { pet: false };
+function figHead(side, title, sub, pct, btn, dot) {
+  return `<div class="figtxt ${side}">${btn ? `<button class="scrollbtn ${statOpen.pet ? 'on' : ''}" data-act="statopen" data-k="pet" aria-label="Títulos">${pic('pergamino', '📜', 26)}${dot ? '<i class="pdot"></i>' : ''}</button>` : ''}<div class="ttl">${title}</div><div class="sub">${sub}</div><div class="bar gold"><i style="width:${Math.max(0, Math.min(100, pct)).toFixed(1)}%"></i></div></div>`;
+}
+/** Personaje de fondo, fusionado con la pantalla: peleador a la derecha, bestia a la izquierda, del borde inferior al 70 % de la altura. */
+function stageSet() {
+  let el = document.getElementById('stage'); if (!el) { el = document.createElement('div'); el.id = 'stage'; document.body.insertBefore(el, document.getElementById('app')); }
+  const on = tab === 'camp' && S.startDate && (SUB.camp === 'her' || SUB.camp === 'pet');
+  const ap = document.getElementById('app'); ap.classList.toggle('stage', !!on); ap.classList.toggle('pet', !!on && SUB.camp === 'pet');
+  if (!on) { el.innerHTML = ''; return; }
+  const her = SUB.camp === 'her', sc = SCENES[petScene % SCENES.length], img = her ? 'sombra_heroe' : (has('sombra_' + sc[0]) ? 'sombra_' + sc[0] : 'sombra_bestia');
+  el.innerHTML = `<div class="fig ${her ? 'r' : 'l'}"><img alt="" src="${url(img)}"></div>`;
 }
 function campHeroe(e, pre) {
   const st = e.state, seen = S.seenLv || {}, up = CATS.filter(c => e.statLevel(c) > (seen[c] ?? e.statLevel(c))), nt = e.nextTitle(), lv = e.level();
@@ -368,7 +377,7 @@ function campHeroe(e, pre) {
     b += `<div class="card slim"><div class="row"><h2>Próximo título</h2><span class="pill">${nt.name}</span></div><p class="mute" style="margin-top:8px">Pide nivel ${nt.avg} de promedio (te faltan ${nt.missingAvg}) y que ninguna estadística quede por debajo de ${nt.min}.</p>`
       + CATS.map(c => `<div class="row" style="margin-top:6px"><span>${iconTag(c)} ${NAMES[c]}</span><b class="${e.eff(c) < nt.min ? 'lowv' : ''}">${e.eff(c)} / ${nt.min}</b></div><div class="bar"><i style="width:${Math.min(100, e.eff(c) / nt.min * 100)}%"></i></div>`).join('') + `</div>`;
   } else b += `<div class="card slim"><h2>Inmortal</h2><p class="mute">Llegaste al último título.</p></div>`;
-  return figCard('her', 'sombra_heroe', e.titleName(), `${HERO_NAME} · Nivel ${lv}`, nt ? Math.min(100, lv / nt.avg * 100) : 100, false, b);
+  return figHead('l', e.titleName(), `${HERO_NAME} · Nivel ${lv}`, nt ? Math.min(100, lv / nt.avg * 100) : 100) + b;
 }
 function viewRecords(hi) {
   const { e, days, weeks, kMax } = hi, w = weeks[weeks.length - 1], best = k => Math.max(...weeks.map(x => x[k])), sum = k => weeks.reduce((a, x) => a + x[k], 0);
@@ -407,7 +416,8 @@ function campMascota(e, pre) {
     return `<div class="mrow static ${got ? 'on' : ''}"><span class="mic">${got ? pic('titulo', '♛', 24) : '·'}</span><span class="mtx"><b>${t.name}</b><small>${got ? 'desde el ' + pretty(addDays(S.startDate, st.petTitles[g])) : `nivel ${t.lvl}`}</small></span><span class="chk">${got ? '✓' : ''}</span></div>`;
   }).join('') + `</div>`;
   b += `<p class="mute">${PET_NAME} sube de nivel con tu constancia en el gimnasio y cuando mejorás tus pesos o repeticiones.</p>`;
-  return figCard('pet', has('sombra_' + sc[0]) ? 'sombra_' + sc[0] : 'sombra_bestia', e.petTitleName(), `${PET_NAME} · Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, false, b);
+  const hi = pre ? null : history();
+  return figHead('r', e.petTitleName(), `${PET_NAME} · Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, true, false) + (hi ? viewRecords(hi) : '') + (statOpen.pet ? b : '');
 }
 
 /** Rutina fija: series de 12 a 15 con 60-75 s de descanso, una por vez. */
@@ -494,7 +504,7 @@ function render() {
   if (tab === 'hoy' && S.token && S.startDate) loadMeals(viewDate);
   hydratePhotos();
   if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
-  fit(); gymScreen();
+  stageSet(); fit(); gymScreen();
 }
 /** Todo entra en la pantalla: se mide el espacio libre y se reduce el contenido lo justo. Si ni así entra, se desplaza dentro de la solapa. */
 let fitting = false;
@@ -640,7 +650,7 @@ document.addEventListener('click', async ev => {
     if (wkdayOf(d) < 5 && mealsOf(d).length && !inp.meals) mealClose(d);
   }
   else if (a === 'reopen') setInput(viewDate, i => { i.closed = false; i.meals = false; });
-  else if (a === 'statopen') { statOpen[el.dataset.k] = !statOpen[el.dataset.k]; render(); }
+  else if (a === 'statopen') { statOpen.pet = !statOpen.pet; render(); }
   else if (a === 'alloc') {
     if (dayIdx(todayISO()) < 0) return;
     const before = dayGain(todayISO()); setInput(todayISO(), i => { i.alloc = [...(i.alloc || []), el.dataset.c]; }); void before; fx(0);
