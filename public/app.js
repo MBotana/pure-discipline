@@ -83,6 +83,8 @@ async function sync() {
   try {
     const changes = Object.entries(S.days).filter(([, v]) => v.dirty).map(([date, v]) => ({ date, input: v.input, updated_at: v.updated_at }));
     const r = await api('/api/sync', 'POST', { device: S.device, changes });
+    // Si el servidor reinició el progreso (otra fecha de inicio), se descarta lo guardado en este dispositivo.
+    if (r.settings.start_date && S.startDate && r.settings.start_date !== S.startDate) { S.days = {}; S.log = {}; S.verdict = {}; }
     for (const [date, remote] of Object.entries(r.days)) {
       const loc = S.days[date];
       if (!loc || remote.updated_at >= loc.updated_at) S.days[date] = { input: remote.input, updated_at: remote.updated_at };
@@ -448,12 +450,11 @@ function viewAjustes() {
   if (SUB.ajustes === 'gen') h += `<div class="card"><h2>Apariencia</h2><div class="themes">${THEMES.map(t => `<button class="theme ${(S.theme || 'gladiador') === t[0] ? 'on' : ''}" data-act="theme" data-v="${t[0]}"><i style="background:${t[2]}"></i>${t[1]}</button>`).join('')}</div></div>`;
   const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   if (SUB.ajustes === 'gen') h += `<div class="card"><h2>Sincronización</h2><div class="row"><span>${pending() ? pending() + ' día(s) pendientes' : 'Todo sincronizado'}</span><button class="btn sm" data-act="sync" ${syncing ? 'disabled' : ''}>${syncing ? 'Sincronizando…' : 'Sincronizar'}</button></div><div class="mute">${S.lastSync ? 'Última vez: ' + new Date(S.lastSync).toLocaleString('es-AR') : 'Nunca'}</div><div class="err">${esc(syncMsg)}</div></div>`;
-  if (SUB.ajustes === 'gen') h += `<div class="card"><h2>Dirección de la app</h2><div class="mute" style="word-break:break-all;user-select:all">${esc(location.origin)}</div><div class="row" style="margin-top:8px"><button class="btn sm" data-act="copyurl">Copiar dirección</button></div><p class="mute">Para los atajos: pegala y agregá <b>/api/gym</b> al final.</p></div>`;
   const st = S.settings || {};
   if (SUB.ajustes === 'notif') {
   h += `<div class="card"><h2>Notificaciones</h2>`;
   if (!standalone) h += `<div class="banner">En el iPhone: abrí esta página en Safari, tocá Compartir → <b>Agregar a pantalla de inicio</b> y abrila desde ahí. Sin eso iOS no permite notificaciones.</div>`;
-  h += `<div class="row"><button class="btn sm" data-act="push">Activar</button><button class="btn sm ghost" data-act="pushtest">Probar</button></div><div class="err" id="pushmsg">${esc(errMsg)}</div>`;
+  h += `<div class="row"><button class="btn sm" data-act="push">Activar</button></div><div class="err" id="pushmsg">${esc(errMsg)}</div>`;
   h += `<label>Recordatorio diario (hora local)<input id="rh" type="number" min="0" max="23" value="${esc(st.reminder_hour ?? 21)}"></label><label>Aviso de alimentación del domingo (hora)<input id="fh" type="number" min="0" max="23" value="${esc(st.feed_hour ?? 18)}"></label><button class="btn sm ghost" data-act="saveset">Guardar horarios</button></div>`;
   } else h += `<div class="card"><h2>Datos</h2><div class="mute">Primer día: ${S.startDate ? pretty(S.startDate) : '—'}</div><div class="row" style="margin-top:8px"><button class="btn sm ghost" data-act="export">Descargar respaldo</button><button class="btn sm ghost" data-act="logout">Cerrar sesión</button></div></div>`;
   return h;
@@ -744,7 +745,6 @@ document.addEventListener('click', async ev => {
   else if (a === 'txopen') { txOpen = true; errMeal = ''; render(); }
   else if (a === 'txcancel') { txOpen = false; txDraft = ''; pendBlob = null; if (pendURL) URL.revokeObjectURL(pendURL); pendURL = ''; render(); }
   else if (a === 'mealsend') { const tx = (document.getElementById('txin')?.value || '').trim(); if (!pendBlob && !tx) { hint('Agregá una foto o escribí qué comiste'); return; } mealSend(pendBlob, tx); }
-  else if (a === 'copyurl') { try { await navigator.clipboard.writeText(location.origin); hint('Dirección copiada'); } catch { hint('Mantené apretada la dirección para copiarla'); } }
   else if (a === 'bookadd') {
     const t = (document.getElementById('bt')?.value || '').trim(), au = (document.getElementById('ba')?.value || '').trim(), d = document.getElementById('bd')?.value || todayISO();
     if (!t) { hint('Escribí el título'); return; }
@@ -772,7 +772,6 @@ document.addEventListener('click', async ev => {
   else if (a === 'login') login();
   else if (a === 'sync') sync();
   else if (a === 'push') enablePush();
-  else if (a === 'pushtest') { try { const r = await api('/api/push/test', 'POST', { pet: 'behemot' }); document.getElementById('pushmsg').textContent = r.telegram ? 'Enviada por Telegram ✔ «' + r.text + '»' : r.error ? 'No se pudo: ' + r.error : r.delivered ? 'Enviada ✔' : 'No hay dispositivos suscritos.'; } catch (e) { document.getElementById('pushmsg').textContent = e.message; } }
   else if (a === 'saveset') {
     try { const r = await api('/api/settings', 'PUT', { reminder_hour: +document.getElementById('rh').value, feed_hour: +document.getElementById('fh').value }); S.settings = r.settings; save(); document.getElementById('pushmsg').textContent = 'Horarios guardados ✔'; } catch (e) { document.getElementById('pushmsg').textContent = e.message; }
   }
