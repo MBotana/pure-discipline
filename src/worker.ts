@@ -29,7 +29,7 @@ async function authed(req: Request, env: Env): Promise<boolean> {
   return tok.length > 0 && (await sha256hex(tok)) === stored;
 }
 
-const PUBLIC_SETTINGS = ['start_date', 'tz_offset', 'reminder_hour', 'feed_hour', 'reminders_on', 'gym_notify', 'aero_steps', 'aero_kcal', 'aero_hour'] as const;
+const PUBLIC_SETTINGS = ['start_date', 'tz_offset', 'reminder_hour', 'feed_hour', 'reminders_on', 'gym_notify', 'aero_steps', 'aero_kcal', 'aero_hour', 'gym_arrive'] as const;
 const DEFAULTS: Record<string, string> = { tz_offset: '-180', reminder_hour: '21', feed_hour: '18', reminders_on: '1', gym_notify: '1', aero_steps: '10000', aero_kcal: '500', aero_hour: '19' };
 
 async function readSettings(env: Env) {
@@ -126,7 +126,8 @@ const RUBRIC = `Rúbrica fija para puntuar la alimentación del día (aplicala s
 - 80: bastante bien, con una falla menor (por ejemplo, poca verdura o una comida algo desbalanceada).
 - 50: malo: falta de proteína clara, desbalance fuerte, comida basura o ultraprocesados repetidos, o comer muy poco.
 - Menos de 50: peor todavía (varias fallas juntas). 0 si no se comió nada.
-Lo que baja el puntaje, sobre todo: falta de proteína, desbalance entre proteínas, verduras, frutas y grasas, comida basura y comer muy poco. Mirá el día completo: lo que faltó en una comida cuenta como cumplido si se compensó en otra. Si falta información para juzgar algo, no lo penalices. Usá solo las comidas listadas; no inventes otras.`;
+Lo que baja el puntaje, sobre todo: falta de proteína, desbalance entre proteínas, verduras, frutas y grasas, comida basura y comer muy poco. Mirá el día completo: lo que faltó en una comida cuenta como cumplido si se compensó en otra. Si falta información para juzgar algo, no lo penalices. Usá solo las comidas listadas; no inventes otras.
+Referencia de esta persona: está bajando de peso y entrena casi todos los días. Su meta diaria es de ~2.000 kcal y ~150 g de proteína, repartidas en tres comidas (≈12, 17 y 23 hs). Menos de ~1.500 kcal o menos de ~110 g de proteína en el día es una falla clara; pasarse de ~2.400 kcal es una falla menor. No come papa ni batata: no las recomiendes.`;
 const mealName = (t: string) => { const h = +t.slice(0, 2); return h < 11 ? 'Desayuno' : h < 16 ? 'Almuerzo' : h < 20 ? 'Merienda' : 'Cena'; };
 const normFirst = (text: string) => text.split('\n').find(l => l.trim())?.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') ?? '';
 const parseScore = (text: string): number | null => { const m = /PUNTAJE[^0-9\n]{0,20}(\d{1,3})/i.exec(text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')); return m ? Math.min(100, Number(m[1])) : null; };
@@ -156,8 +157,8 @@ async function judgeDay(env: Env, date: string, final: boolean) {
   const meals = await listMeals(env, date);
   const list = meals.map(m => `${m.t} ${mealName(m.t)}: ${m.descr}`).join('\n');
   const how = final
-    ? 'El día terminó. Primera línea: solo "PUNTAJE: NN%" (un número entero de 0 a 100), según TODO el día junto. Después: "Macros del día (aprox.): proteína X g · carbohidratos X g · grasas X g · ~X kcal". Después, una sección "Qué bajó el puntaje:" con cada falla y qué habría que haber comido para evitarla (o una línea de por qué fue 100 si no hubo fallas). Sin markdown.'
-    : 'El día sigue. Respondé con estas cuatro líneas, sin encabezado de veredicto y sin markdown: "Comida de ahora: qué comí (la última comida listada)", "Macros de esa comida (aprox.): proteína X g · carbohidratos X g · grasas X g · ~X kcal", "Macros del día hasta ahora (aprox.): sumando todas las comidas", "Te falta para una buena alimentación: lo que todavía haría falta comer o evitar hoy según la rúbrica", "Puntaje estimado hasta ahora: PUNTAJE: NN%" (suponiendo que no comes nada más). ';
+    ? 'El día terminó. Primera línea: solo "PUNTAJE: NN%" (un número entero de 0 a 100), según TODO el día junto. Después: "Macros del día (aprox.): proteína X g · carbohidratos X g · grasas X g · ~X kcal" y una línea "Meta: 2.000 kcal y 150 g de proteína: llegó / quedó corto en X". Después, una sección "Qué bajó el puntaje:" con cada falla y qué habría que haber comido para evitarla (o una línea de por qué fue 100 si no hubo fallas). Sin markdown.'
+    : 'El día sigue. Respondé con estas líneas, sin encabezado de veredicto y sin markdown, cortas y concretas: "Esta comida: qué comí (la última comida listada)", "Esta comida: ~X kcal · X g de proteína", "Acumulado hoy: ~X kcal · X g de proteína (meta: 2.000 kcal y 150 g)", "Te falta: X kcal y X g de proteína, y si falta algo más (verduras, fruta, grasas buenas) o si hay algo para evitar", "Para compensar: una sugerencia concreta con alimentos y cantidades para la próxima comida (o para lo que queda del día, según la hora de las comidas listadas)", "Puntaje estimado hasta ahora: PUNTAJE: NN%" (suponiendo que no comes nada más). Si ya llegó a la meta o se pasó, decilo y no sugieras comer más. ';
   return gemini(env, 'Sos un evaluador consistente de la alimentación diaria de un adulto que entrena. Respondés en español rioplatense, breve y concreto.\n' + RUBRIC, [{ text: `${how}\n\nComidas del día:\n${list}` }]);
 }
 

@@ -430,7 +430,7 @@ function rutinaCards(pre) {
 function campGimnasio(e, pre) {
   const st = e.state, d = pre ? 0 : dayIdx(todayISO()), wt = e.weekType(d), mult = ladder(st.k, Math.min(st.wk.sess, 4)), wkStart = pre ? null : addDays(S.startDate, d - d % 7);
   const mine = []; if (wkStart) for (let q = 0; q < 7; q++) { const dt = addDays(wkStart, q); (S.days[dt]?.input?.prog ?? []).forEach((n, k) => mine.push({ d: dt, k, n })); }
-  let h = rutinaCards(pre) + `<div class="card slim"><div class="row"><h2>Semana de ${wt}</h2><span class="pill ${wt === 'descarga' ? 'gold' : ''}">${wt === 'carga' ? 'subí el peso' : 'una repetición más'}</span></div><div class="mute">${wt === 'carga' ? 'En las semanas de carga el progreso es usar más peso que tu mejor marca (llegando al mínimo del rango de repeticiones).' : 'En la descarga el progreso es una repetición más con el mismo peso que la última descarga. Un peso nuevo queda como base.'}</div></div>`;
+  let h = `<button class="btn" style="width:100%;margin-bottom:12px" data-act="gopen">Abrir modo gimnasio</button>` + rutinaCards(pre) + `<div class="card slim"><div class="row"><h2>Semana de ${wt}</h2><span class="pill ${wt === 'descarga' ? 'gold' : ''}">${wt === 'carga' ? 'subí el peso' : 'una repetición más'}</span></div><div class="mute">${wt === 'carga' ? 'En las semanas de carga el progreso es usar más peso que tu mejor marca (llegando al mínimo del rango de repeticiones).' : 'En la descarga el progreso es una repetición más con el mismo peso que la última descarga. Un peso nuevo queda como base.'}</div></div>`;
   h += `<div class="card slim"><div class="row"><h2>Constancia</h2><span class="pill gold">semana ${st.k} · ×${String(+mult.toFixed(2)).replace('.', ',')}</span></div><div class="mute">Sesiones esta semana: ${st.wk.sess} / ${needSessions(st.k)} mínimas · ciclo de 4 semanas: ${st.cyc.length} / ${e.cfg.cycleNeed} ejercicios distintos con progreso</div></div>`;
   h += `<div class="card slim"><div class="row"><h2>Progreso de la semana</h2><span class="pill ${mine.length ? 'ok' : ''}">${mine.length}</span></div><div class="row" style="margin-top:8px"><input id="px" type="text" placeholder="Ejercicio que mejoraste" ${pre ? 'disabled' : ''} autocomplete="off"><button class="btn sm" ${pre ? 'disabled' : 'data-act="progadd"'}>Registrar</button></div>`
     + mine.map(m => `<div class="mrow static"><span class="mic">📈</span><span class="mtx"><b>${esc(m.n)}</b><small>${pretty(m.d)}</small></span><button class="undo" data-act="progdel" data-d="${m.d}" data-k="${m.k}">Borrar</button></div>`).join('')
@@ -494,7 +494,7 @@ function render() {
   if (tab === 'hoy' && S.token && S.startDate) loadMeals(viewDate);
   hydratePhotos();
   if (focus && document.getElementById(focus)) document.getElementById(focus).focus();
-  fit();
+  fit(); gymScreen();
 }
 /** Todo entra en la pantalla: se mide el espacio libre y se reduce el contenido lo justo. Si ni así entra, se desplaza dentro de la solapa. */
 let fitting = false;
@@ -559,6 +559,31 @@ function fx(delta) {
   if (delta > 0) { const t = document.createElement('div'); t.className = 'dmg'; t.textContent = '+' + delta; document.body.appendChild(t); setTimeout(() => t.remove(), 950); }
 }
 
+// ---------- Modo gimnasio ----------
+let gymForce = false, gymRest = 0, gymTick = null;
+const gymArrive = () => +(S.settings?.gym_arrive || 0);
+const gymActive = () => { const a = gymArrive(); return gymForce || (a > 0 && Date.now() - a < 6 * 3600e3 && S.gymHide !== a); };
+const exSets = x => +(/(\d)×/.exec(x)?.[1] ?? 1);
+function gymScreen() {
+  let el = document.getElementById('gymmode');
+  if (!gymActive() || !S.token) { el?.remove(); if (gymTick) { clearInterval(gymTick); gymTick = null; } return; }
+  if (!el) { el = document.createElement('div'); el.id = 'gymmode'; document.body.appendChild(el); }
+  const today = todayISO(), r = RUTINA[wkdayOf(today)], done = (S.gym ||= {})[today] ||= {};
+  const total = r[2].reduce((a, x) => a + exSets(x), 0), made = r[2].reduce((a, x, i) => a + Math.min(exSets(x), done[i] || 0), 0);
+  el.innerHTML = `<div class="gm-head"><span>Modo gimnasio</span><b id="gmt"></b></div><h1>${r[0]} · ${r[1]}</h1><div class="bar gold"><i style="width:${total ? made / total * 100 : 0}%"></i></div>`
+    + `<div class="gm-list">${r[2].map((x, i) => { const n = exSets(x), d = Math.min(n, done[i] || 0); return `<button class="gm-ex ${d >= n ? 'ok' : ''}" data-act="gset" data-i="${i}"><span class="gm-n">${esc(x.split(' · ')[0])}<small>${esc(x.split(' · ')[1] || '')}</small></span><span class="gm-dots">${Array.from({ length: n }, (_, k) => `<i class="${k < d ? 'f' : ''}"></i>`).join('')}</span></button>`; }).join('')}</div>`
+    + `<div class="gm-foot"><button class="btn" data-act="grest">Descanso <span id="gmr">60</span> s</button>${spotifyBar()}<button class="undo" data-act="gexit">Salir del modo</button></div>`;
+  tickGym();
+  if (!gymTick) gymTick = setInterval(tickGym, 1000);
+}
+function tickGym() {
+  const t = document.getElementById('gmt'), a = gymArrive();
+  if (t) { const m = a ? Math.max(0, Math.floor((Date.now() - a) / 60000)) : 0; t.textContent = !a ? '' : m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`; }
+  const r = document.getElementById('gmr');
+  if (r) { if (gymRest > 0 && Date.now() >= gymRest) { gymRest = 0; navigator.vibrate?.(300); } r.textContent = gymRest ? Math.max(0, Math.ceil((gymRest - Date.now()) / 1000)) : 60; r.parentElement.classList.toggle('on', !!gymRest); }
+}
+const spotifyBar = () => '';
+
 // ---------- acciones ----------
 async function login() {
   const token = document.getElementById('tok').value;
@@ -585,6 +610,10 @@ document.addEventListener('click', async ev => {
   if (el.tagName === 'A') ev.preventDefault();
   const a = el.dataset.act;
   if (a === 'tab') { tab = el.dataset.t; if (tab === 'camp') rerollScene(); render(); }
+  else if (a === 'gset') { const i = +el.dataset.i, r = RUTINA[wkdayOf(todayISO())], n = exSets(r[2][i]), g = ((S.gym ||= {})[todayISO()] ||= {}); g[i] = (g[i] || 0) >= n ? 0 : (g[i] || 0) + 1; if (g[i] > 0 && g[i] < n || (g[i] === n && n > 1)) gymRest = Date.now() + 60000; save(); gymScreen(); }
+  else if (a === 'grest') { gymRest = gymRest ? 0 : Date.now() + 60000; tickGym(); }
+  else if (a === 'gexit') { S.gymHide = gymArrive(); gymForce = false; save(); gymScreen(); }
+  else if (a === 'gopen') { gymForce = true; gymScreen(); }
   else if (a === 'closemodal') { announce = null; render(); }
   else if (a === 'gear') { if (tab !== 'ajustes') { lastTab = tab; tab = 'ajustes'; errMsg = ''; } render(); }
   else if (a === 'back') { tab = lastTab || 'hoy'; render(); }
@@ -684,6 +713,7 @@ async function detectMode() {
 // ---------- arranque ----------
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 window.addEventListener('online', sync);
+setInterval(() => { if (document.visibilityState === 'visible' && S.token && navigator.onLine) sync(); }, 45000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (viewDate > todayISO()) viewDate = todayISO(); sync(); render(); if (tab === 'hoy') loadMeals(todayISO(), true); } });
 onAssets(() => render());
 render(); detectMode(); sync();

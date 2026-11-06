@@ -126,3 +126,12 @@ img.tile{width:52px;height:52px;object-fit:contain;filter:grayscale(1) invert(1)
 .wq{margin:8px 0;padding:8px 10px;border:1px solid var(--hi);background:var(--field)}.wq b{display:block;font-size:13px;margin-bottom:6px}.wq .row{justify-content:flex-start}
 .rooms{gap:6px}.room{min-height:64px;padding:5px 2px;gap:2px}.room .tile,img.tile{width:36px;height:36px;font-size:20px}
 ul.plan{margin:8px 0 0;padding-left:18px;font-size:14px}ul.plan li{margin:3px 0}details summary{cursor:pointer;font:700 12px var(--fd);letter-spacing:.14em;text-transform:uppercase;color:var(--hi);padding:6px 0;list-style:none}details summary::-webkit-details-marker{display:none}details summary::after{content:' ▾'}details[open] summary::after{content:' ▴'}
+#gymmode{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;padding:calc(env(safe-area-inset-top) + 16px) max(14px,calc((100vw - 560px)/2 + 14px)) calc(env(safe-area-inset-bottom) + 14px);display:flex;flex-direction:column;gap:10px}
+.gm-head{display:flex;justify-content:space-between;font:700 11px var(--fd);letter-spacing:.3em;text-transform:uppercase;color:var(--mute)}.gm-head b{color:var(--hi);letter-spacing:.1em}
+#gymmode h1{padding:0;margin:0}
+.gm-list{display:flex;flex-direction:column;gap:8px;flex:1}
+.gm-ex{display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;background:var(--panel);border:2px solid var(--line2);color:var(--ink);padding:12px;min-height:60px;cursor:pointer}
+.gm-ex.ok{border-color:var(--hi);opacity:.55}.gm-n{display:flex;flex-direction:column;font:700 14px var(--fd);letter-spacing:.04em}.gm-n small{font:500 12px var(--fb);color:var(--mute);letter-spacing:0;margin-top:2px}
+.gm-dots{display:flex;gap:6px}.gm-dots i{width:18px;height:18px;border:2px solid var(--line2)}.gm-dots i.f{background:var(--hi);border-color:var(--hi)}
+.gm-foot{display:flex;flex-direction:column;gap:8px;position:sticky;bottom:0;background:var(--bg);padding-top:6px}
+.gm-foot .btn.on{background:transparent;color:var(--hi);border:2px solid var(--hi)}
