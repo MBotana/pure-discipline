@@ -282,8 +282,8 @@ function history() {
     for (const c of CATS) { const l = e.statLevel(c); if (l > prevL[c]) log.push({ date, t: `${NAMES[c]} subió a ${l}`, ic: c }); prevL[c] = l; }
     if (e.petLevel() > prevP) { log.push({ date, t: `${PET_NAME} subió a nivel ${e.petLevel()}`, ic: 'P' }); prevP = e.petLevel(); }
     if (e.level() > prevH) { log.push({ date, t: `Nivel ${e.level()}`, ic: 'H' }); prevH = e.level(); }
-    for (const g of r.unlocked) log.push({ date, t: `Título: ${HERO_TITLES[g].name}`, ic: 'T' });
-    for (const g of r.petUnlocked) log.push({ date, t: `${PET_NAME}: ${PET_TITLES[g].name}`, ic: 'T' });
+    if (TITLES_ON) for (const g of r.unlocked) log.push({ date, t: `Título: ${HERO_TITLES[g].name}`, ic: 'T' });
+    if (TITLES_ON) for (const g of r.petUnlocked) log.push({ date, t: `${PET_NAME}: ${PET_TITLES[g].name}`, ic: 'T' });
     for (const x of r.events) if (x.kind !== 'D') log.push({ date, t: `${x.label}: +${fmt(x.amount)} XP`, ic: x.cat });
   }
   return { e, days, log, weeks, kMax };
@@ -310,17 +310,7 @@ function viewRegistro() {
     + books.map(b => `<div class="mrow static"><span class="mic">📖</span><span class="mtx"><b>${esc(b.t)}</b><small>${b.a ? esc(b.a) + ' · ' : ''}${pretty(b.d)}</small></span><button class="undo" data-act="bookdel" data-d="${b.d}" data-k="${b.k}">Borrar</button></div>`).join('') + `</div>`;
   h += `<div class="card slim"><div class="row"><h2>Arreglos en la casa</h2><span class="pill ${reps.length ? 'ok' : ''}">${reps.length}</span></div><div class="mute">Este mes: ${mReps} · el primero del mes vale el doble</div><label>Qué arreglaste<input id="rt" value="${esc(rpDraft.t)}" autocomplete="off"></label><label>Lo terminé el<input id="rd" type="date" min="${S.startDate}" max="${today}" value="${rpDraft.d || today}"></label><button class="btn" style="margin-top:10px" data-act="repairadd">Agregar arreglo</button>`
     + reps.map(b => `<div class="mrow static"><span class="mic">🔧</span><span class="mtx"><b>${esc(b.t)}</b><small>${pretty(b.d)}</small></span><button class="undo" data-act="repairdel" data-d="${b.d}" data-k="${b.k}">Borrar</button></div>`).join('') + `</div>`;
-  // Títulos
-  const tIdx = e.titleIndex();
-  h += `<div class="card slim"><div class="row"><h2>${pic('titulo', '')} Títulos</h2><span class="pill gold">${Object.keys(st.titles).length} / ${HERO_TITLES.length}</span></div>` + HERO_TITLES.map((t, g) => {
-    const got = st.titles[g] !== undefined, min = Math.max(1, t.avg - cfg.balanceGap);
-    return `<div class="mrow static ${got ? 'on' : ''}"><span class="mic">${got ? pic('titulo', '♛', 24) : '·'}</span><span class="mtx"><b>${t.name}</b><small>${got ? 'desde el ' + pretty(addDays(S.startDate, st.titles[g])) : `nivel ${t.avg}${t.avg > 1 ? ` · ninguna estadística bajo ${min}` : ''}`}</small></span><span class="chk">${got ? '✓' : ''}</span></div>`;
-  }).join('') + `</div>`;
-  h += `<div class="card slim"><div class="row"><h2>Títulos de ${PET_NAME}</h2><span class="pill gold">${Object.keys(st.petTitles).length} / ${PET_TITLES.length}</span></div>` + PET_TITLES.map((t, g) => {
-    const got = st.petTitles[g] !== undefined;
-    return `<div class="mrow static ${got ? 'on' : ''}"><span class="mic">${got ? '🐾' : '·'}</span><span class="mtx"><b>${t.name}</b><small>${got ? 'desde el ' + pretty(addDays(S.startDate, st.petTitles[g])) : `nivel ${t.lvl}`}</small></span><span class="chk">${got ? '✓' : ''}</span></div>`;
-  }).join('') + `</div>`;
-  void tIdx;
+  // Títulos: se quitaron hasta definir los nuevos (TITLES_ON)
   h += viewLogros(h0);
   // Diario
   const recent = log.slice(-40).reverse();
@@ -332,6 +322,7 @@ function entryHTML(e, date) {
   return `<div class="entry">${e.kind === 'photo' ? `<img class="thumb" data-ph="${e.id}" alt="">` : '<span class="mic">✍️</span>'}<span class="mtx"><b>${e.t} · ${mealName(e.t)}</b><small class="dsc">${esc(e.descr)}</small></span></div>`;
 }
 // ---------- Guarida: Héroe · La bestia · Gimnasio ----------
+const TITLES_ON = false;   // los títulos nuevos se cargan más adelante
 const PET_NAME = 'La bestia';
 const HERO_NAME = 'El Discípulo';
 const SCENES = [['saco', 'Golpeando el saco', '🥊'], ['asador', 'Asando una presa', '🍖'], ['metal', 'Cabeceando heavy metal', '🤘'], ['grimorio', 'Leyendo el libro oscuro', '📕'], ['ki', 'Cargando energía', '⚡'], ['agua', 'Bebiendo agua', '💧'], ['martillo', 'Martillando', '🔨']];
@@ -346,7 +337,7 @@ function lvlSeen() {
 }
 function viewCamp() {
   if (!S.startDate) return `<h1>Guarida</h1><div class="card mute">Disponibles al ingresar.</div>`;
-  const head = `<h1>Guarida</h1>` + subtabs('camp', [['her', 'Luchador'], ['pet', 'Bestia'], ['gim', 'Gimnasio']]) + '<!--fit-->';
+  const head = `<h1>Guarida</h1>` + subtabs('camp', [['her', 'Stats'], ['pet', 'Récords'], ['gim', 'Gimnasio']]) + '<!--fit-->';
   const { e, pre } = current();
   return head + `<div class="iscroll">${SUB.camp === 'pet' ? campMascota(e, pre) : SUB.camp === 'gim' ? campGimnasio(e, pre) : campHeroe(e, pre)}</div>`;
 }
@@ -373,7 +364,7 @@ function campHeroe(e, pre) {
     b += `<div style="margin-top:10px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="upar">↑</span>' : ''}${bad ? ' <span class="pill bad">baja</span>' : ''}</b><b class="lv">${p.level}/99</b></div><div class="bar"><i style="width:${(p.pct * 100).toFixed(1)}%"></i></div><small class="mute">${p.max ? 'máximo' : `${fmt(p.into)} / ${fmt(p.cost)} XP para el nivel ${p.level + 1}`}</small></div>`;
   }
   b += `</div>`;
-  return figHead('l', e.titleName(), `${HERO_NAME} · Nivel ${lv}`, nt ? Math.min(100, lv / nt.avg * 100) : 100) + b;
+  return figHead('l', 'El hombre', `Nivel ${lv}`, nt ? Math.min(100, lv / nt.avg * 100) : 100) + b;
 }
 function viewRecords(hi) {
   const { e, days, weeks, kMax } = hi, w = weeks[weeks.length - 1], best = k => Math.max(...weeks.map(x => x[k])), sum = k => weeks.reduce((a, x) => a + x[k], 0);
@@ -398,7 +389,6 @@ function viewLogros(hi) {
     ['📚', 'Primer libro', 'Libros leídos', st.totals.books, 1], ['📚', '6 libros', 'Libros leídos', st.totals.books, 6], ['📚', '12 libros', 'Libros leídos', st.totals.books, 12],
     ['🔧', 'Primer arreglo', 'Arreglos', st.totals.repairs, 1],
     ['▲', 'Nivel 10', 'Nivel del héroe', e.level(), 10], ['▲', 'Nivel 25', 'Nivel del héroe', e.level(), 25], ['▲', 'Nivel 50', 'Nivel del héroe', e.level(), 50], ['▲', 'Nivel 75', 'Nivel del héroe', e.level(), 75], ['▲', 'Nivel 99', 'Nivel del héroe', e.level(), 99],
-    ['♛', '3 títulos', 'Títulos del héroe', nT, 3], ['♛', '6 títulos', 'Títulos del héroe', nT, 6], ['♛', '11 títulos', 'Todos los títulos', nT, 11],
     ['🐾', `${PET_NAME} nivel 25`, 'Bestia', e.petLevel(), 25], ['🐾', `${PET_NAME} nivel 100`, 'Bestia', e.petLevel(), 100],
   ];
   const got = M.filter(m => m[3] >= m[4]).length;
@@ -407,7 +397,7 @@ function viewLogros(hi) {
 
 function campMascota(e, pre) {
   const pp = e.petProgress(), hi = pre ? null : history();
-  return figHead('r', e.petTitleName(), `${PET_NAME} · Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, false, false) + (hi ? viewRecords(hi) : '') + viewLifts();
+  return figHead('r', 'La bestia', `Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, false, false) + (hi ? viewRecords(hi) : '') + viewLifts();
 }
 
 /** Rutina fija. Series con repeticiones por serie (r) y peso que se anota en el modo gimnasio. */
@@ -535,7 +525,7 @@ const NAV = [['hoy', '◉', 'Objetivos'], ['reg', '☰', 'Registro'], ['camp', '
 /** Aviso de título nuevo (héroe o mascota), una sola vez. */
 let announce = null;
 function titleSeen() {
-  const { e, pre } = current(); if (pre) return;
+  const { e, pre } = current(); if (pre || !TITLES_ON) return;
   const h = e.titleIndex(), p = e.petTitleIndex();
   if (S.seenTitle === undefined) { S.seenTitle = h; S.seenPetTitle = p; save(); return; }
   if (h > S.seenTitle) { announce = { k: 'Nuevo título', n: HERO_TITLES[h].name, f: frase('titulo', todayISO()) }; S.seenTitle = h; save(); }
