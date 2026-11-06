@@ -150,3 +150,9 @@ ul.plan{margin:8px 0 0;padding-left:18px;font-size:14px}ul.plan li{margin:3px 0}
 .figtxt{margin:6px 0 12px;position:relative;text-shadow:0 2px 6px #000}.figtxt.l{text-align:left}.figtxt.r{text-align:right}
 .figtxt .ttl{margin-top:0;font-size:22px}.figtxt .bar{margin-top:10px}
 .figtxt .scrollbtn{position:static;float:left;margin:0 10px 6px 0}
+.gm-ex.col{flex-direction:column;align-items:stretch;gap:8px}.gm-set{display:grid;grid-template-columns:1fr 84px 24px 46px;align-items:center;gap:8px}
+.gm-set .gm-w{margin:0;text-align:center;height:44px;font-size:18px;font-weight:700}.gm-rp b{font-size:20px}.gm-rp{color:var(--mute);font-size:13px}
+.gm-ok{width:46px;height:44px;border:2px solid var(--line2);background:transparent;color:var(--inv);font-size:22px;font-weight:800;cursor:pointer}.gm-set.ok .gm-ok{background:var(--hi);border-color:var(--hi)}
+select{font:inherit;font-size:15px;color:var(--ink);background:var(--field);border:1px solid var(--line2);padding:8px;height:40px;flex:1;min-width:0;border-radius:0}
+.fig.l{height:52%;left:-10%}
+#app.stage .scrollbtn{background:transparent;border:0;box-shadow:none;width:36px;height:36px}

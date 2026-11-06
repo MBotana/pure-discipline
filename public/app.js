@@ -413,34 +413,55 @@ function campMascota(e, pre) {
   }).join('') + `</div>`;
   b += `<p class="mute">${PET_NAME} sube de nivel con tu constancia en el gimnasio y cuando mejorás tus pesos o repeticiones.</p>`;
   const hi = pre ? null : history();
-  return figHead('r', e.petTitleName(), `${PET_NAME} · Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, true, false) + (hi ? viewRecords(hi) : '') + (statOpen.pet ? b : '');
+  return figHead('r', e.petTitleName(), `${PET_NAME} · Nivel ${pp.level}`, pp.max ? 100 : pp.pct * 100, true, false) + (hi ? viewRecords(hi) : '') + (statOpen.pet ? b : '') + viewLifts();
 }
 
-/** Rutina fija: series de 12 a 15 con 60-75 s de descanso, una por vez. */
+/** Rutina fija. Series con repeticiones por serie (r) y peso que se anota en el modo gimnasio. */
+const R = (n, r = [15, 12, 12]) => ({ n, r });
 const RUTINA = [
-  ['Lunes', 'Boxeo', ['Boxeo (sin pesas)', 'Si querés: 10 min de abdomen al final']],
-  ['Martes', 'Torso 1', ['Press de pecho en máquina · 3×12-15', 'Jalón al pecho · 3×12-15', 'Press de hombros en máquina · 3×12-15', 'Remo sentado · 3×12-15', 'Peck deck · 3×12-15', 'Curl de bíceps en polea · 3×12-15', 'Tríceps en polea · 3×12-15', 'Plancha · 3×40 s', 'Bici libre 30-45 min']],
-  ['Miércoles', 'Boxeo', ['Boxeo (sin pesas)']],
-  ['Jueves', 'Torso 2', ['Press inclinado en máquina · 3×12-15', 'Remo en polea baja · 3×12-15', 'Elevaciones laterales · 3×12-15', 'Peck deck invertido · 3×12-15', 'Fondos asistidos o máquina de tríceps · 3×12-15', 'Jalón con agarre cerrado · 3×12-15', 'Crunch en máquina · 3×15', 'Elevación de piernas · 3×12-15', 'Bici libre 30-45 min']],
-  ['Viernes', 'Piernas', ['Peso muerto convencional · 3×8-10, moderado', 'Sentadilla · 3×10-12', 'Prensa · 3×12-15', 'Curl femoral · 3×12-15', 'Extensión de cuádriceps · 3×12-15', 'Abductores y aductores · 3×15', 'Gemelos · 3×15', 'Puente de glúteos · 3×15', 'Bici suave 30 min']],
-  ['Sábado', 'Libre', ['Descanso o bici libre']],
-  ['Domingo', 'Libre', ['Descanso o bici libre']],
+  ['Lunes', 'Boxeo', [{ n: 'Boxeo (sin pesas)' }]],
+  ['Martes', 'Torso 1', [R('Press de pecho'), R('Jalón al pecho'), R('Press de hombros'), R('Remo sentado'), R('Peck deck'), R('Curl de bíceps en polea'), R('Tríceps en polea'), { n: 'Plancha', t: '3 × 40 s' }, { n: 'Bici libre 30-45 min' }]],
+  ['Miércoles', 'Boxeo', [{ n: 'Boxeo (sin pesas)' }]],
+  ['Jueves', 'Torso 2', [R('Press inclinado en máquina'), R('Remo en polea baja'), R('Elevaciones laterales'), R('Peck deck invertido'), R('Fondos asistidos o máquina de tríceps'), R('Jalón con agarre cerrado'), R('Crunch en máquina'), R('Elevación de piernas'), { n: 'Bici libre 30-45 min' }]],
+  ['Viernes', 'Piernas', [R('Peso muerto convencional', [12, 10, 10]), R('Sentadilla'), R('Prensa'), R('Curl femoral'), R('Extensión de cuádriceps'), R('Abductores y aductores'), R('Gemelos'), R('Puente de glúteos'), { n: 'Bici suave 30 min' }]],
+  ['Sábado', 'Libre', [{ n: 'Descanso o bici libre' }]],
+  ['Domingo', 'Libre', [{ n: 'Descanso o bici libre' }]],
 ];
+const exTxt = x => x.r ? `${x.n} · ${x.r.join('-')}` : x.t ? `${x.n} · ${x.t}` : x.n;
 const COMIDAS = [['12:00', 'Milanesa grande al horno con pan integral y verduras'], ['17:00', 'Licuado: 2 bananas, 300 ml de leche proteica, 1 scoop de proteína y 1 de avena'], ['23:00', '1 taza de arroz, 3 huevos, queso rallado y zanahoria rallada']];
 function rutinaCards(pre) {
   const hoy = RUTINA[wkdayOf(todayISO())];
-  const lista = r => `<ul class="plan">${r[2].map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+  const lista = r => `<ul class="plan">${r[2].map(x => `<li>${esc(exTxt(x))}</li>`).join('')}</ul>`;
   return `<div class="card slim"><div class="row"><h2>Hoy · ${hoy[0]}</h2><span class="pill gold">${hoy[1]}</span></div>${lista(hoy)}<details><summary>Toda la semana</summary>${RUTINA.map(r => `<div class="row" style="margin-top:10px"><b>${r[0]}</b><span class="pill">${r[1]}</span></div>${lista(r)}`).join('')}</details></div>`
     + `<div class="card slim"><details><summary>Comidas del día · ~2.000 kcal</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: ~150 g de proteína y 2 litros de agua por día.</p></details></div>`;
 }
+/** Récords de peso: por cada levantamiento, el máximo con 12 repeticiones o más y el máximo absoluto. */
+const LIFTS = [['Banco plano', 'Press de pecho'], ['Sentadilla', 'Sentadilla'], ['Peso muerto', 'Peso muerto convencional'], ['Prensa', 'Prensa'], ['Press de hombros', 'Press de hombros']];
+function liftSets() {
+  const out = [];
+  for (const [d, v] of Object.entries(S.days)) {
+    for (const [n, arr] of Object.entries(v.input?.lifts ?? {})) for (const x of arr || []) if (x && x.ok && x.w > 0) out.push({ d, n, w: +x.w, r: +x.r });
+    for (const x of v.input?.liftsM ?? []) if (x.w > 0) out.push({ d, n: x.n, w: +x.w, r: +x.r });
+  }
+  return out;
+}
+function liftRecords(sets) {
+  return LIFTS.map(([nm, key]) => {
+    const l = sets.filter(x => x.n === key), r12 = l.filter(x => x.r >= 12).sort((a, b) => b.w - a.w || b.r - a.r)[0], mx = l.sort((a, b) => b.w - a.w || b.r - a.r)[0];
+    return { nm, key, r12, mx };
+  });
+}
+const kg = w => `${String(+(+w).toFixed(1)).replace('.', ',')} kg`;
+function viewLifts() {
+  const rec = liftRecords(liftSets());
+  let h = `<div class="card slim"><div class="row"><h2>Récords de peso</h2></div><div class="rtab rhead"><span></span><span>A 12 reps</span><span>Máximo</span></div>`;
+  h += rec.map(r => `<div class="rtab"><span class="rl"><b>${r.nm}</b></span><span class="rv ${r.r12 ? 'rec' : ''}">${r.r12 ? kg(r.r12.w) : '—'}</span><span class="rh">${r.mx ? `<b>${kg(r.mx.w)}</b> × ${r.mx.r}` : '—'}</span></div>`).join('');
+  h += `<div class="row" style="margin-top:10px;gap:6px"><select id="rl">${LIFTS.map(l => `<option value="${esc(l[1])}">${l[0]}</option>`).join('')}</select><input id="rw" type="text" inputmode="decimal" placeholder="kg" style="width:64px"><input id="rr" type="text" inputmode="numeric" placeholder="reps" style="width:64px"><button class="btn sm" data-act="recadd">Anotar</button></div><p class="mute">Se actualizan solos con lo que anotás en el modo gimnasio. Acá podés cargar un récord anterior.</p></div>`;
+  return h;
+}
 function campGimnasio(e, pre) {
-  const st = e.state, d = pre ? 0 : dayIdx(todayISO()), wt = e.weekType(d), mult = ladder(st.k, Math.min(st.wk.sess, 4)), wkStart = pre ? null : addDays(S.startDate, d - d % 7);
-  const mine = []; if (wkStart) for (let q = 0; q < 7; q++) { const dt = addDays(wkStart, q); (S.days[dt]?.input?.prog ?? []).forEach((n, k) => mine.push({ d: dt, k, n })); }
+  const wt = e.weekType(pre ? 0 : dayIdx(todayISO()));
   let h = `<button class="btn" style="width:100%;margin-bottom:12px" data-act="gopen">Abrir modo gimnasio</button>` + rutinaCards(pre) + `<div class="card slim"><div class="row"><h2>Semana de ${wt}</h2><span class="pill ${wt === 'descarga' ? 'gold' : ''}">${wt === 'carga' ? 'subí el peso' : 'una repetición más'}</span></div><div class="mute">${wt === 'carga' ? 'En las semanas de carga el progreso es usar más peso que tu mejor marca (llegando al mínimo del rango de repeticiones).' : 'En la descarga el progreso es una repetición más con el mismo peso que la última descarga. Un peso nuevo queda como base.'}</div></div>`;
-  h += `<div class="card slim"><div class="row"><h2>Constancia</h2><span class="pill gold">semana ${st.k} · ×${String(+mult.toFixed(2)).replace('.', ',')}</span></div><div class="mute">Sesiones esta semana: ${st.wk.sess} / ${needSessions(st.k)} mínimas · ciclo de 4 semanas: ${st.cyc.length} / ${e.cfg.cycleNeed} ejercicios distintos con progreso</div></div>`;
-  h += `<div class="card slim"><div class="row"><h2>Progreso de la semana</h2><span class="pill ${mine.length ? 'ok' : ''}">${mine.length}</span></div><div class="row" style="margin-top:8px"><input id="px" type="text" placeholder="Ejercicio que mejoraste" ${pre ? 'disabled' : ''} autocomplete="off"><button class="btn sm" ${pre ? 'disabled' : 'data-act="progadd"'}>Registrar</button></div>`
-    + mine.map(m => `<div class="mrow static"><span class="mic">📈</span><span class="mtx"><b>${esc(m.n)}</b><small>${pretty(m.d)}</small></span><button class="undo" data-act="progdel" data-d="${m.d}" data-k="${m.k}">Borrar</button></div>`).join('')
-    + `<p class="mute">Cada ejercicio cuenta una vez por semana. Cuando cargues tu rutina, el registro de pesos y repeticiones va a anotar esto solo.</p></div>`;
   return h;
 }
 
@@ -569,19 +590,35 @@ function fx(delta) {
 let gymForce = false, gymRest = 0, gymTick = null;
 const gymArrive = () => +(S.settings?.gym_arrive || 0);
 const gymActive = () => { const a = gymArrive(); return gymForce || (a > 0 && Date.now() - a < 6 * 3600e3 && S.gymHide !== a); };
-const exSets = x => +(/(\d)×/.exec(x)?.[1] ?? 1);
-function gymScreen() {
+const lastW = (n, i) => { const f = Object.entries(S.days).filter(([d]) => d < todayISO()).sort((a, b) => b[0].localeCompare(a[0])).map(([, v]) => v.input?.lifts?.[n]).find(a => a && a.some(x => x?.ok)); return f ? (f[i]?.w ?? f.filter(x => x?.ok).pop()?.w ?? '') : ''; };
+function gymScreen(force) {
   let el = document.getElementById('gymmode');
   if (!gymActive() || !S.token) { el?.remove(); if (gymTick) { clearInterval(gymTick); gymTick = null; } return; }
+  if (el && !force) return;                       // no se redibuja solo: así no se pierde lo que estás escribiendo
   if (!el) { el = document.createElement('div'); el.id = 'gymmode'; document.body.appendChild(el); }
-  const today = todayISO(), r = RUTINA[wkdayOf(today)], done = (S.gym ||= {})[today] ||= {};
-  const total = r[2].reduce((a, x) => a + exSets(x), 0), made = r[2].reduce((a, x, i) => a + Math.min(exSets(x), done[i] || 0), 0);
+  const today = todayISO(), r = RUTINA[wkdayOf(today)], L = S.days[today]?.input?.lifts ?? {}, done = (S.gymDone ||= {})[today] ||= {};
+  const sets = r[2].filter(x => x.r), total = sets.reduce((a, x) => a + x.r.length, 0), made = sets.reduce((a, x) => a + x.r.filter((_, k) => L[x.n]?.[k]?.ok).length, 0);
   el.innerHTML = `<div class="gm-head"><span>Modo gimnasio</span><b id="gmt"></b></div><h1>${r[0]} · ${r[1]}</h1><div class="bar gold"><i style="width:${total ? made / total * 100 : 0}%"></i></div>`
-    + `<div class="gm-list">${r[2].map((x, i) => { const n = exSets(x), d = Math.min(n, done[i] || 0); return `<button class="gm-ex ${d >= n ? 'ok' : ''}" data-act="gset" data-i="${i}"><span class="gm-n">${esc(x.split(' · ')[0])}<small>${esc(x.split(' · ')[1] || '')}</small></span><span class="gm-dots">${Array.from({ length: n }, (_, k) => `<i class="${k < d ? 'f' : ''}"></i>`).join('')}</span></button>`; }).join('')}</div>`
+    + `<div class="gm-list">${r[2].map((x, i) => {
+      if (!x.r) { const ok = !!done[i]; return `<button class="gm-ex ${ok ? 'ok' : ''}" data-act="gcheck" data-i="${i}"><span class="gm-n">${esc(x.n)}<small>${esc(x.t || '')}</small></span><span class="gm-dots"><i class="${ok ? 'f' : ''}"></i></span></button>`; }
+      const all = x.r.every((_, k) => L[x.n]?.[k]?.ok);
+      return `<div class="gm-ex col ${all ? 'ok' : ''}"><span class="gm-n">${esc(x.n)}</span>${x.r.map((rp, k) => { const c = L[x.n]?.[k], w = c?.w ?? lastW(x.n, k); return `<div class="gm-set ${c?.ok ? 'ok' : ''}"><span class="gm-rp"><b>${rp}</b> reps</span><input class="gm-w" type="text" inputmode="decimal" placeholder="kg" value="${w === '' || w === undefined ? '' : String(w).replace('.', ',')}" data-gw="${esc(x.n)}" data-k="${k}"><span class="mute">kg</span><button class="gm-ok" data-act="gset" data-i="${i}" data-k="${k}" aria-label="Serie hecha">${c?.ok ? '✓' : ''}</button></div>`; }).join('')}</div>`;
+    }).join('')}</div>`
     + `<div class="gm-foot"><button class="btn" data-act="grest">Descanso <span id="gmr">60</span> s</button>${spotifyBar()}<button class="undo" data-act="gexit">Salir del modo</button></div>`;
   tickGym();
   if (!gymTick) gymTick = setInterval(tickGym, 1000);
 }
+/** Si en la semana superaste tu mejor marca anterior de un ejercicio, cuenta como progreso (una vez por ejercicio). */
+function autoProg(date, name) {
+  const wkS = addDays(date, -wkdayOf(date)), wt = dayIdx(date) >= 0 ? newRise().weekType(dayIdx(date)) : 'carga';
+  const prev = liftSets0().filter(x => x.n === name && x.d < wkS), now = liftSets0().filter(x => x.n === name && x.d >= wkS && x.d <= addDays(wkS, 6));
+  if (!prev.length || !now.length) return;
+  const pw = Math.max(...prev.map(x => x.w)), best = now.sort((a, b) => b.w - a.w || b.r - a.r)[0];
+  const pr = Math.max(...prev.filter(x => x.w === best.w).map(x => x.r), 0);
+  const up = wt === 'carga' ? best.w > pw : (best.w > pw || (best.w === pw && best.r > pr));
+  if (up) setInput(date, i => { i.prog = [...new Set([...(i.prog || []), name])]; });
+}
+const liftSets0 = () => { const out = []; for (const [d, v] of Object.entries(S.days)) for (const [n, arr] of Object.entries(v.input?.lifts ?? {})) for (const x of arr || []) if (x?.ok && x.w > 0) out.push({ d, n, w: +x.w, r: +x.r }); return out; };
 function tickGym() {
   const t = document.getElementById('gmt'), a = gymArrive();
   if (t) { const m = a ? Math.max(0, Math.floor((Date.now() - a) / 60000)) : 0; t.textContent = !a ? '' : m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`; }
@@ -616,10 +653,21 @@ document.addEventListener('click', async ev => {
   if (el.tagName === 'A') ev.preventDefault();
   const a = el.dataset.act;
   if (a === 'tab') { tab = el.dataset.t; if (tab === 'camp') rerollScene(); render(); }
-  else if (a === 'gset') { const i = +el.dataset.i, r = RUTINA[wkdayOf(todayISO())], n = exSets(r[2][i]), g = ((S.gym ||= {})[todayISO()] ||= {}); g[i] = (g[i] || 0) >= n ? 0 : (g[i] || 0) + 1; if (g[i] > 0 && g[i] < n || (g[i] === n && n > 1)) gymRest = Date.now() + 60000; save(); gymScreen(); }
+  else if (a === 'gset') {
+    const r = RUTINA[wkdayOf(todayISO())], x = r[2][+el.dataset.i], k = +el.dataset.k, inp = document.querySelector(`#gymmode input[data-gw="${CSS.escape(x.n)}"][data-k="${k}"]`);
+    const w = parseFloat((inp?.value || '').replace(',', '.')) || 0, cur = S.days[todayISO()]?.input?.lifts?.[x.n]?.[k];
+    setInput(todayISO(), i => { const a2 = ((i.lifts ||= {})[x.n] ||= []); a2[k] = cur?.ok ? { ...cur, ok: false } : { w, r: x.r[k], ok: true }; for (let q = 0; q < x.r.length; q++) a2[q] ||= null; });
+    if (!cur?.ok) { gymRest = Date.now() + 60000; autoProg(todayISO(), x.n); }
+    gymScreen(true);
+  }
+  else if (a === 'gcheck') { const g = (S.gymDone ||= {})[todayISO()] ||= {}; g[+el.dataset.i] = !g[+el.dataset.i]; save(); gymScreen(true); }
+  else if (a === 'recadd') {
+    const n = document.getElementById('rl').value, w = parseFloat(document.getElementById('rw').value.replace(',', '.')), rp = parseInt(document.getElementById('rr').value, 10);
+    if (w > 0 && rp > 0) { setInput(todayISO(), i => { (i.liftsM ||= []).push({ n, w, r: rp }); }); hint('Récord anotado'); }
+  }
   else if (a === 'grest') { gymRest = gymRest ? 0 : Date.now() + 60000; tickGym(); }
-  else if (a === 'gexit') { S.gymHide = gymArrive(); gymForce = false; save(); gymScreen(); }
-  else if (a === 'gopen') { gymForce = true; gymScreen(); }
+  else if (a === 'gexit') { S.gymHide = gymArrive(); gymForce = false; save(); gymScreen(true); }
+  else if (a === 'gopen') { gymForce = true; gymScreen(true); }
   else if (a === 'closemodal') { announce = null; render(); }
   else if (a === 'gear') { if (tab !== 'ajustes') { lastTab = tab; tab = 'ajustes'; errMsg = ''; } render(); }
   else if (a === 'back') { tab = lastTab || 'hoy'; render(); }
@@ -719,6 +767,7 @@ async function detectMode() {
 // ---------- arranque ----------
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 window.addEventListener('online', sync);
+document.addEventListener('change', e => { const el = e.target; if (!el.dataset?.gw) return; const k = +el.dataset.k, n = el.dataset.gw, w = parseFloat(el.value.replace(',', '.')) || 0, rp = RUTINA[wkdayOf(todayISO())][2].find(x => x.n === n)?.r[k]; setInput(todayISO(), i => { const a = ((i.lifts ||= {})[n] ||= []); a[k] = { ...(a[k] || {}), w, r: rp }; for (let q = 0; q < k; q++) a[q] ||= null; }); });
 setInterval(() => { if (document.visibilityState === 'visible' && S.token && navigator.onLine) sync(); }, 45000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (viewDate > todayISO()) viewDate = todayISO(); sync(); render(); if (tab === 'hoy') loadMeals(todayISO(), true); } });
 onAssets(() => render());
