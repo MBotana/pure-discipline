@@ -140,7 +140,7 @@ ul.plan{margin:8px 0 0;padding-left:18px;font-size:14px}ul.plan li{margin:3px 0}
 .fig{position:absolute;bottom:0;height:70%;aspect-ratio:auto}
 .fig img{height:100%;width:auto;display:block;max-width:none;filter:drop-shadow(0 0 2px rgba(255,255,255,.55)) drop-shadow(0 0 14px rgba(255,255,255,.18))}
 :root[data-theme=papel] .fig img{filter:none}
-.fig.r{right:-4%;background:radial-gradient(closest-side at 55% 45%,rgba(200,200,200,.34),transparent 100%)}
+.fig.r{right:-17%;background:radial-gradient(closest-side at 55% 45%,rgba(200,200,200,.34),transparent 100%)}
 .fig.l{left:-34%;background:radial-gradient(closest-side at 50% 45%,rgba(200,200,200,.34),transparent 100%)}
 :root[data-theme=papel] .fig.r,:root[data-theme=papel] .fig.l{background:none}
 #app.stage .card{background:transparent;border:0;box-shadow:none;padding:6px 0;text-shadow:0 1px 5px #000}

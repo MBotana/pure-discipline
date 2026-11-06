@@ -373,10 +373,6 @@ function campHeroe(e, pre) {
     b += `<div style="margin-top:10px"><div class="row"><b>${iconTag(c)} ${NAMES[c]}${up.includes(c) ? ' <span class="pill gold">¡sube!</span>' : ''}${bad ? ' <span class="pill bad">baja</span>' : ''}</b><b>${p.level} / 99</b></div><div class="bar"><i style="width:${(p.pct * 100).toFixed(1)}%"></i></div><small class="mute">${p.max ? 'máximo' : `${fmt(p.into)} / ${fmt(p.cost)} XP para el nivel ${p.level + 1}`}</small></div>`;
   }
   b += `</div>`;
-  if (nt) {
-    b += `<div class="card slim"><div class="row"><h2>Próximo título</h2><span class="pill">${nt.name}</span></div><p class="mute" style="margin-top:8px">Pide nivel ${nt.avg} de promedio (te faltan ${nt.missingAvg}) y que ninguna estadística quede por debajo de ${nt.min}.</p>`
-      + CATS.map(c => `<div class="row" style="margin-top:6px"><span>${iconTag(c)} ${NAMES[c]}</span><b class="${e.eff(c) < nt.min ? 'lowv' : ''}">${e.eff(c)} / ${nt.min}</b></div><div class="bar"><i style="width:${Math.min(100, e.eff(c) / nt.min * 100)}%"></i></div>`).join('') + `</div>`;
-  } else b += `<div class="card slim"><h2>Inmortal</h2><p class="mute">Llegaste al último título.</p></div>`;
   return figHead('l', e.titleName(), `${HERO_NAME} · Nivel ${lv}`, nt ? Math.min(100, lv / nt.avg * 100) : 100) + b;
 }
 function viewRecords(hi) {
