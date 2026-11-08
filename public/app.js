@@ -690,7 +690,7 @@ function gymScreen(force) {
   const inp = S.days[today]?.input ?? {}, L = inp.lifts ?? {}, D = inp.dl ?? {}, done = (S.gymDone ||= {})[today] ||= {};
   const okEx = (x, i) => x.r ? gymSets(x).every((_, k) => des ? D[x.n]?.[k] : L[x.n]?.[k]?.ok) : !!done[i];
   const made = items.filter((x, i) => okEx(x, i)).length;
-  const head = `<div class="gm-head"><span>${dayIdx(today) >= 0 ? FASES[ph] : 'Modo gimnasio'}</span><b id="gmt"></b></div><h1>${r[0]} · ${r[1]}</h1><div class="bar gold"><i style="width:${made / items.length * 100}%"></i></div>`;
+  const head = `<div class="gm-fig"><img alt="" src="/img/sombra_gym.png"></div><div class="gm-head"><span>${dayIdx(today) >= 0 ? FASES[ph] : 'Modo gimnasio'}</span><b id="gmt"></b></div><h1>${r[0]} · ${r[1]}</h1><div class="bar gold"><i style="width:${made / items.length * 100}%"></i></div>`;
   const foot = `<div class="gm-foot"><button class="btn ghost" data-act="grest">Descanso <span id="gmr">60</span> s</button><button class="undo" data-act="gexit">Salir del modo</button></div>`;
   if (gymI < 0 || gymI >= items.length) {
     const rows = items.map((x, i) => {

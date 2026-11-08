@@ -152,3 +152,10 @@ select{font:inherit;font-size:15px;color:var(--ink);background:var(--field);bord
 
 .upar{font-weight:800;color:var(--hi)}
 .rtab.two{display:grid;grid-template-columns:1fr auto;justify-content:end;gap:10px;text-align:right}
+
+#gymmode{isolation:isolate}
+.gm-fig{position:absolute;right:-4%;bottom:0;height:52%;z-index:-1;pointer-events:none;background:radial-gradient(closest-side at 55% 45%,rgba(200,200,200,.28),transparent 100%)}
+.gm-fig img{height:100%;width:auto;display:block;max-width:none;filter:drop-shadow(0 0 2px rgba(255,255,255,.55)) drop-shadow(0 0 14px rgba(255,255,255,.18))}
+:root[data-theme=papel] .gm-fig img{filter:none}
+#gymmode .gm-row,#gymmode .gm-ex.col,#gymmode .gm-set,#gymmode .btn.ghost{background:color-mix(in srgb,var(--panel) 45%,transparent)}
+#gymmode h1,#gymmode .gm-n,#gymmode .gm-wt,#gymmode .gm-head{text-shadow:0 1px 3px rgba(0,0,0,.9)}
