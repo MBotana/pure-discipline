@@ -267,3 +267,27 @@ test('aviso del lunes: sugerencias de la semana que terminó, una sola vez, a pr
   const n: any = await (await call(e, 'GET', '/api/last-notification', undefined, T)).json();
   assert.equal(n.title, 'Resumen de la semana'); assert.match(n.body, /Gimnasio|Hiciste/);
 });
+
+test('league of legends: suma la duración de las partidas nuevas, sin repetir y sin contar el pasado', async () => {
+  const { runRiot } = await import('../src/worker.ts');
+  const e: any = env(); await call(e, 'POST', '/api/setup', { token: 'clave-larga-1', startDate: '2026-11-02' });
+  assert.equal((await runRiot(e)).ok, false, 'sin clave no hace nada');
+  e.RIOT_API_KEY = 'RGAPI-test'; e.RIOT_ID = 'Fulano#LAS';
+  const real = globalThis.fetch; const urls: string[] = []; let ids = ['LA2_1', 'LA2_2'];
+  globalThis.fetch = (async (url: any, init: any) => {
+    const u = String(url); urls.push(u);
+    assert.equal(init.headers['X-Riot-Token'], 'RGAPI-test');
+    if (u.includes('by-riot-id/Fulano/LAS')) return new Response('{"puuid":"P1"}');
+    if (u.includes('/ids?')) return new Response(JSON.stringify(ids));
+    const id = u.split('/').pop()!; return new Response(JSON.stringify({ info: { gameEndTimestamp: Date.now() - 600e3, gameDuration: id === 'LA2_1' ? 1800 : 1200 } }));
+  }) as any;
+  try {
+    assert.deepEqual(await runRiot(e), { ok: true, baseline: true, addedH: 0, matches: 0 }, 'la primera lectura es el punto de partida');
+    const r = await runRiot(e);
+    assert.equal(r.ok, true); assert.equal(r.matches, 2); assert.equal(r.addedH, 0.83, '30 + 20 min');
+    ids = ['LA2_1', 'LA2_2', 'LA2_3'];
+    assert.equal((await runRiot(e)).matches, 1, 'no repite las ya contadas');
+    globalThis.fetch = (async () => new Response('{}', { status: 403 })) as any;
+    assert.match((await runRiot(e)).error!, /rechaz/);
+  } finally { globalThis.fetch = real; }
+});

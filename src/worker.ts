@@ -1,7 +1,7 @@
 /* Pure Discipline — servidor (Cloudflare Worker + D1). Un solo usuario.
  * Autenticación: la primera vez se define una clave (/api/setup); después todo exige Authorization: Bearer <clave>. */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export interface Env { DB: any; ASSETS: any; GEMINI_KEY?: string; GEMINI_MODEL?: string; STEAM_KEY?: string; STEAM_ID?: string; TELEGRAM_CHAT_ID?: string; [bot: `TELEGRAM_BOT_${string}`]: string | undefined }
+export interface Env { DB: any; ASSETS: any; GEMINI_KEY?: string; GEMINI_MODEL?: string; STEAM_KEY?: string; STEAM_ID?: string; RIOT_API_KEY?: string; RIOT_ID?: string; RIOT_REGION?: string; TELEGRAM_CHAT_ID?: string; [bot: `TELEGRAM_BOT_${string}`]: string | undefined }
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
@@ -271,6 +271,9 @@ export async function handle(req: Request, env: Env): Promise<Response> {
     await notify(`Saliste del gimnasio · ${hhmm(now)} · ${minutes} min: sesión contada ✔`);
     return json({ ok: true, counted: true, minutes, date });
   }
+  // League of Legends: lectura manual (para probar la conexión) y estado.
+  if (path === '/api/riot/sync' && m === 'POST') return json(await runRiot(env));
+  if (path === '/api/riot' && m === 'GET') return json({ configured: !!(env.RIOT_API_KEY && env.RIOT_ID), last: Number(await getSetting(env, 'riot_last') ?? 0) || null });
   // Steam: lectura manual (para probar la conexión) y estado.
   if (path === '/api/steam/sync' && m === 'POST') return json(await runSteam(env));
   if (path === '/api/steam' && m === 'GET') return json({ configured: !!(env.STEAM_KEY && env.STEAM_ID), last: Number(await getSetting(env, 'steam_last') ?? 0) || null });
@@ -479,6 +482,49 @@ export async function runSteam(env: Env): Promise<{ ok: boolean; addedH?: number
   return { ok: true, addedH };
 }
 
+// ---------- League of Legends: horas jugadas (cuentan como videojuegos). Suma la duración de las partidas nuevas del día en que terminaron ----------
+export async function runRiot(env: Env): Promise<{ ok: boolean; addedH?: number; matches?: number; baseline?: boolean; error?: string }> {
+  if (!env.RIOT_API_KEY || !env.RIOT_ID || !env.RIOT_ID.includes('#')) return { ok: false, error: 'Faltan RIOT_API_KEY o RIOT_ID (nombre#tag) en Cloudflare' };
+  const host = `https://${env.RIOT_REGION || 'americas'}.api.riotgames.com`, hdr = { 'X-Riot-Token': env.RIOT_API_KEY };
+  const get = async (u: string) => { const r = await fetch(host + u, { headers: hdr }); if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<any>; };
+  const now = Date.now(), tz = Number((await getSetting(env, 'tz_offset')) ?? DEFAULTS.tz_offset);
+  try {
+    let puuid = await getSetting(env, 'riot_puuid');
+    if (!puuid) {
+      const [name, tag] = env.RIOT_ID.split('#');
+      puuid = (await get(`/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(name.trim())}/${encodeURIComponent(tag.trim())}`)).puuid;
+      await putSetting(env, 'riot_puuid', puuid!);
+    }
+    const lastRaw = await getSetting(env, 'riot_last');
+    await putSetting(env, 'riot_last', String(now));
+    if (!lastRaw) return { ok: true, baseline: true, addedH: 0, matches: 0 };       // primera lectura: punto de partida, no cuenta partidas viejas
+    const since = Math.floor((Number(lastRaw) - 3 * 3600e3) / 1000);                 // un margen de 3 h por si una partida terminó entre lecturas
+    const ids: string[] = await get(`/lol/match/v5/matches/by-puuid/${puuid}/ids?startTime=${since}&count=30`);
+    const seen: string[] = JSON.parse((await getSetting(env, 'riot_seen')) ?? '[]'), perDay: Record<string, number> = {}; let n = 0;
+    for (const id of ids) {
+      if (seen.includes(id)) continue;
+      const info = (await get(`/lol/match/v5/matches/${id}`))?.info; if (!info) continue;
+      const end = Number(info.gameEndTimestamp) || (Number(info.gameStartTimestamp) + Number(info.gameDuration) * (info.gameEndTimestamp ? 1 : 1000));
+      const secs = info.gameEndTimestamp ? Number(info.gameDuration) : Number(info.gameDuration) / 1000;   // antes de 2021 venía en milisegundos
+      const date = new Date(end + tz * 60000).toISOString().slice(0, 10);
+      perDay[date] = (perDay[date] ?? 0) + secs / 3600; seen.push(id); n++;
+    }
+    await putSetting(env, 'riot_seen', JSON.stringify(seen.slice(-60)));
+    let total = 0;
+    for (const [date, h] of Object.entries(perDay)) {
+      const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
+      const input = row ? JSON.parse(row.input as string) : {}, add = Math.round(h * 100) / 100;
+      input.gameH = Math.round(((Number(input.gameH) || 0) + add) * 100) / 100; total += add;
+      await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
+        .bind(date, JSON.stringify(input), now, 'riot').run();
+    }
+    return { ok: true, addedH: Math.round(total * 100) / 100, matches: n };
+  } catch (e: any) {
+    const c = String(e?.message ?? '');
+    return { ok: false, error: c === '401' || c === '403' ? 'Riot rechazó la clave (vencida o incorrecta)' : c === '404' ? 'No se encontró el Riot ID' : c === '429' ? 'Riot pidió esperar (límite de pedidos)' : 'No se pudo consultar Riot' };
+  }
+}
+
 export default {
   fetch: (req: Request, env: Env) => handle(req, env),
   scheduled: async (_e: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }) => {
@@ -486,5 +532,6 @@ export default {
     ctx.waitUntil(runReminders(env, origin));
     ctx.waitUntil(runSemanal(env, origin).then(() => undefined, () => undefined));
     ctx.waitUntil(runSteam(env).then(() => undefined, () => undefined));
+    ctx.waitUntil(runRiot(env).then(() => undefined, () => undefined));
   },
 };
