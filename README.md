@@ -1,4 +1,4 @@
-# Rise
+# Set ∞
 
 PWA de hábitos gamificada (un solo usuario). Cloudflare Worker + D1, sin dependencias de ejecución.
 

@@ -185,9 +185,9 @@ export async function runReminders(env: Env, origin: string, now = Date.now()) {
     await pushAll(env, origin, title, body); sent.push(kind);
   };
   if (dow >= 1 && dow <= 5 && hour >= Number(st.feed_hour) && !(input && (input.meals || input.feed)))
-    await once('feed', 'Rise', 'Cargá el veredicto de alimentación de hoy y revisá tus horas de videojuegos.');
+    await once('feed', 'Set ∞', 'Cargá el veredicto de alimentación de hoy y revisá tus horas de videojuegos.');
   if (hour >= Number(st.reminder_hour) && isEmptyInput(row ? (row.input as string) : null))
-    await once('daily', 'Rise', 'Todavía no registraste nada hoy. ¿Cómo te fue?');
+    await once('daily', 'Set ∞', 'Todavía no registraste nada hoy. ¿Cómo te fue?');
   return sent;
 }
 
@@ -214,7 +214,7 @@ export async function handle(req: Request, env: Env): Promise<Response> {
   if (path === '/api/status' && m === 'GET') return json({ configured: !!(await getSetting(env, 'auth_hash')) });
   if (path === '/api/last-notification' && m === 'GET') {
     const raw = await getSetting(env, 'last_notification');
-    return json(raw ? JSON.parse(raw) : { title: 'Rise', body: 'Tenés un recordatorio.' });
+    return json(raw ? JSON.parse(raw) : { title: 'Set ∞', body: 'Tenés un recordatorio.' });
   }
   if (path === '/api/setup' && m === 'POST') {
     if (await getSetting(env, 'auth_hash')) return json({ error: 'ya configurado' }, 409);
@@ -447,7 +447,7 @@ export async function handle(req: Request, env: Env): Promise<Response> {
         return json({ delivered: tg.ok ? 1 : 0, telegram: tg.ok, text, error: tg.error });
       } catch (err: any) { return json({ delivered: 0, telegram: false, error: err.message }, 200); }
     }
-    const n = await pushAll(env, url.origin, 'Rise', 'Las notificaciones funcionan.');
+    const n = await pushAll(env, url.origin, 'Set ∞', 'Las notificaciones funcionan.');
     return json({ delivered: n });
   }
   return json({ error: 'no encontrado' }, 404);
