@@ -462,10 +462,12 @@ const RUTINA = [
   ['Sábado', 'Libre', [{ n: 'Descanso o bici libre' }]],
   ['Domingo', 'Libre', [{ n: 'Descanso o bici libre' }]],
 ];
+/** Rutina del día: la del calendario o la que elegiste para hoy (input.rut). */
+const rutDia = d => RUTINA[S.days[d]?.input?.rut ?? wkdayOf(d)];
 const exTxt = x => x.r ? `${x.n} · ${x.r.join('-')}` : x.t ? `${x.n} · ${x.t}` : x.n;
 const COMIDAS = [['12:00', 'Milanesa grande al horno con pan integral y verduras'], ['17:00', 'Licuado: 2 bananas, 300 ml de leche proteica, 1 scoop de proteína y 1 de avena'], ['23:00', '1 taza de arroz, 3 huevos, queso rallado y zanahoria rallada']];
 function rutinaCards(pre) {
-  const hoy = RUTINA[wkdayOf(todayISO())];
+  const hoy = rutDia(todayISO());
   const lista = r => `<ul class="plan">${r[2].map(x => `<li>${esc(exTxt(x))}</li>`).join('')}</ul>`;
   return `<div class="card slim"><div class="row"><h2>Hoy · ${hoy[0]}</h2><span class="pill gold">${hoy[1]}</span></div>${lista(hoy)}<details><summary>Toda la semana</summary>${RUTINA.map(r => `<div class="row" style="margin-top:10px"><b>${r[0]}</b><span class="pill">${r[1]}</span></div>${lista(r)}`).join('')}</details></div>`
     + `<div class="card slim"><details><summary>Comidas del día · ~2.000 kcal</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: ~150 g de proteína y 2 litros de agua por día.</p></details></div>`;
@@ -539,7 +541,9 @@ const FASE_TXT = [
 ];
 function campGimnasio(e, pre) {
   const ph = (pre ? 0 : wkOf(todayISO())) % 4;
-  return `<button class="btn" style="width:100%;margin-bottom:12px" data-act="gopen">Abrir modo gimnasio</button>` + rutinaCards(pre)
+  const cur = S.days[todayISO()]?.input?.rut ?? wkdayOf(todayISO());
+  const pick = `<div class="card slim"><div class="row"><b>Rutina de hoy</b><select data-rut style="background:transparent;color:inherit;border:1px solid var(--line,#444);border-radius:8px;padding:4px 8px">${RUTINA.map((r, q) => `<option value="${q}" ${q === cur ? 'selected' : ''}>${r[0]} · ${r[1]}</option>`).join('')}</select></div></div>`;
+  return `<button class="btn" style="width:100%;margin-bottom:12px" data-act="gopen">Abrir modo gimnasio</button>` + pick + rutinaCards(pre)
     + `<div class="card slim"><div class="row"><h2>${FASES[ph]}</h2><span class="pill ${ph === 3 ? 'gold' : ''}">semana ${ph + 1} de 4</span></div><div class="mute">${FASE_TXT[ph]}</div></div>`;
 }
 
@@ -673,7 +677,7 @@ function gymScreen(force) {
   if (!gymActive() || !S.token) { el?.remove(); if (gymTick) { clearInterval(gymTick); gymTick = null; } return; }
   if (el && !force) return;                       // no se redibuja solo: así no se pierde lo que estás escribiendo
   if (!el) { el = document.createElement('div'); el.id = 'gymmode'; document.body.appendChild(el); }
-  const today = todayISO(), r = RUTINA[wkdayOf(today)], items = r[2], wk = wkOf(today), ph = wk % 4, des = ph === 3 && dayIdx(today) >= 0;
+  const today = todayISO(), r = rutDia(today), items = r[2], wk = wkOf(today), ph = wk % 4, des = ph === 3 && dayIdx(today) >= 0;
   const inp = S.days[today]?.input ?? {}, L = inp.lifts ?? {}, D = inp.dl ?? {}, done = (S.gymDone ||= {})[today] ||= {};
   const okEx = (x, i) => x.r ? gymSets(x).every((_, k) => des ? D[x.n]?.[k] : L[x.n]?.[k]?.ok) : !!done[i];
   const made = items.filter((x, i) => okEx(x, i)).length;
@@ -744,7 +748,7 @@ document.addEventListener('click', async ev => {
   const a = el.dataset.act;
   if (a === 'tab') { tab = el.dataset.t; render(); }
   else if (a === 'gset') {
-    const r = RUTINA[wkdayOf(todayISO())], x = r[2][+el.dataset.i], k = +el.dataset.k;
+    const r = rutDia(todayISO()), x = r[2][+el.dataset.i], k = +el.dataset.k;
     if (wkOf(todayISO()) % 4 === 3 && dayIdx(todayISO()) >= 0) {
       const was = S.days[todayISO()]?.input?.dl?.[x.n]?.[k];
       setInput(todayISO(), i => { const d = { ...(i.dl || {}) }, a2 = [...(d[x.n] || [])]; a2[k] = !was; d[x.n] = a2; i.dl = d; });
@@ -759,7 +763,7 @@ document.addEventListener('click', async ev => {
   }
   else if (a === 'gopenex') { gymI = +el.dataset.i; gymScreen(true); }
   else if (a === 'glist') { gymI = -1; gymScreen(true); }
-  else if (a === 'gfeel') { const r = RUTINA[wkdayOf(todayISO())], x = r[2][gymI], v = el.dataset.v; setInput(todayISO(), i => { const f = { ...(i.feel || {}) }; f[x.n] = f[x.n] === v ? undefined : v; i.feel = f; }); gymScreen(true); }
+  else if (a === 'gfeel') { const r = rutDia(todayISO()), x = r[2][gymI], v = el.dataset.v; setInput(todayISO(), i => { const f = { ...(i.feel || {}) }; f[x.n] = f[x.n] === v ? undefined : v; i.feel = f; }); gymScreen(true); }
   else if (a === 'gcheck') { const g = (S.gymDone ||= {})[todayISO()] ||= {}; g[+el.dataset.i] = !g[+el.dataset.i]; save(); gymScreen(true); }
   else if (a === 'grest') { gymRest = gymRest ? 0 : Date.now() + 60000; tickGym(); }
   else if (a === 'gexit') { S.gymHide = gymArrive(); gymForce = false; save(); gymScreen(true); }
@@ -863,7 +867,7 @@ async function detectMode() {
 // ---------- arranque ----------
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
 window.addEventListener('online', sync);
-document.addEventListener('change', e => { const el = e.target; if (!el.dataset?.gw) return; const k = +el.dataset.k, n = el.dataset.gw, w = parseFloat(el.value.replace(',', '.')) || 0, rp = RUTINA[wkdayOf(todayISO())][2].find(x => x.n === n)?.r[k]; setInput(todayISO(), i => { const a = ((i.lifts ||= {})[n] ||= []); a[k] = { ...(a[k] || {}), w, r: rp }; for (let q = 0; q < k; q++) a[q] ||= null; }); });
+document.addEventListener('change', e => { const el = e.target; if (el.dataset?.rut !== undefined) { const v = +el.value; setInput(todayISO(), i => { if (v === wkdayOf(todayISO())) delete i.rut; else i.rut = v; }); gymI = -1; render(); return; } if (!el.dataset?.gw) return; const k = +el.dataset.k, n = el.dataset.gw, w = parseFloat(el.value.replace(',', '.')) || 0, rp = rutDia(todayISO())[2].find(x => x.n === n)?.r[k]; setInput(todayISO(), i => { const a = ((i.lifts ||= {})[n] ||= []); a[k] = { ...(a[k] || {}), w, r: rp }; for (let q = 0; q < k; q++) a[q] ||= null; }); });
 setInterval(() => { if (document.visibilityState === 'visible' && S.token && navigator.onLine) sync(); }, 45000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (viewDate > todayISO()) viewDate = todayISO(); sync(); render(); if (tab === 'hoy') loadMeals(todayISO(), true); } });
 onAssets(() => render());
