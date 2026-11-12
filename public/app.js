@@ -186,7 +186,7 @@ const infoRow = (cat, label, meta, right, done) => `<div class="mrow static ${do
 
 /** Tarjeta de comidas del día: lista, carga (foto o texto) y el puntaje que va dando la IA. */
 function foodCard(date, inp, locked) {
-  if (wkdayOf(date) >= 5) return `<div class="card slim"><h2>${pic('comida', '')} Comidas</h2><p class="mute">Fin de semana: tus permitidos. La comida no puntúa.</p>${date === todayISO() ? `<div class="row" style="margin-top:8px"><span class="mute">Agua: ${litros(inp.waterMl ?? 0)} / 1 L</span><button class="btn sm" data-act="waterq" data-v="1">Bebí 250 ml</button></div>` : ''}</div>`;
+  if (wkdayOf(date) >= 5) return `<div class="card slim"><h2>${pic('comida', '')} Comidas</h2><p class="mute">Fin de semana: tus permitidos. La comida no puntúa.</p>${date === todayISO() ? `<div class="row" style="margin-top:8px"><span class="mute">Agua: ${litros(inp.waterMl ?? 0)} / 1 L</span><button class="btn sm" data-act="waterq" data-v="1">Bebí 250 ml</button>${(inp.waterMl ?? 0) < 1000 ? '<button class="btn sm" data-act="water1">Confirmar 1 L</button>' : ''}</div>` : ''}</div>`;
   const list = mealsOf(date), isToday = date === todayISO(), pre = dayIdx(date) < 0, off = pre || !!busy || locked || !isToday;
   const sc = inp.foodPct, cls = sc >= 0.8 ? 'ok' : sc >= 0.5 ? 'gold' : sc !== undefined ? 'bad' : '';
   let h = `<div class="card slim"><div class="row"><h2>${pic('comida', '')} Comidas</h2><span class="pill ${cls}">${sc === undefined ? 'sin puntuar' : (inp.meals ? 'final ' : 'va ') + pc(sc)}</span></div>`;
@@ -219,7 +219,7 @@ function viewHoy() {
     let b = `<div class="card slim"><div class="row"><h2>Automático</h2><span class="pill ${isSess(inp) ? 'ok' : ''}">${isSess(inp) ? 'sesión ✓' : 'sin sesión'}</span></div>`
       + infoRow('F', 'Gimnasio / boxeo', `${sessMin} min · se detecta por ubicación`, '', isSess(inp))
       + `<div class="row"><b>${pic('juegos', iconTag('D', 1))} Juegos</b><span class="pill ${gs[0]}">${hrs(gH)} / ${hrs(cap)}</span></div><div class="bar gold"><i style="width:${Math.min(100, gH / cap * 100)}%"></i></div><div class="mute">${gs[1]} · hoy ${hrs(inp.gameH || 0)}</div>`
-      + `<div class="row" style="margin-top:6px"><b>${pic('agua', '💧')} Agua</b><span class="pill ${waterOk(inp) ? 'ok' : ''}">${litros(ml)} / 1 L</span></div><div class="bar"><i style="width:${Math.min(100, ml / 10)}%"></i></div></div>`;
+      + `<div class="row" style="margin-top:6px"><b>${pic('agua', '💧')} Agua</b><span class="row" style="gap:6px">${!locked && ml < 1000 ? '<button class="btn sm" data-act="water1">Confirmar 1 L</button>' : ''}<span class="pill ${waterOk(inp) ? 'ok' : ''}">${litros(ml)} / 1 L</span></span></div><div class="bar"><i style="width:${Math.min(100, ml / 10)}%"></i></div></div>`;
     b += foodCard(viewDate, inp, locked);
     const mine = roomsOf(inp), taken = wk.rooms.filter(x => !mine.includes(x));
     b += `<div class="card slim"><div class="row"><h2>Ambientes</h2><span class="pill ${wk.rooms.length >= cfg.cleanRoomsWeek ? 'ok' : ''}">${wk.rooms.length} / ${cfg.cleanRoomsWeek} esta semana</span></div><div class="rooms">${ROOMS.map(([id, nm]) => `<button class="room ${mine.includes(id) ? 'sel' : ''} ${taken.includes(id) ? 'taken' : ''}" ${locked ? 'disabled' : `data-act="roomtap" data-r="${id}"`}>${roomTile(id)}<b>${nm}</b>${mine.includes(id) || taken.includes(id) ? '<span class="ck">✓</span>' : ''}</button>`).join('')}</div></div>`;
@@ -776,6 +776,7 @@ document.addEventListener('click', async ev => {
   else if (a === 'readtog') actDay(viewDate, i => { i.read = !i.read; });
   else if (a === 'waterq') { const d = waterQ?.date || todayISO(); waterQ = null; if (el.dataset.v === '1') actDay(d, i => { i.waterMl = (i.waterMl || 0) + 250; }); else render(); }
   else if (a === 'water') actDay(viewDate, i => { const v = Math.max(0, (i.waterMl || 0) + (+el.dataset.v)); if (v) i.waterMl = v; else delete i.waterMl; });
+  else if (a === 'water1') actDay(viewDate, i => { i.waterMl = Math.max(i.waterMl || 0, 1000); });
   else if (a === 'gymset') {
     const v = parseInt(document.getElementById('gm')?.value, 10);
     if (!(v >= 0 && v <= 600)) { hint('Escribí los minutos'); return; }
