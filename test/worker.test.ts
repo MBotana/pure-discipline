@@ -291,3 +291,30 @@ test('league of legends: suma la duración de las partidas nuevas, sin repetir y
     assert.match((await runRiot(e)).error!, /rechaz/);
   } finally { globalThis.fetch = real; }
 });
+
+test('comidas: la estimación se guarda una vez y el acumulado es una suma (el agua no mueve nada)', async () => {
+  const e: any = env(); const T = 'clave-larga-1'; e.GEMINI_KEY = 'k';
+  await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-02' });
+  const real = globalThis.fetch, rn = Date.now; Date.now = () => Date.parse('2026-11-04T20:00:00Z');
+  const prompts: string[] = [];
+  globalThis.fetch = (async (_u: any, init: any) => {
+    const b = JSON.parse(init.body), user = b.contents[0].parts[0].text as string, sys = b.systemInstruction.parts[0].text as string;
+    prompts.push(user);
+    if (sys.includes('SOLO un JSON')) return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: user.includes('agua') ? '{"kcal":0,"prot":0}' : '{"kcal":770,"prot":54}' }] } }] }));
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Esta comida: ok\nPUNTAJE: 100%' }] } }] }));
+  }) as any;
+  try {
+    const post = (text: string, t: string) => call(e, 'POST', '/api/meal', { date: '2026-11-04', text, t }, T).then(x => x.json());
+    await post('Dos milanesas con tomates', '22:36');
+    const r: any = await post('50ml de agua', '22:38');
+    const j = prompts.at(-1)!;
+    assert.match(j, /22:36: Dos milanesas con tomates \[fijo: ~770 kcal · 54 g/); assert.match(j, /22:38: 50ml de agua \[fijo: ~0 kcal · 0 g/);
+    assert.match(j, /~770 kcal · 54 g de proteína\. Los números/, 'el acumulado ya viene sumado');
+    assert.doesNotMatch(j, /Cena|Almuerzo|Merienda|Desayuno/, 'no se nombra la comida según la hora');
+    assert.equal(r.meals.length, 2); assert.deepEqual(r.meals.map((m: any) => m.kcal), [770, 0]);
+    // una comida vieja sin estimación se estima una vez y queda fija
+    await e.DB.prepare('INSERT INTO meals (id, date, t, kind, descr, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind('old', '2026-11-04', '14:00', 'text', 'Un café', 1).run();
+    await post('agua', '22:40');
+    assert.equal(((await e.DB.prepare("SELECT kcal FROM meals WHERE id='old'").first()) as any).kcal, 770);
+  } finally { globalThis.fetch = real; Date.now = rn; }
+});

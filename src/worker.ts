@@ -130,7 +130,6 @@ const RUBRIC = `Rúbrica fija para puntuar la alimentación del día (aplicala s
 - Menos de 50: peor todavía (varias fallas juntas). 0 si no se comió nada.
 Lo que baja el puntaje, sobre todo: falta de proteína, desbalance entre proteínas, verduras, frutas y grasas, comida basura y comer muy poco. Mirá el día completo: lo que faltó en una comida cuenta como cumplido si se compensó en otra. Si falta información para juzgar algo, no lo penalices. Usá solo las comidas listadas; no inventes otras.
 Referencia de esta persona: está bajando de peso y entrena casi todos los días. Su meta diaria es de ~2.000 kcal y ~150 g de proteína, repartidas en tres comidas (≈12, 17 y 23 hs). Menos de ~1.500 kcal o menos de ~110 g de proteína en el día es una falla clara; pasarse de ~2.400 kcal es una falla menor. No come papa ni batata: no las recomiendes.`;
-const mealName = (t: string) => { const h = +t.slice(0, 2); return h < 11 ? 'Desayuno' : h < 16 ? 'Almuerzo' : h < 20 ? 'Merienda' : 'Cena'; };
 const normFirst = (text: string) => text.split('\n').find(l => l.trim())?.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') ?? '';
 const parseScore = (text: string): number | null => { const m = /PUNTAJE[^0-9\n]{0,20}(\d{1,3})/i.exec(text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')); return m ? Math.min(100, Number(m[1])) : null; };
 const validDate = (d: unknown): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
@@ -138,11 +137,23 @@ const dowOf = (date: string) => new Date(date + 'T00:00:00Z').getUTCDay();
 const mealsReady = new WeakSet<object>();
 async function ensureMeals(env: Env) {
   if (mealsReady.has(env.DB)) return;
-  await env.DB.prepare('CREATE TABLE IF NOT EXISTS meals (id TEXT PRIMARY KEY, date TEXT NOT NULL, t TEXT NOT NULL, kind TEXT NOT NULL, descr TEXT NOT NULL, created_at INTEGER NOT NULL)').run();
+  await env.DB.prepare('CREATE TABLE IF NOT EXISTS meals (id TEXT PRIMARY KEY, date TEXT NOT NULL, t TEXT NOT NULL, kind TEXT NOT NULL, descr TEXT NOT NULL, created_at INTEGER NOT NULL, kcal INTEGER, prot INTEGER)').run();
+  for (const c of ['kcal', 'prot']) { try { await env.DB.prepare(`ALTER TABLE meals ADD COLUMN ${c} INTEGER`).run(); } catch { /* ya existe */ } }   // tablas creadas antes de las estimaciones fijas
   mealsReady.add(env.DB);
 }
+type Meal = { id: string; t: string; kind: string; descr: string; kcal: number | null; prot: number | null };
 const listMeals = async (env: Env, date: string) =>
-  ((await env.DB.prepare('SELECT id, t, kind, descr FROM meals WHERE date = ? ORDER BY t, created_at').bind(date).all()).results as { id: string; t: string; kind: string; descr: string }[]);
+  ((await env.DB.prepare('SELECT id, t, kind, descr, kcal, prot FROM meals WHERE date = ? ORDER BY t, created_at').bind(date).all()).results as Meal[]);
+/** Estimación fija de una comida: se calcula UNA vez al cargarla y se guarda. Así el acumulado del día es una suma y no una nueva estimación de la IA. */
+async function estimateMeal(env: Env, descr: string): Promise<{ kcal: number; prot: number } | null> {
+  const k = /~?\s*(\d[\d.]*)\s*kcal/i.exec(descr), p = /prote[ií]na\D{0,12}(\d[\d.]*)\s*g/i.exec(descr);
+  if (k && p) return { kcal: Math.round(Number(k[1].replace(/\./g, ''))), prot: Math.round(Number(p[1].replace(/\./g, ''))) };
+  try {
+    const t = await gemini(env, 'Estimás las calorías y la proteína de una comida. Respondé SOLO un JSON {"kcal":N,"prot":N} con enteros. Si es solo agua, infusión sin azúcar o algo sin calorías, {"kcal":0,"prot":0}. Usá porciones razonables; no inventes lo que no se menciona.', [{ text: descr }], 0);
+    const kk = /"kcal"\s*:\s*(\d+)/.exec(t), pp = /"prot"\s*:\s*(\d+)/.exec(t);
+    return kk && pp ? { kcal: Number(kk[1]), prot: Number(pp[1]) } : null;
+  } catch { return null; }
+}
 /** Guarda el análisis del día en la entrada del día. El puntaje (lunes a viernes) va a foodPct; con final cierra el día. */
 async function saveVerdict(env: Env, date: string, text: string, fin: boolean) {
   const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
@@ -157,11 +168,19 @@ async function saveVerdict(env: Env, date: string, text: string, fin: boolean) {
 }
 async function judgeDay(env: Env, date: string, final: boolean) {
   const meals = await listMeals(env, date);
-  const list = meals.map(m => `${m.t} ${mealName(m.t)}: ${m.descr}`).join('\n');
+  for (const m of meals) if (m.kcal === null || m.prot === null) {      // comidas viejas, sin estimación guardada: se estiman una vez y quedan fijas
+    const e = await estimateMeal(env, m.descr); if (!e) continue;
+    m.kcal = e.kcal; m.prot = e.prot;
+    await env.DB.prepare('UPDATE meals SET kcal = ?, prot = ? WHERE id = ?').bind(e.kcal, e.prot, m.id).run();
+  }
+  const fmt = (m: Meal) => m.kcal === null ? '' : ` [fijo: ~${m.kcal} kcal · ${m.prot} g de proteína]`;
+  const list = meals.map(m => `${m.t}: ${m.descr}${fmt(m)}`).join('\n');
+  const kcal = meals.reduce((a, m) => a + (m.kcal ?? 0), 0), prot = meals.reduce((a, m) => a + (m.prot ?? 0), 0);
+  const tot = `Acumulado del día (ya sumado, NO lo recalcules): ~${kcal} kcal · ${prot} g de proteína. Los números "fijo" de cada comida tampoco se recalculan: usalos tal cual.`;
   const how = final
-    ? 'El día terminó. Primera línea: solo "PUNTAJE: NN%" (un número entero de 0 a 100), según TODO el día junto. Después: "Macros del día (aprox.): proteína X g · carbohidratos X g · grasas X g · ~X kcal" y una línea "Meta: 2.000 kcal y 150 g de proteína: llegó / quedó corto en X". Después, una sección "Qué bajó el puntaje:" con cada falla y qué habría que haber comido para evitarla (o una línea de por qué fue 100 si no hubo fallas). Sin markdown.'
-    : 'El día sigue. Respondé con estas líneas, sin encabezado de veredicto y sin markdown, cortas y concretas: "Esta comida: qué comí (la última comida listada)", "Esta comida: ~X kcal · X g de proteína", "Acumulado hoy: ~X kcal · X g de proteína (meta: 2.000 kcal y 150 g)", "Te falta: X kcal y X g de proteína, y si falta algo más (verduras, fruta, grasas buenas) o si hay algo para evitar", "Para compensar: una sugerencia concreta con alimentos y cantidades para la próxima comida (o para lo que queda del día, según la hora de las comidas listadas)", "Puntaje estimado hasta ahora: PUNTAJE: NN%" (suponiendo que no comes nada más). Si ya llegó a la meta o se pasó, decilo y no sugieras comer más. ';
-  return gemini(env, 'Sos un evaluador consistente de la alimentación diaria de un adulto que entrena. Respondés en español rioplatense, breve y concreto.\n' + RUBRIC, [{ text: `${how}\n\nComidas del día:\n${list}` }]);
+    ? `El día terminó. Primera línea: solo "PUNTAJE: NN%" (un número entero de 0 a 100), según TODO el día junto. Después: "Macros del día: ~${kcal} kcal · ${prot} g de proteína" (usá exactamente esos números) y una línea "Meta: 2.000 kcal y 150 g de proteína: llegó / quedó corto en X". Después, una sección "Qué bajó el puntaje:" con cada falla y qué habría que haber comido para evitarla (o una línea de por qué fue 100 si no hubo fallas). Sin markdown.`
+    : 'El día sigue. Respondé con estas líneas, sin encabezado de veredicto y sin markdown, cortas y concretas: "Esta comida: qué comí (SOLO la última comida cargada, la de la hora más tardía; no la mezcles con otras)", "Esta comida: ~X kcal · X g de proteína" (los números "fijo" de esa comida), "Acumulado hoy: ~X kcal · X g de proteína (meta: 2.000 kcal y 150 g)" (usá el acumulado ya sumado), "Te falta: X kcal y X g de proteína, y si falta algo más (verduras, fruta, grasas buenas) o si hay algo para evitar", "Para compensar: una sugerencia concreta con alimentos y cantidades para la próxima comida (o para lo que queda del día, según la hora de las comidas listadas)", "Puntaje estimado hasta ahora: PUNTAJE: NN%" (suponiendo que no comes nada más). Si ya llegó a la meta o se pasó, decilo y no sugieras comer más. Una comida sin calorías (agua) no cambia nada del acumulado ni del puntaje.';
+  return gemini(env, 'Sos un evaluador consistente de la alimentación diaria de un adulto que entrena. Respondés en español rioplatense, breve y concreto.\n' + RUBRIC, [{ text: `${how}\n\nComidas del día (ordenadas por hora):\n${list}\n\n${tot}` }]);
 }
 
 const isEmptyInput = (raw: string | null) => {
@@ -408,7 +427,8 @@ export async function handle(req: Request, env: Env): Promise<Response> {
         ? await gemini(env, DESCRIBE_SYSTEM, [{ text: 'Describí esta comida.' + (text ? ' Nota de quien la comió: ' + text : '') }, { inline_data: { mime_type: typeof b.mime === 'string' ? b.mime : 'image/jpeg', data: image } }], 0.1)
         : text;
       const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-      await env.DB.prepare('INSERT INTO meals (id, date, t, kind, descr, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(id, b.date, t, image ? 'photo' : 'text', descr, Date.now()).run();
+      const est = await estimateMeal(env, descr);
+      await env.DB.prepare('INSERT INTO meals (id, date, t, kind, descr, created_at, kcal, prot) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(id, b.date, t, image ? 'photo' : 'text', descr, Date.now(), est?.kcal ?? null, est?.prot ?? null).run();
       const analysis = await judgeDay(env, b.date, false);
       await saveVerdict(env, b.date, analysis, false);
       return json({ ok: true, id, descr, text: analysis, meals: await listMeals(env, b.date) });

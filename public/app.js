@@ -121,7 +121,6 @@ const pic = (n, fb, k = 22) => has('icono_' + n) ? `<img class="ico" alt="" src=
 const hrs = x => String(+Number(x).toFixed(2)).replace('.', ',') + ' h';
 const roomsOf = inp => inp.rooms ?? (inp.room ? [inp.room] : []);
 const hhmm = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
-const mealName = t => { const h = +t.slice(0, 2); return h < 11 ? 'Desayuno' : h < 16 ? 'Almuerzo' : h < 20 ? 'Merienda' : 'Cena'; };
 let txOpen = false, txDraft = '', vDraft = '', bkDraft = { t: '', a: '', d: '' };
 // Fotos: se guardan en el teléfono (IndexedDB) hasta que las mandás; en el estado solo queda la hora y el texto.
 let dbp = null;
@@ -386,7 +385,7 @@ function viewDiario(h0) {
 }
 
 function entryHTML(e, date) {
-  return `<div class="entry">${e.kind === 'photo' ? `<img class="thumb" data-ph="${e.id}" alt="">` : '<span class="mic">✍️</span>'}<span class="mtx"><b>${e.t} · ${mealName(e.t)}</b><small class="dsc">${esc(e.descr)}</small></span></div>`;
+  return `<div class="entry">${e.kind === 'photo' ? `<img class="thumb" data-ph="${e.id}" alt="">` : '<span class="mic">✍️</span>'}<span class="mtx"><b>${e.t}</b><small class="dsc">${esc(e.descr)}</small></span></div>`;
 }
 // ---------- Guarida: Héroe · La bestia · Gimnasio ----------
 const TITLES_ON = false;   // los títulos nuevos se cargan más adelante
