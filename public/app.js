@@ -195,8 +195,21 @@ function foodCard(date, inp, locked) {
     : `<button class="btn" style="margin-top:10px;width:100%" ${off ? 'disabled' : 'data-act="txopen"'}>Cargar comida</button>`;
   if (waterQ && waterQ.date === date) h += `<div class="wq"><b>¿Bebiste 250 ml de agua con esta comida?</b><div class="row"><button class="btn sm" data-act="waterq" data-v="1">Sí</button><button class="btn sm ghost" data-act="waterq" data-v="0">No</button></div></div>`;
   h += `${busy ? `<p class="mute busy">⏳ ${busy}</p>` : ''}${errMeal ? `<p class="err">${esc(errMeal)}</p>` : ''}`;
+  if (inp.comp && wkdayOf(date) < 5) h += compCard(date, inp, locked);
   if (inp.verdictTx) h += `<p class="vnote">${esc(inp.verdictTx)}</p>`;
   return h + `</div>`;
+}
+const ACT_NOM = { bici: 'de bici', soga: 'de saltos a la soga', trote: 'de trote' };
+/** Desafío para compensar un exceso de calorías: cuánto quemar, equivalencias y contador manual. */
+function compCard(date, inp, locked) {
+  const c = inp.comp, left = Math.max(0, c.burn - (c.done || 0)), ok = left === 0;
+  const eq = c.opts.map(o => `${Math.max(1, Math.round(left / o.kpm))} min ${ACT_NOM[o.n] || o.n}`).join(' · ');
+  return `<div class="wq"><div class="row"><b>${ok ? 'Exceso compensado ✓' : `Te pasaste ${c.over} kcal`}</b><span class="pill ${ok ? 'ok' : 'gold'}">${c.done || 0} / ${c.burn} kcal</span></div>`
+    + `<div class="bar gold"><i style="width:${Math.min(100, (c.done || 0) / c.burn * 100)}%"></i></div>`
+    + (ok ? `<small class="mute">El puntaje vuelve a ${c.sin} %.</small>`
+      : `<small class="mute">Quemá ${left} kcal para volver a ${c.sin} %: ${eq}.</small>`
+        + (locked ? '' : `<div class="row" style="margin-top:6px;gap:6px"><select id="ca" style="background:transparent;color:inherit;border:1px solid var(--line,#444);border-radius:8px;padding:4px 6px">${c.opts.map(o => `<option value="${o.n}">${o.n} (min)</option>`).join('')}<option value="kcal">kcal</option></select><input id="cn" type="text" inputmode="numeric" placeholder="0" autocomplete="off" style="width:64px"><button class="btn sm" data-act="compreg">Registrar</button></div>`))
+    + `</div>`;
 }
 
 function viewHoy() {
@@ -776,6 +789,10 @@ document.addEventListener('click', async ev => {
   else if (a === 'readtog') actDay(viewDate, i => { i.read = !i.read; });
   else if (a === 'waterq') { const d = waterQ?.date || todayISO(); waterQ = null; if (el.dataset.v === '1') actDay(d, i => { i.waterMl = (i.waterMl || 0) + 250; }); else render(); }
   else if (a === 'water') actDay(viewDate, i => { const v = Math.max(0, (i.waterMl || 0) + (+el.dataset.v)); if (v) i.waterMl = v; else delete i.waterMl; });
+  else if (a === 'compreg') {
+    const n = parseInt(document.getElementById('cn')?.value, 10), act = document.getElementById('ca')?.value; if (!(n > 0)) return;
+    actDay(viewDate, i => { const c = i.comp; if (!c) return; const o = c.opts.find(x => x.n === act); c.done = (c.done || 0) + Math.round(o ? n * o.kpm : n); if (c.done >= c.burn) i.foodPct = Math.max(i.foodPct ?? 0, c.sin / 100); });
+  }
   else if (a === 'water1') actDay(viewDate, i => { i.waterMl = Math.max(i.waterMl || 0, 1000); });
   else if (a === 'gymset') {
     const v = parseInt(document.getElementById('gm')?.value, 10);

@@ -131,7 +131,7 @@ const RUBRIC = `Rúbrica fija para puntuar la alimentación del día (aplicala s
 Lo que baja el puntaje, sobre todo: falta de proteína, desbalance entre proteínas, verduras, frutas y grasas, comida basura y comer muy poco. Mirá el día completo: lo que faltó en una comida cuenta como cumplido si se compensó en otra. Si falta información para juzgar algo, no lo penalices. Usá solo las comidas listadas; no inventes otras.
 Referencia de esta persona: está bajando de peso y entrena casi todos los días. Su meta diaria es de ~2.000 kcal y ~150 g de proteína, repartidas en tres comidas (≈12, 17 y 23 hs). Menos de ~1.500 kcal o menos de ~110 g de proteína en el día es una falla clara; pasarse de ~2.400 kcal es una falla menor. No come papa ni batata: no las recomiendes.`;
 const normFirst = (text: string) => text.split('\n').find(l => l.trim())?.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') ?? '';
-const parseScore = (text: string): number | null => { const m = /PUNTAJE[^0-9\n]{0,20}(\d{1,3})/i.exec(text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')); return m ? Math.min(100, Number(m[1])) : null; };
+const parseScore = (text: string): number | null => { const m = /PUNTAJE(?! SIN)[^0-9\n]{0,20}(\d{1,3})/i.exec(text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')); return m ? Math.min(100, Number(m[1])) : null; };
 const validDate = (d: unknown): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
 const dowOf = (date: string) => new Date(date + 'T00:00:00Z').getUTCDay();
 const mealsReady = new WeakSet<object>();
@@ -154,17 +154,36 @@ async function estimateMeal(env: Env, descr: string): Promise<{ kcal: number; pr
     return kk && pp ? { kcal: Number(kk[1]), prot: Number(pp[1]) } : null;
   } catch { return null; }
 }
-/** Guarda el análisis del día en la entrada del día. El puntaje (lunes a viernes) va a foodPct; con final cierra el día. */
+/** Calorías por encima de las cuales el día pierde puntos; lo que pase de ahí se compensa con ejercicio. */
+const CAL_TOPE = 2400;
+/** Gasto por minuto de cada actividad = MET × 3,5 × kg / 200 (fórmula estándar). La IA no inventa estos números: así el desafío es siempre el mismo. */
+const MET: [string, number][] = [['bici', 7.5], ['soga', 11], ['trote', 9.8]];
+async function lastWeight(env: Env, date: string): Promise<number> {
+  const rows = (await env.DB.prepare('SELECT input FROM day_inputs WHERE date <= ? ORDER BY date DESC LIMIT 20').bind(date).all()).results as { input: string }[];
+  for (const r of rows) { try { const w = Number(JSON.parse(r.input).weightKg); if (w > 30 && w < 300) return w; } catch { /* sigue */ } }
+  return 80;
+}
+/** Guarda el análisis del día en la entrada del día. El puntaje (lunes a viernes) va a foodPct; con final cierra el día.
+ *  Si el único motivo de la baja fue pasarse de calorías, arma el desafío de compensación (input.comp); al registrar las kcal quemadas el puntaje vuelve al "sin exceso". */
 async function saveVerdict(env: Env, date: string, text: string, fin: boolean) {
+  await ensureMeals(env);
   const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
   const input = row ? JSON.parse(row.input as string) : {}, score = parseScore(text), weekday = dowOf(date) >= 1 && dowOf(date) <= 5;
+  let eff = score;
+  const kcal = (await listMeals(env, date)).reduce((a, m) => a + (m.kcal ?? 0), 0);
+  const sinM = /PUNTAJE SIN EXCESO[^0-9\n]{0,20}(\d{1,3})/i.exec(text.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+  if (weekday && score !== null && kcal >= CAL_TOPE + 50 && sinM) {
+    const burn = Math.round((kcal - CAL_TOPE) / 10) * 10, kg = await lastWeight(env, date), sin = Math.min(100, Number(sinM[1]));
+    input.comp = { over: kcal - CAL_TOPE, burn, sin, done: input.comp?.done ?? 0, opts: MET.map(([n, met]) => ({ n, kpm: Math.round(met * 3.5 * kg / 200 * 10) / 10 })) };
+    if (input.comp.done >= burn) eff = Math.max(score, sin);
+  } else delete input.comp;
   if (text) input.verdictTx = text; else delete input.verdictTx;
-  if (weekday && score !== null) input.foodPct = Math.round(score) / 100;
-  const closed = fin && weekday && score !== null;
+  if (weekday && eff !== null) input.foodPct = Math.round(eff) / 100;
+  const closed = fin && weekday && eff !== null;
   if (closed) { input.meals = true; delete input.food; delete input.meat; delete input.veg; }
   await env.DB.prepare('INSERT INTO day_inputs (date, input, updated_at, device) VALUES (?, ?, ?, ?) ON CONFLICT(date) DO UPDATE SET input = excluded.input, updated_at = excluded.updated_at, device = excluded.device')
     .bind(date, JSON.stringify(input), Date.now(), 'ia-comida').run();
-  return { status: score === null ? 'none' : score >= 80 ? 'ok' : 'no', closed, score };
+  return { status: eff === null ? 'none' : eff >= 80 ? 'ok' : 'no', closed, score: eff };
 }
 async function judgeDay(env: Env, date: string, final: boolean) {
   const meals = await listMeals(env, date);
@@ -176,11 +195,14 @@ async function judgeDay(env: Env, date: string, final: boolean) {
   const fmt = (m: Meal) => m.kcal === null ? '' : ` [fijo: ~${m.kcal} kcal · ${m.prot} g de proteína]`;
   const list = meals.map(m => `${m.t}: ${m.descr}${fmt(m)}`).join('\n');
   const kcal = meals.reduce((a, m) => a + (m.kcal ?? 0), 0), prot = meals.reduce((a, m) => a + (m.prot ?? 0), 0);
+  const over = kcal >= CAL_TOPE + 50
+    ? ` Las calorías pasan de ${CAL_TOPE}: decí cuántas kcal se pasó (${kcal - CAL_TOPE}) y NO sugieras ejercicio ni inventes un desafío (lo arma la app). Agregá como ÚLTIMA línea "PUNTAJE SIN EXCESO: NN%": el puntaje que tendría el día si las calorías estuvieran dentro del tope; solo cambia lo que bajó por el exceso de calorías (si también faltó proteína o hubo desbalance, eso sigue bajando).`
+    : '';
   const tot = `Acumulado del día (ya sumado, NO lo recalcules): ~${kcal} kcal · ${prot} g de proteína. Los números "fijo" de cada comida tampoco se recalculan: usalos tal cual.`;
   const how = final
     ? `El día terminó. Primera línea: solo "PUNTAJE: NN%" (un número entero de 0 a 100), según TODO el día junto. Después: "Macros del día: ~${kcal} kcal · ${prot} g de proteína" (usá exactamente esos números) y una línea "Meta: 2.000 kcal y 150 g de proteína: llegó / quedó corto en X". Después, una sección "Qué bajó el puntaje:" con cada falla y qué habría que haber comido para evitarla (o una línea de por qué fue 100 si no hubo fallas). Sin markdown.`
     : 'El día sigue. Respondé con estas líneas, sin encabezado de veredicto y sin markdown, cortas y concretas: "Esta comida: qué comí (SOLO la última comida cargada, la de la hora más tardía; no la mezcles con otras)", "Esta comida: ~X kcal · X g de proteína" (los números "fijo" de esa comida), "Acumulado hoy: ~X kcal · X g de proteína (meta: 2.000 kcal y 150 g)" (usá el acumulado ya sumado), "Te falta: X kcal y X g de proteína, y si falta algo más (verduras, fruta, grasas buenas) o si hay algo para evitar", "Para compensar: una sugerencia concreta con alimentos y cantidades para la próxima comida (o para lo que queda del día, según la hora de las comidas listadas)", "Puntaje estimado hasta ahora: PUNTAJE: NN%" (suponiendo que no comes nada más). Si ya llegó a la meta o se pasó, decilo y no sugieras comer más. Una comida sin calorías (agua) no cambia nada del acumulado ni del puntaje.';
-  return gemini(env, 'Sos un evaluador consistente de la alimentación diaria de un adulto que entrena. Respondés en español rioplatense, breve y concreto.\n' + RUBRIC, [{ text: `${how}\n\nComidas del día (ordenadas por hora):\n${list}\n\n${tot}` }]);
+  return gemini(env, 'Sos un evaluador consistente de la alimentación diaria de un adulto que entrena. Respondés en español rioplatense, breve y concreto.\n' + RUBRIC, [{ text: `${how}${over}\n\nComidas del día (ordenadas por hora):\n${list}\n\n${tot}` }]);
 }
 
 const isEmptyInput = (raw: string | null) => {
