@@ -24,7 +24,7 @@ export const pesosDe = (inp: Inputs): Record<string, number> => Object.fromEntri
 export function puntajeDia(i: any, fecha: string, kg: number = GASTO.kgDef, extra = 0): number {
   const wd = comidaPuntua(fecha), g = gastoCuenta(fecha);
   const lista = [gymMin(i) >= 40, !!i?.read, (i?.rooms ?? (i?.room ? [i.room] : [])).length > 0, agua(i), (i?.weightKg ?? 0) > 0, ...(wd ? [i?.foodPct !== undefined] : [])];
-  if (g) { const x = gastoDia(i, dowL(fecha), kg, extra, fecha); lista.push(x.total >= x.meta); }
+  if (g) { const x = gastoDia(i, dowL(fecha), kg, extra); lista.push(x.total >= x.meta); }
   return Math.min(1, lista.filter(Boolean).length / lista.length);
 }
 
@@ -39,7 +39,7 @@ export function semanas(inp: Inputs, start: string, hoy: string): Sem[] {
       const d = addD(lun, q); if (d > hoy) break;
       const i = inp[d] ?? {}, kg = pesoHasta(inp, d), ex = extraGasto(P, d); s.dias++;
       if (d < hoy) { sc += puntajeDia(i, d, kg, ex); n++; }
-      if (gastoCuenta(d)) { const g = gastoDia(i, q, kg, ex, d); s.gastoN++; if (g.total >= g.meta) s.gastoDias++; }
+      if (gastoCuenta(d)) { const g = gastoDia(i, q, kg, ex); s.gastoN++; if (g.total >= g.meta) s.gastoDias++; }
       const m = gymMin(i); s.gymMin += m; if (m >= 40) s.sess++;
       if (i.foodPct !== undefined) comida.push(Number(i.foodPct));
       if (agua(i)) s.aguaDias++; if (i.read) s.lecturaDias++;

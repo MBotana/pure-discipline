@@ -15,7 +15,8 @@ test('puntaje del día: 6 misiones entre semana, 5 el fin de semana', () => {
   assert.equal(puntajeDia(dia(), '2026-11-20'), 6 / 7, 'viernes con 60 min de pesas: 365 kcal, no llega a 900');
   assert.equal(puntajeDia(dia(), '2026-11-13'), 1, 'el viernes 13 todavía no hay misión de gasto');
   assert.equal(puntajeDia(dia({ aeroKcal: 600 }), '2026-11-20', 87), 1);
-  assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], aeroKcal: 600, foodPct: 0.9 }, '2026-11-14', 87), 1, 'sábado del modo 25/12: 7 de 7 (la comida también cuenta)');
+  assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], aeroKcal: 600, foodPct: 0.9 }, '2026-11-21', 87), 1, 'sábado del modo 25/12: 7 de 7 (la comida también cuenta)');
+  assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'] }, '2026-11-14', 87), 1, 'sábado 14/11, antes del modo: 5 de 5');
   assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], aeroKcal: 600 }, '2027-01-09', 87), 1, 'sábado fuera del modo: 6 de 6');
 });
 
@@ -25,10 +26,13 @@ test('gasto del día: gimnasio por tiempo y peso, boxeo con más MET, aeróbico 
   const b = gastoDia({ gymMin: 90 }, 0, 87);                        // lunes, boxeo
   assert.equal(b.box, true); assert.equal(b.gym, 936); assert.equal(gastoDia({ gymMin: 90, rut: 4 }, 0, 87).box, false, 'si el lunes elegiste piernas, son pesas');
   assert.equal(gastoDia({}, 6, 87).meta, 500, 'domingo: descanso activo');
-  assert.equal(gastoDia({}, 0, 87, 0, '2026-11-16').meta, 750, 'rampa: primera semana');
-  assert.equal(gastoDia({}, 6, 87, 0, '2026-11-15').meta, 400, 'rampa: domingo');
-  assert.equal(gastoDia({}, 4, 87, 0, '2026-11-20').meta, 900, 'desde el 20/11: completa');
-  const d = gastoDia({ modo: 'descanso' }, 2, 87, 150, '2026-11-25'); assert.equal(d.meta, 0); assert.equal(d.extra, 0); assert.ok(d.total >= d.meta, 'día de descanso: sin meta');
+  const d = gastoDia({ modo: 'pausa' }, 2, 87, 150); assert.equal(d.meta, 0); assert.equal(d.extra, 0); assert.ok(d.total >= d.meta, 'pausa por salud: sin meta');
+  assert.equal(gastoDia({}, 4, 87).meta, 900, 'sin rampa: 900 desde el primer día');
+  // pasarse de 1.500 kcal suma kcal a la meta, 1 a 1, con margen de 50 y tope de 400
+  assert.equal(gastoDia({ kcalDia: 1500 }, 2, 87).comp, 0); assert.equal(gastoDia({ kcalDia: 1540 }, 2, 87).comp, 0, 'margen de error');
+  const c = gastoDia({ kcalDia: 1850 }, 2, 87, 150); assert.equal(c.exc, 350); assert.equal(c.comp, 350); assert.equal(c.meta, 900 + 150 + 350);
+  const t = gastoDia({ kcalDia: 3000 }, 2, 87); assert.equal(t.exc, 1500); assert.equal(t.comp, 400, 'tope diario'); assert.equal(t.meta, 1300);
+  assert.equal(gastoDia({ kcalDia: 3000, modo: 'pausa' }, 2, 87).comp, 0, 'en pausa no se compensa');
 });
 
 test('semanas y destacados: la mejor semana, el peor mes y la racha de días', () => {
@@ -68,10 +72,10 @@ test('ajuste de peso del corte: 0,8 a 1,3 kg por semana', () => {
 
 test('controles del 25/12: cada viernes no alcanzado (o sin pesaje) suma 150 kcal a la meta de gasto', async () => {
   const { extraGasto, controles } = await import('../src/engine/gasto.ts');
-  assert.equal(extraGasto({ '2026-11-20': 85.4 }, '2026-11-21'), 0, 'llegó');
-  assert.equal(extraGasto({ '2026-11-19': 85.4 }, '2026-11-21'), 0, 'se pesó el jueves: vale');
-  assert.equal(extraGasto({ '2026-11-20': 86 }, '2026-11-20'), 0, 'el mismo día del control todavía no suma');
-  assert.equal(extraGasto({ '2026-11-20': 86 }, '2026-11-21'), 150);
+  assert.equal(extraGasto({ '2026-11-20': 85.9 }, '2026-11-21'), 0, 'llegó');
+  assert.equal(extraGasto({ '2026-11-19': 85.9 }, '2026-11-21'), 0, 'se pesó el jueves: vale');
+  assert.equal(extraGasto({ '2026-11-20': 86.5 }, '2026-11-20'), 0, 'el mismo día del control todavía no suma');
+  assert.equal(extraGasto({ '2026-11-20': 86.5 }, '2026-11-21'), 150);
   assert.equal(extraGasto({ '2026-11-20': 85 }, '2026-11-28'), 150, 'el 27 no se pesó: cuenta como no alcanzado');
   assert.equal(controles({}, '2026-11-14').filter(c => c.pasado).length, 0);
 });

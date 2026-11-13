@@ -100,8 +100,8 @@ test('comida: fin de semana libre, agua todos los días', () => {
   assert.equal(r.log.flatMap(d => d.events).filter(x => x.label === 'Agua').length, 7);
   assert.equal(Math.round(r.e.state.xp.V), 5 * 105 + 7 * 15 + 250);
   const bad = run(7, (i) => ({ foodPct: 0.7 }), GEN);
-  const corte = run(7, (i) => ({ foodPct: 1 }));                    // semana del 9/11: el sábado 14 y el domingo 15 ya puntúan
-  assert.equal(corte.log.flatMap(d => d.events).filter(x => x.label === 'Comida').length, 7);
+  const corte = run(14, (i) => ({ foodPct: 1 }));                   // semana del 9/11 (5 días) y del 16/11 (modo 25/12: sábado y domingo también puntúan)
+  assert.equal(corte.log.flatMap(d => d.events).filter(x => x.label === 'Comida').length, 5 + 7);
   assert.equal(bad.log.flatMap(d => d.events).filter(x => x.kind === 'W' && x.cat === 'V').length, 0);
 });
 
@@ -178,13 +178,17 @@ test('progreso: carga/descarga alternan 3+1 y el ciclo paga con 4 ejercicios dis
   assert.ok(!r2.log.flatMap(d => d.events).some(x => x.label === 'Ciclo completo'));
 });
 
-test('gasto del día: desde el modo corte suma Vitalidad si llega a la meta (con la rampa y el último peso anotado)', () => {
+test('gasto del día: desde el lunes 16/11 suma Vitalidad si llega a la meta (900, sin rampa), con la compensación por comer de más', () => {
   const e = new Rise();
-  for (let i = 0; i < 5; i++) e.processDay(i === 0 ? { weightKg: 87 } : {});          // 9 al 13/11: antes del corte
-  const sab = e.processDay({ gymMin: 72, aeroKcal: 400 });                           // sábado 14/11: 439 + 400 kcal ≥ 750 (rampa)
-  assert.ok(sab.events.some(x => x.label === 'Gasto del día' && x.cat === 'V'));
-  const dom = e.processDay({ aeroKcal: 300 });                                       // domingo 15/11: meta 400, no llega
-  assert.ok(!dom.events.some(x => x.label === 'Gasto del día'));
-  const desc = e.processDay({ modo: 'descanso' } as any);                            // día de descanso: sin meta, suma
-  assert.ok(desc.events.some(x => x.label === 'Gasto del día'));
+  for (let i = 0; i < 7; i++) e.processDay(i === 0 ? { weightKg: 87 } : { gymMin: 90, aeroKcal: 900 });   // 9 al 15/11: antes del modo, no cuenta
+  const lun = e.processDay({ gymMin: 90 });                                           // lunes 16/11, boxeo: 90 min × 10,4 = 936 ≥ 900
+  assert.ok(lun.events.some(x => x.label === 'Gasto del día' && x.cat === 'V'));
+  const mar = e.processDay({ gymMin: 72, aeroKcal: 500 });                            // martes: 439 + 500 = 939 ≥ 900
+  assert.ok(mar.events.some(x => x.label === 'Gasto del día'));
+  const mie = e.processDay({ gymMin: 72, aeroKcal: 500, kcalDia: 1900 });             // miércoles (boxeo): 90... 72 min × 10,4 = 749 + 500 = 1.249 < 900 + 400
+  assert.ok(!mie.events.some(x => x.label === 'Gasto del día'), 'comió 400 de más: la meta sube a 1.300 y no llega');
+  const jue = e.processDay({ gymMin: 72, aeroKcal: 900, kcalDia: 1900 });             // jueves: 439 + 900 = 1.339 ≥ 1.300
+  assert.ok(jue.events.some(x => x.label === 'Gasto del día'));
+  const vie = e.processDay({ modo: 'pausa' } as any);                                 // pausa por salud: sin meta
+  assert.ok(vie.events.some(x => x.label === 'Gasto del día'));
 });

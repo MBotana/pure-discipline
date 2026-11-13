@@ -219,7 +219,7 @@ export class Rise {
     }
     if (inp.water) add('V', 'D', 'Agua', c.waterXp);
     if ((inp.weightKg ?? 0) > 0) { add('V', 'D', 'Peso', c.weighXp); S.kg = inp.weightKg; (S.pesos ??= {})[date] = inp.weightKg!; }
-    if (gastoCuenta(date)) { const g = gastoDia(inp, dd, S.kg ?? GASTO.kgDef, extraGasto(S.pesos ?? {}, date), date); if (g.total >= g.meta) add('V', 'D', 'Gasto del día', c.gastoXp); }
+    if (gastoCuenta(date)) { const g = gastoDia(inp, dd, S.kg ?? GASTO.kgDef, extraGasto(S.pesos ?? {}, date)); if (g.total >= g.meta) add('V', 'D', 'Gasto del día', c.gastoXp); }
     // Disciplina
     if (inp.gameH) S.wk.gameH += inp.gameH;
 

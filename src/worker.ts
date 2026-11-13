@@ -95,7 +95,7 @@ async function gemini(env: Env, system: string, parts: unknown[], temperature = 
   throw Object.assign(new Error('La IA no respondió (' + last + ')'), { status: 502 });
 }
 import { sugerencias, dowL } from '../engine/src/engine/resumen.ts';
-import { AERO, kpm, comidaPuntua } from '../engine/src/engine/gasto.ts';
+import { comidaPuntua, GASTO } from '../engine/src/engine/gasto.ts';
 
 // ---------- Mascotas que hablan (Gemini redacta, Telegram entrega) ----------
 // El servidor decide SI hay algo que decir y qué hechos pasaron; Gemini solo decide CÓMO decirlo, con la voz de la mascota.
@@ -130,16 +130,16 @@ const RUBRIC = `Rúbrica fija para puntuar la alimentación del día (aplicala s
 - 50: malo: falta de proteína clara, desbalance fuerte, comida basura o ultraprocesados repetidos.
 - Menos de 50: peor todavía (varias fallas juntas). 0 si no se comió nada.
 Lo que baja el puntaje, sobre todo: falta de proteína, desbalance entre proteínas, verduras, frutas y grasas, y comida basura. Comer pocas calorías NO baja el puntaje. Mirá el día completo: lo que faltó en una comida cuenta como cumplido si se compensó en otra. Si falta información para juzgar algo, no lo penalices. Usá solo las comidas listadas; no inventes otras.
-Referencia de esta persona: está bajando de peso y entrena casi todos los días. Está en un corte agresivo hasta el 25/12, bajo en carbohidratos y sin azúcar: hace ayuno hasta las 17 hs y come entre las 17 y las 23 hs. Meta diaria: ~1.500 kcal, ~185 g de proteína y menos de 50 g de carbohidratos (solo de verduras y lácteos). Quedarse corto de calorías NO es una falla y no baja el puntaje (solo si el día cerró con menos de ~1.200 kcal, agregá una línea de aviso de que es poco para cómo entrena, sin bajar el puntaje). Fallas: proteína por debajo de ~165 g (falla leve) y por debajo de ~140 g (falla clara); más de ~70 g de carbohidratos; cualquier azúcar, dulce, harina, pan, arroz, pasta, cereal, legumbre, jugo o más de una porción de fruta; pasarse de ~1.600 kcal. La fruta (una porción) está permitida. Un plan sugerido de referencia: omelette de 4 huevos con tomate cherry y cebolla; 280 g de nalga o peceto con rúcula, cherry y zanahoria más yogur griego con una fruta; 280 g de carne magra con brócoli, 250 ml de leche proteica y 10 g de nueces. Es una sugerencia, no una obligación. Tiene cristales de oxalato de calcio en orina: no le sugieras espinaca, acelga, remolacha ni almendras (rúcula, lechuga, brócoli, zucchini y nueces en poca cantidad sí), ni suplementos de vitamina C, ni más de ~1 litro de agua por hora; sí lácteos con las comidas. Si él come espinaca o almendras, no lo penalices: solo no las sugieras. No le sugieras ninguno de esos alimentos para compensar. Si una comida trae gramos, calculá con esos gramos (la carne en crudo salvo que diga cocida). No come papa ni batata: no las recomiendes.`;
+Referencia de esta persona: está bajando de peso y entrena casi todos los días. Está en un corte agresivo hasta el 25/12, bajo en carbohidratos y sin azúcar: hace ayuno hasta las 17 hs y come entre las 17 y las 23 hs. Meta diaria: ~1.500 kcal, ~185 g de proteína y menos de 50 g de carbohidratos (solo de verduras y lácteos). Quedarse corto de calorías NO es una falla y no baja el puntaje (solo si el día cerró con menos de ~1.200 kcal, agregá una línea de aviso de que es poco para cómo entrena, sin bajar el puntaje). Pasarse de calorías tampoco baja el puntaje: lo compensa la app con ejercicio. Fallas: proteína por debajo de ~165 g (falla leve) y por debajo de ~140 g (falla clara); más de ~70 g de carbohidratos; cualquier azúcar, dulce, harina, pan, arroz, pasta, cereal, legumbre, jugo o más de una porción de fruta; una comida fuera del plan (pizza, hamburguesa, postre, alcohol). La fruta (una porción) está permitida. Un plan sugerido de referencia: omelette de 4 huevos con tomate cherry y cebolla; 280 g de nalga o peceto con rúcula, cherry y zanahoria más yogur griego con una fruta; 280 g de carne magra con brócoli, 250 ml de leche proteica y 10 g de nueces. Es una sugerencia, no una obligación. Tiene cristales de oxalato de calcio en orina: no le sugieras espinaca, acelga, remolacha ni almendras (rúcula, lechuga, brócoli, zucchini y nueces en poca cantidad sí), ni suplementos de vitamina C, ni más de ~1 litro de agua por hora; sí lácteos con las comidas. Si él come espinaca o almendras, no lo penalices: solo no las sugieras. No le sugieras ninguno de esos alimentos para compensar. Si una comida trae gramos, calculá con esos gramos (la carne en crudo salvo que diga cocida). No come papa ni batata: no las recomiendes.`;
 const normFirst = (text: string) => text.split('\n').find(l => l.trim())?.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') ?? '';
 const parseScore = (text: string): number | null => { const m = /PUNTAJE(?! SIN)[^0-9\n]{0,20}(\d{1,3})/i.exec(text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')); return m ? Math.min(100, Number(m[1])) : null; };
 const validDate = (d: unknown): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
 const dowOf = (date: string) => new Date(date + 'T00:00:00Z').getUTCDay();
-/** Modo del día: 'libre' (la comida abierta del sábado, una vez por semana) o 'descanso' (día de descanso con 2.000 kcal). Cualquier otro valor no cuenta. */
-const modoValido = (date: string, m: unknown) => (m === 'libre' && dowOf(date) === 6) || m === 'descanso' ? (m as string) : '';
+/** Modo del día: solo 'pausa' (pausa por salud: mareos, fiebre, dolor o pulso alto). No hay comidas libres ni días de descanso programados. */
+const modoValido = (m: unknown) => (m === 'pausa' ? 'pausa' : '');
 async function modoDe(env: Env, date: string): Promise<string> {
   const r = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
-  try { return modoValido(date, JSON.parse((r?.input as string) ?? '{}').modo); } catch { return ''; }
+  try { return modoValido(JSON.parse((r?.input as string) ?? '{}').modo); } catch { return ''; }
 }
 const mealsReady = new WeakSet<object>();
 async function ensureMeals(env: Env) {
@@ -162,30 +162,18 @@ async function estimateMeal(env: Env, descr: string): Promise<{ kcal: number; pr
     return kk && pp ? { kcal: Number(kk[1]), prot: Number(pp[1]), carb: cc ? Number(cc[1]) : null } : null;
   } catch { return null; }
 }
-/** Calorías por encima de las cuales el día pierde puntos; lo que pase de ahí se compensa con ejercicio. */
-const CAL_TOPE = 1600;
+const CAL_META = GASTO.kcalMeta;
 const META_TX = '1.500 kcal, 185 g de proteína y menos de 50 g de carbohidratos';
-/** Gasto activo por minuto de cada actividad = (MET − 1) × 3,5 × kg / 200 (gasto/gasto.ts). La IA no inventa estos números: así el desafío es siempre el mismo. */
-const MET: [string, number][] = AERO.filter(a => ['bici', 'soga', 'trote'].includes(a[0])).map(a => [a[0], a[2]]);
-async function lastWeight(env: Env, date: string): Promise<number> {
-  const rows = (await env.DB.prepare('SELECT input FROM day_inputs WHERE date <= ? ORDER BY date DESC LIMIT 20').bind(date).all()).results as { input: string }[];
-  for (const r of rows) { try { const w = Number(JSON.parse(r.input).weightKg); if (w > 30 && w < 300) return w; } catch { /* sigue */ } }
-  return 80;
-}
 /** Guarda el análisis del día en la entrada del día. El puntaje (lunes a viernes) va a foodPct; con final cierra el día.
- *  Si el único motivo de la baja fue pasarse de calorías, arma el desafío de compensación (input.comp); al registrar las kcal quemadas el puntaje vuelve al "sin exceso". */
+ *  También guarda las kcal del día (kcalDia): lo que pase de 1.500 se suma a la meta de gasto (se calcula en el motor, gasto.ts). */
 async function saveVerdict(env: Env, date: string, text: string, fin: boolean) {
   await ensureMeals(env);
   const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
   const input = row ? JSON.parse(row.input as string) : {}, score = parseScore(text), weekday = comidaPuntua(date);
-  let eff = score;
-  const kcal = (await listMeals(env, date)).reduce((a, m) => a + (m.kcal ?? 0), 0);
-  const sinM = /PUNTAJE SIN EXCESO[^0-9\n]{0,20}(\d{1,3})/i.exec(text.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
-  if (weekday && score !== null && kcal >= CAL_TOPE + 50 && sinM && !modoValido(date, input.modo)) {
-    const burn = Math.round((kcal - CAL_TOPE) / 10) * 10, kg = await lastWeight(env, date), sin = Math.min(100, Number(sinM[1]));
-    input.comp = { over: kcal - CAL_TOPE, burn, sin, done: input.comp?.done ?? 0, opts: MET.map(([n, met]) => ({ n, kpm: kpm(met, kg) })) };
-    if (input.comp.done >= burn) eff = Math.max(score, sin);
-  } else delete input.comp;
+  const eff = score;
+  input.kcalDia = (await listMeals(env, date)).reduce((a, m) => a + (m.kcal ?? 0), 0);
+  if (input.kcalDia === 0) delete input.kcalDia;
+  delete input.comp;                                         // el desafío viejo (puntaje) ya no existe: ahora suma a la meta de gasto
   if (text) input.verdictTx = text; else delete input.verdictTx;
   if (weekday && eff !== null) input.foodPct = Math.round(eff) / 100;
   const closed = fin && weekday && eff !== null;
@@ -206,13 +194,11 @@ async function judgeDay(env: Env, date: string, final: boolean) {
   const list = meals.map(m => `${m.t}: ${m.descr}${fmt(m)}`).join('\n');
   const kcal = meals.reduce((a, m) => a + (m.kcal ?? 0), 0), prot = meals.reduce((a, m) => a + (m.prot ?? 0), 0), carb = meals.reduce((a, m) => a + (m.carb ?? 0), 0);
   const modo = await modoDe(env, date);
-  const modoTx = modo === 'libre'
-    ? ' HOY ES LA COMIDA ABIERTA SEMANAL: una sola comida de hoy (la más calórica) es libre. No penalices por carbohidratos, azúcar ni calorías de esa comida; el resto del día sigue las reglas y la proteína sigue contando. No armes desafío ni sugieras ejercicio extra.'
-    : modo === 'descanso'
-      ? ' HOY ES DÍA DE DESCANSO: la meta es ~2.000 kcal y ~185 g de proteína, con hasta ~150 g de carbohidratos (arroz, fruta, lácteos), sin azúcar agregada ni frituras; comer hasta ~2.200 kcal no es falla. No sugieras ejercicio.'
-      : '';
-  const over = !modo && kcal >= CAL_TOPE + 50
-    ? ` Las calorías pasan de ${CAL_TOPE}: decí cuántas kcal se pasó (${kcal - CAL_TOPE}) y NO sugieras ejercicio ni inventes un desafío (lo arma la app). Agregá como ÚLTIMA línea "PUNTAJE SIN EXCESO: NN%": el puntaje que tendría el día si las calorías estuvieran dentro del tope; solo cambia lo que bajó por el exceso de calorías (si también faltó proteína o hubo desbalance, eso sigue bajando).`
+  const modoTx = modo === 'pausa'
+    ? ' HOY ES PAUSA POR SALUD (síntomas): la meta es ~2.000 kcal y ~185 g de proteína, con hasta ~150 g de carbohidratos (arroz, fruta, lácteos), sin azúcar agregada ni frituras; comer hasta ~2.200 kcal no es falla. No sugieras ejercicio.'
+    : '';
+  const over = !modo && kcal > CAL_META + GASTO.kcalIgn
+    ? ` Las calorías pasan de ${CAL_META}: mencioná cuántas kcal se pasó (${kcal - CAL_META}) en una línea, sin bajar el puntaje por eso y SIN sugerir ejercicio (la app suma esas kcal a la meta de gasto del día).`
     : '';
   const tot = `Acumulado del día (ya sumado, NO lo recalcules): ~${kcal} kcal · ${prot} g de proteína · ${carb} g de carbohidratos. Los números "fijo" de cada comida tampoco se recalculan: usalos tal cual.`;
   const how = final
