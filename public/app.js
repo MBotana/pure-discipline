@@ -509,12 +509,12 @@ const RUTINA = [
 const rutDia = d => RUTINA[S.days[d]?.input?.rut ?? wkdayOf(d)];
 const exTxt = x => x.r ? `${x.n} · ${x.r.join('-')}` : x.t ? `${x.n} · ${x.t}` : x.n;
 // Provisorio hasta armar el plan con la lista de alimentos: ayuno hasta las 17, caminata, y se come entre las 17 y las 23.
-const COMIDAS = [['18:00', '300 g de nalga o peceto (en crudo) a la plancha, ensalada verde grande y 1 cda de aceite · ~560 kcal · 66 g de proteína'], ['20:30', 'Licuado: 2 scoops de proteína y 250 ml de leche descremada · ~330 kcal · 57 g'], ['23:00', '250 g de pechuga (en crudo), 2 huevos y verduras salteadas con 1 cdita de aceite · ~560 kcal · 70 g']];
+const COMIDAS = [['17:45', 'Después de la caminata: omelette de 4 huevos con espinaca y cebolla · ~310 kcal · 26 g de proteína'], ['20:00', '280 g de nalga o peceto (en crudo) a la plancha, rúcula, 100 g de cherry y zanahoria rallada; de postre, yogur griego natural con 1 fruta · ~620 kcal · 70 g'], ['23:00', '280 g de carne magra (en crudo) al horno con brócoli al vapor, 250 ml de leche proteica y 10 g de nueces · ~560 kcal · 88 g']];
 function rutinaCards(pre) {
   const hoy = rutDia(todayISO());
   const lista = r => `<ul class="plan">${r[2].map(x => `<li>${esc(exTxt(x))}</li>`).join('')}</ul>`;
   return `<div class="card slim"><div class="row"><h2>Hoy · ${hoy[0]}</h2><span class="pill gold">${hoy[1]}</span></div>${lista(hoy)}<details><summary>Toda la semana</summary>${RUTINA.map(r => `<div class="row" style="margin-top:10px"><b>${r[0]}</b><span class="pill">${r[1]}</span></div>${lista(r)}`).join('')}</details></div>`
-    + `<div class="card slim"><details><summary>Comidas del día · ~1.500 kcal · de 17 a 23 h</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: 200 g de proteína, menos de 50 g de carbohidratos, sin azúcar, nunca menos de 1.500 kcal y ~3 litros de agua (con sal) por día. Ayuno hasta las 17 h. Pesá la comida y cargala con gramos.</p></details></div>`;
+    + `<div class="card slim"><details><summary>Comidas del día · ~1.500 kcal · de 17 a 23 h</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: ~185 g de proteína, menos de 50 g de carbohidratos, sin azúcar, nunca menos de 1.500 kcal y ~3 litros de agua (con sal) por día. Ayuno hasta las 17 h. Pesá la comida y cargala con gramos.</p></details></div>`;
 }
 /** Fases del bloque de 4 semanas: base, progresiva, máxima y descarga. */
 const FASES = ['Carga base', 'Carga progresiva', 'Carga máxima', 'Descarga'];

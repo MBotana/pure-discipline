@@ -130,7 +130,7 @@ const RUBRIC = `Rúbrica fija para puntuar la alimentación del día (aplicala s
 - 50: malo: falta de proteína clara, desbalance fuerte, comida basura o ultraprocesados repetidos, o comer muy poco.
 - Menos de 50: peor todavía (varias fallas juntas). 0 si no se comió nada.
 Lo que baja el puntaje, sobre todo: falta de proteína, desbalance entre proteínas, verduras, frutas y grasas, comida basura y comer muy poco. Mirá el día completo: lo que faltó en una comida cuenta como cumplido si se compensó en otra. Si falta información para juzgar algo, no lo penalices. Usá solo las comidas listadas; no inventes otras.
-Referencia de esta persona: está bajando de peso y entrena casi todos los días. Está en un corte agresivo hasta el 25/12, bajo en carbohidratos y sin azúcar: hace ayuno hasta las 17 hs y come entre las 17 y las 23 hs. Meta diaria: ~1.500 kcal, ~200 g de proteína y menos de 50 g de carbohidratos (solo de verduras y lácteos). Fallas claras: menos de ~1.350 kcal, menos de ~170 g de proteína, más de ~70 g de carbohidratos, o cualquier azúcar, dulce, harina, pan, arroz, pasta, cereal, legumbre o fruta dulce. Pasarse de ~1.600 kcal es una falla. No le sugieras ninguno de esos alimentos para compensar. Si una comida trae gramos, calculá con esos gramos (la carne en crudo salvo que diga cocida). No come papa ni batata: no las recomiendes.`;
+Referencia de esta persona: está bajando de peso y entrena casi todos los días. Está en un corte agresivo hasta el 25/12, bajo en carbohidratos y sin azúcar: hace ayuno hasta las 17 hs y come entre las 17 y las 23 hs. Meta diaria: ~1.500 kcal, ~185 g de proteína y menos de 50 g de carbohidratos (solo de verduras y lácteos). Fallas claras: menos de ~1.350 kcal, menos de ~160 g de proteína, más de ~70 g de carbohidratos, o cualquier azúcar, dulce, harina, pan, arroz, pasta, cereal, legumbre o fruta dulce. Pasarse de ~1.600 kcal es una falla. No le sugieras ninguno de esos alimentos para compensar. Si una comida trae gramos, calculá con esos gramos (la carne en crudo salvo que diga cocida). No come papa ni batata: no las recomiendes.`;
 const normFirst = (text: string) => text.split('\n').find(l => l.trim())?.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') ?? '';
 const parseScore = (text: string): number | null => { const m = /PUNTAJE(?! SIN)[^0-9\n]{0,20}(\d{1,3})/i.exec(text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')); return m ? Math.min(100, Number(m[1])) : null; };
 const validDate = (d: unknown): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
@@ -158,7 +158,7 @@ async function estimateMeal(env: Env, descr: string): Promise<{ kcal: number; pr
 }
 /** Calorías por encima de las cuales el día pierde puntos; lo que pase de ahí se compensa con ejercicio. */
 const CAL_TOPE = 1600;
-const META_TX = '1.500 kcal, 200 g de proteína y menos de 50 g de carbohidratos';
+const META_TX = '1.500 kcal, 185 g de proteína y menos de 50 g de carbohidratos';
 /** Gasto activo por minuto de cada actividad = (MET − 1) × 3,5 × kg / 200 (gasto/gasto.ts). La IA no inventa estos números: así el desafío es siempre el mismo. */
 const MET: [string, number][] = AERO.filter(a => ['bici', 'soga', 'trote'].includes(a[0])).map(a => [a[0], a[2]]);
 async function lastWeight(env: Env, date: string): Promise<number> {
