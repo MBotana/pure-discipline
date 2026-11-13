@@ -12,17 +12,17 @@ test('puntaje del día: 6 misiones entre semana, 5 el fin de semana', () => {
   assert.equal(puntajeDia({ read: true, waterMl: 1200, gymMin: 45 }, '2026-11-09'), 0.5);
   assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'] }, '2026-11-08'), 1, 'domingo antes del corte: 5 de 5');
   // desde el modo corte el gasto del día es una misión más (7 entre semana, 6 el fin de semana)
-  assert.equal(puntajeDia(dia(), '2026-11-13'), 6 / 7, 'viernes con 60 min de pesas: 365 kcal, no llega a 700');
-  assert.equal(puntajeDia(dia({ aeroKcal: 400 }), '2026-11-13', 87), 1);
-  assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], aeroKcal: 400 }, '2026-11-14', 87), 1, 'sábado: 6 de 6');
+  assert.equal(puntajeDia(dia(), '2026-11-13'), 6 / 7, 'viernes con 60 min de pesas: 365 kcal, no llega a 900');
+  assert.equal(puntajeDia(dia({ aeroKcal: 600 }), '2026-11-13', 87), 1);
+  assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], aeroKcal: 600 }, '2026-11-14', 87), 1, 'sábado: 6 de 6');
 });
 
 test('gasto del día: gimnasio por tiempo y peso, boxeo con más MET, aeróbico a mano', () => {
   const g = gastoDia({ gymMin: 72, aeroKcal: 200 }, 4, 87);       // viernes, pesas
-  assert.equal(g.kpm, 6.1); assert.equal(g.gym, 439); assert.equal(g.total, 639); assert.equal(g.meta, 700);
+  assert.equal(g.kpm, 6.1); assert.equal(g.gym, 439); assert.equal(g.total, 639); assert.equal(g.meta, 900);
   const b = gastoDia({ gymMin: 90 }, 0, 87);                        // lunes, boxeo
   assert.equal(b.box, true); assert.equal(b.gym, 936); assert.equal(gastoDia({ gymMin: 90, rut: 4 }, 0, 87).box, false, 'si el lunes elegiste piernas, son pesas');
-  assert.equal(gastoDia({}, 6, 87).meta, 350, 'domingo: descanso activo');
+  assert.equal(gastoDia({}, 6, 87).meta, 500, 'domingo: descanso activo');
 });
 
 test('semanas y destacados: la mejor semana, el peor mes y la racha de días', () => {
@@ -58,4 +58,14 @@ test('ajuste de peso del corte: 0,8 a 1,3 kg por semana', () => {
   assert.match(ajustePeso([-1, -1]), /no toques nada/);
   assert.match(ajustePeso([-1.2, -1.8]), /sumá 150 kcal/);
   assert.equal(ajustePeso([-2]), '', 'la primera semana baja agua: no se corrige');
+});
+
+test('controles del 25/12: cada viernes no alcanzado (o sin pesaje) suma 150 kcal a la meta de gasto', async () => {
+  const { extraGasto, controles } = await import('../src/engine/gasto.ts');
+  assert.equal(extraGasto({ '2026-11-20': 85.4 }, '2026-11-21'), 0, 'llegó');
+  assert.equal(extraGasto({ '2026-11-19': 85.4 }, '2026-11-21'), 0, 'se pesó el jueves: vale');
+  assert.equal(extraGasto({ '2026-11-20': 86 }, '2026-11-20'), 0, 'el mismo día del control todavía no suma');
+  assert.equal(extraGasto({ '2026-11-20': 86 }, '2026-11-21'), 150);
+  assert.equal(extraGasto({ '2026-11-20': 85 }, '2026-11-28'), 150, 'el 27 no se pesó: cuenta como no alcanzado');
+  assert.equal(controles({}, '2026-11-14').filter(c => c.pasado).length, 0);
 });

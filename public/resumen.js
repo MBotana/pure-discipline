@@ -1,8 +1,8 @@
 // engine/src/engine/gasto.ts
 var GASTO = {
   desde: "2026-11-13",
-  meta: 700,
-  metaDom: 350,
+  meta: 900,
+  metaDom: 500,
   kgDef: 87,
   metPesas: 5,
   metBoxeo: 7.8,
@@ -12,10 +12,27 @@ var kpm = (met, kg) => Math.round((met - 1) * 3.5 * kg / 200 * 10) / 10;
 var esBoxeo = (inp, dowL) => GASTO.boxeo.includes(inp?.rut ?? dowL);
 var gastoCuenta = (fecha) => fecha >= GASTO.desde;
 var metaGasto = (dowL) => dowL === 6 ? GASTO.metaDom : GASTO.meta;
-function gastoDia(inp, dowL, kg) {
+var CONTROLES = [["2026-11-20", 85.5], ["2026-11-27", 84.3], ["2026-12-04", 83], ["2026-12-11", 81.8], ["2026-12-18", 80.6], ["2026-12-25", 79.9]];
+var EXTRA_KCAL = 150;
+function pesoControl(pesos, fecha) {
+  for (let q = 0;q < 3; q++) {
+    const d = new Date(Date.parse(fecha) - q * 86400000).toISOString().slice(0, 10);
+    if (pesos[d] > 0)
+      return pesos[d];
+  }
+  return null;
+}
+function controles(pesos, fecha) {
+  return CONTROLES.map(([d, max]) => {
+    const kg = d < fecha ? pesoControl(pesos, d) : null;
+    return { d, max, kg, pasado: d < fecha, ok: kg !== null && kg <= max };
+  });
+}
+var extraGasto = (pesos, fecha) => controles(pesos, fecha).filter((c) => c.pasado && !c.ok).length * EXTRA_KCAL;
+function gastoDia(inp, dowL, kg, extra = 0) {
   const min = inp?.gymMin ?? (inp?.gym ? 60 : 0), box = esBoxeo(inp, dowL), k = kpm(box ? GASTO.metBoxeo : GASTO.metPesas, kg || GASTO.kgDef);
   const gym = Math.round(min * k), aero = Math.round(Number(inp?.aeroKcal) || 0);
-  return { min, box, kpm: k, gym, aero, total: gym + aero, meta: metaGasto(dowL) };
+  return { min, box, kpm: k, gym, aero, total: gym + aero, meta: metaGasto(dowL) + extra, extra };
 }
 
 // engine/src/engine/resumen.ts
@@ -38,17 +55,18 @@ function pesoHasta(inp, fecha) {
     }
   return kg;
 }
-function puntajeDia(i, fecha, kg = GASTO.kgDef) {
+var pesosDe = (inp) => Object.fromEntries(Object.entries(inp).filter(([, i]) => i?.weightKg > 0).map(([d, i]) => [d, +i.weightKg]));
+function puntajeDia(i, fecha, kg = GASTO.kgDef, extra = 0) {
   const wd = dowL(fecha) < 5, g = gastoCuenta(fecha);
   const lista = [gymMin(i) >= 40, !!i?.read, (i?.rooms ?? (i?.room ? [i.room] : [])).length > 0, agua(i), (i?.weightKg ?? 0) > 0, ...wd ? [i?.foodPct !== undefined] : []];
   if (g) {
-    const x = gastoDia(i, dowL(fecha), kg);
+    const x = gastoDia(i, dowL(fecha), kg, extra);
     lista.push(x.total >= x.meta);
   }
   return Math.min(1, lista.filter(Boolean).length / lista.length);
 }
 function semanas(inp, start, hoy) {
-  const out = [];
+  const out = [], P = pesosDe(inp);
   for (let lun = start;lun <= hoy; lun = addD(lun, 7)) {
     const s = { lunes: lun, completa: addD(lun, 6) < hoy, dias: 0, gastoDias: 0, gastoN: 0, score: null, gymMin: 0, sess: 0, comida: null, aguaDias: 0, lecturaDias: 0, ambientes: 0, prog: 0, juegosH: 0, peso: null, pesoN: 0 };
     let sc = 0, n = 0;
@@ -57,14 +75,14 @@ function semanas(inp, start, hoy) {
       const d = addD(lun, q);
       if (d > hoy)
         break;
-      const i = inp[d] ?? {}, kg = pesoHasta(inp, d);
+      const i = inp[d] ?? {}, kg = pesoHasta(inp, d), ex = extraGasto(P, d);
       s.dias++;
       if (d < hoy) {
-        sc += puntajeDia(i, d, kg);
+        sc += puntajeDia(i, d, kg, ex);
         n++;
       }
       if (gastoCuenta(d)) {
-        const g = gastoDia(i, q, kg);
+        const g = gastoDia(i, q, kg, ex);
         s.gastoN++;
         if (g.total >= g.meta)
           s.gastoDias++;
@@ -96,21 +114,21 @@ function semanas(inp, start, hoy) {
   return out;
 }
 function meses(inp, start, hoy) {
-  const m = {};
+  const m = {}, P = pesosDe(inp);
   for (let d = start;d < hoy; d = addD(d, 1)) {
     const k = d.slice(0, 7), x = m[k] ??= { sc: 0, n: 0, g: 0 };
-    x.sc += puntajeDia(inp[d] ?? {}, d, pesoHasta(inp, d));
+    x.sc += puntajeDia(inp[d] ?? {}, d, pesoHasta(inp, d), extraGasto(P, d));
     x.n++;
     x.g += gymMin(inp[d]);
   }
   return Object.entries(m).map(([ym, x]) => ({ ym, dias: x.n, score: x.sc / x.n, gymMin: x.g }));
 }
 function destacados(inp, start, hoy) {
-  const S = semanas(inp, start, hoy), comp = S.filter((s) => s.completa && s.score !== null), M = meses(inp, start, hoy).filter((m) => m.dias >= 7);
+  const S = semanas(inp, start, hoy), comp = S.filter((s) => s.completa && s.score !== null), M = meses(inp, start, hoy).filter((m) => m.dias >= 7), P = pesosDe(inp);
   const by = (a, f, mx) => a.length ? a.reduce((p, c) => (mx ? f(c) > f(p) : f(c) < f(p)) ? c : p) : null;
   let racha = 0, cur = 0;
   for (let d = start;d < hoy; d = addD(d, 1)) {
-    cur = puntajeDia(inp[d] ?? {}, d, pesoHasta(inp, d)) >= 0.8 ? cur + 1 : 0;
+    cur = puntajeDia(inp[d] ?? {}, d, pesoHasta(inp, d), extraGasto(P, d)) >= 0.8 ? cur + 1 : 0;
     racha = Math.max(racha, cur);
   }
   const conPeso = S.filter((s) => s.peso !== null);
@@ -202,6 +220,7 @@ export {
   meses,
   nombreMes,
   pesoHasta,
+  pesosDe,
   puntajeDia,
   semanas,
   sugerencias

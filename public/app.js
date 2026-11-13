@@ -1,4 +1,4 @@
-import { Rise, ladder, needSessions, HERO_TITLES, PET_TITLES, AERO, kpm, gastoDia, gastoCuenta, GASTO } from '/rise.js';
+import { Rise, ladder, needSessions, HERO_TITLES, PET_TITLES, AERO, kpm, gastoDia, gastoCuenta, GASTO, controles, extraGasto, EXTRA_KCAL } from '/rise.js';
 import { frase } from '/phrases.js';
 import { semanas, meses, destacados, sugerencias, nombreMes, ajustePeso } from '/resumen.js';
 import { ROOMS, roomTile, onAssets, has, url, iconTag } from '/assets.js';
@@ -178,7 +178,8 @@ const isSess = inp => (inp.gymMin ?? (inp.gym ? 60 : 0)) >= 40;
 const waterOk = inp => (inp.waterMl ?? 0) >= 1000 || !!inp.water;
 /** Último peso anotado hasta ese día (para el gasto del gimnasio). */
 function kgAt(d) { let best = '', kg = GASTO.kgDef; for (const [k, v] of Object.entries(S.days)) if (k <= d && k > best && v.input?.weightKg > 0) { best = k; kg = +v.input.weightKg; } return kg; }
-const gastoOf = (inp, d) => gastoDia(inp, wkdayOf(d), kgAt(d));
+const pesosApp = () => Object.fromEntries(Object.entries(S.days).filter(([, v]) => v.input?.weightKg > 0).map(([d, v]) => [d, +v.input.weightKg]));
+const gastoOf = (inp, d) => gastoDia(inp, wkdayOf(d), kgAt(d), extraGasto(pesosApp(), d));
 const dayDoneN = (inp, d) => [isSess(inp), !!inp.read, roomsOf(inp).length > 0, waterOk(inp), (inp.weightKg ?? 0) > 0, ...(wkdayOf(d) < 5 ? [inp.foodPct !== undefined] : []), ...(gastoCuenta(d) ? [(g => g.total >= g.meta)(gastoOf(inp, d))] : [])].filter(Boolean).length;
 const dayNeed = d => (wkdayOf(d) < 5 ? 6 : 5) + (gastoCuenta(d) ? 1 : 0);
 const pc = x => Math.round(x * 100) + ' %';
@@ -204,6 +205,20 @@ function foodCard(date, inp, locked) {
 }
 const ACT_NOM = { bici: 'de bici', soga: 'de saltos a la soga', trote: 'de trote' };
 const kc = n => Math.round(n).toLocaleString('es-AR');
+/** Modo 25/12: cuenta regresiva, controles de los viernes y si vas atrasado. */
+function metaCard(date) {
+  const fin = '2026-12-25', P = pesosApp(), cs = controles(P, addDays(fin, 1)).map(c => c.d < date || (c.d === date && P[date]) ? c : { ...c, pasado: false, kg: null, ok: false });
+  const dias = Math.round((toUTC(fin) - toUTC(date)) / 864e5), prox = cs.find(c => !c.pasado), fm = x => String(+(+x).toFixed(1)).replace('.', ',');
+  const win = Object.entries(P).filter(([d]) => d <= date && toUTC(date) - toUTC(d) < 7 * 864e5).map(([, w]) => w), avg = win.length ? win.reduce((a, b) => a + b, 0) / win.length : null;
+  const ult = Object.keys(P).filter(d => d <= date).sort().pop(), extra = extraGasto(P, date);
+  const fila = c => `<span class="pill ${c.pasado ? (c.ok ? 'ok' : 'bad') : ''}" title="${c.d}">${+c.d.slice(8)}/${+c.d.slice(5, 7)} ≤ ${fm(c.max)}${c.pasado ? (c.kg ? ` · ${fm(c.kg)}` : ' · sin pesaje') : ''}</span>`;
+  let estado = '';
+  if (prox && ult) { const falta = P[ult] - prox.max; estado = falta <= 0 ? `Hoy ya estás por debajo del próximo control (${fm(prox.max)} kg).` : `Para el ${+prox.d.slice(8)}/${+prox.d.slice(5, 7)} te faltan ${fm(falta)} kg.`; }
+  return `<div class="card slim"><div class="row"><h2>🎯 Abajo de 80 kg el 25/12</h2><span class="pill gold">${dias > 0 ? `faltan ${dias} días` : dias === 0 ? 'hoy' : 'terminó'}</span></div>`
+    + `<div class="mute">Último pesaje: <b>${ult ? fm(P[ult]) + ' kg' : '—'}</b>${avg ? ` · promedio 7 días ${fm(avg)} kg` : ''}. ${estado}</div>`
+    + `<div class="row" style="flex-wrap:wrap;gap:4px;justify-content:flex-start;margin-top:6px">${cs.map(fila).join('')}</div>`
+    + `<div class="mute" style="font-size:12px;margin-top:6px">Control: pesaje del viernes en ayunas. Cada control no alcanzado (o sin pesarte) suma ${EXTRA_KCAL} kcal a la meta de gasto de todos los días siguientes${extra ? ` · hoy: +${extra}` : ''}. La comida no baja de 1.500 kcal.</div></div>`;
+}
 /** Gasto del día: gimnasio calculado por tiempo y peso + aeróbico cargado a mano (hasta conectar el reloj). */
 function gastoCard(date, inp, locked) {
   const g = gastoOf(inp, date), ok = g.total >= g.meta, left = Math.max(0, g.meta - g.total), kg = kgAt(date);
@@ -213,6 +228,7 @@ function gastoCard(date, inp, locked) {
   return `<div class="card slim"><div class="row"><h2>🔥 Gasto del día</h2><span class="pill ${ok ? 'ok' : ''}">${kc(g.total)} / ${kc(g.meta)} kcal</span></div>`
     + `<div class="bar gold"><i style="width:${Math.min(100, g.total / g.meta * 100)}%"></i></div>`
     + `<div class="mute">${g.box ? 'Boxeo' : 'Gimnasio'}: ${g.min} min × ${nf(g.kpm)} kcal/min = <b>${kc(g.gym)}</b> · Aeróbico: <b>${kc(g.aero)}</b>${log ? ` (${log})` : ''}</div>`
+    + (g.extra ? `<div class="mute">Incluye +${kc(g.extra)} kcal por ${g.extra / EXTRA_KCAL} control${g.extra / EXTRA_KCAL === 1 ? '' : 'es'} de peso no alcanzado${g.extra / EXTRA_KCAL === 1 ? '' : 's'}.</div>` : '')
     + (ok ? '<div class="mute">Meta cumplida ✓</div>' : `<div class="mute">Te faltan ${kc(left)} kcal: ${eq}.</div>`)
     + (locked ? '' : `<div class="row" style="margin-top:6px;gap:6px"><select id="aa" style="background:transparent;color:inherit;border:1px solid var(--line,#444);border-radius:8px;padding:4px 6px"><option value="kcal">kcal</option>${AERO.map(([n]) => `<option value="${n}">${n} (min)</option>`).join('')}</select><input id="an" type="text" inputmode="numeric" placeholder="0" autocomplete="off" style="width:64px"><button class="btn sm" data-act="aeroadd">Sumar</button></div>${g.aero ? '<button class="undo" data-act="aerozero">Borrar el aeróbico de este día</button>' : ''}`)
     + `<div class="mute" style="font-size:12px;margin-top:6px">kcal activas (sin lo que gastás en reposo), con tu último peso: ${nf(kg)} kg.</div></div>`;
@@ -250,7 +266,7 @@ function viewHoy() {
       + infoRow('F', 'Gimnasio / boxeo', `${sessMin} min · se detecta por ubicación`, '', isSess(inp))
       + `<div class="row"><b>${pic('juegos', iconTag('D', 1))} Juegos</b><span class="pill ${gs[0]}">${hrs(gH)} / ${hrs(cap)}</span></div><div class="bar gold"><i style="width:${Math.min(100, gH / cap * 100)}%"></i></div><div class="mute">${gs[1]} · hoy ${hrs(inp.gameH || 0)}</div>`
       + `<div class="row" style="margin-top:6px"><b>${pic('agua', '💧')} Agua</b><span class="row" style="gap:6px">${!locked && ml < 1000 ? '<button class="btn sm" data-act="water1">Confirmar 1 L</button>' : ''}<span class="pill ${waterOk(inp) ? 'ok' : ''}">${litros(ml)} / 1 L</span></span></div><div class="bar"><i style="width:${Math.min(100, ml / 10)}%"></i></div></div>`;
-    if (gastoCuenta(viewDate)) b += gastoCard(viewDate, inp, locked);
+    if (gastoCuenta(viewDate)) b += metaCard(viewDate) + gastoCard(viewDate, inp, locked);
     b += foodCard(viewDate, inp, locked);
     const mine = roomsOf(inp), taken = wk.rooms.filter(x => !mine.includes(x));
     b += `<div class="card slim"><div class="row"><h2>Ambientes</h2><span class="pill ${wk.rooms.length >= cfg.cleanRoomsWeek ? 'ok' : ''}">${wk.rooms.length} / ${cfg.cleanRoomsWeek} esta semana</span></div><div class="rooms">${ROOMS.map(([id, nm]) => `<button class="room ${mine.includes(id) ? 'sel' : ''} ${taken.includes(id) ? 'taken' : ''}" ${locked ? 'disabled' : `data-act="roomtap" data-r="${id}"`}>${roomTile(id)}<b>${nm}</b>${mine.includes(id) || taken.includes(id) ? '<span class="ck">✓</span>' : ''}</button>`).join('')}</div></div>`;
@@ -481,23 +497,24 @@ function campMascota(e, pre) {
 const R = (n, r = [15, 12]) => ({ n, r });
 const B = [12, 10];   // los cinco ejercicios de récord
 const RUTINA = [
-  ['Lunes', 'Boxeo', [{ n: 'Boxeo (sin pesas)' }]],
-  ['Martes', 'Torso 1', [R('Press de pecho', B), R('Jalón al pecho'), R('Press de hombros', B), R('Remo sentado'), R('Peck deck'), R('Curl de bíceps en polea'), R('Tríceps en polea'), { n: 'Plancha', t: '3 × 40 s' }, { n: 'Bici libre 30-45 min' }]],
-  ['Miércoles', 'Boxeo', [{ n: 'Boxeo (sin pesas)' }]],
-  ['Jueves', 'Torso 2', [R('Press inclinado en máquina'), R('Remo en polea baja'), R('Elevaciones laterales'), R('Peck deck invertido'), R('Fondos asistidos o máquina de tríceps'), R('Jalón con agarre cerrado'), R('Crunch en máquina'), R('Elevación de piernas'), { n: 'Bici libre 30-45 min' }]],
-  ['Viernes', 'Piernas', [R('Peso muerto convencional', B), R('Sentadilla', B), R('Prensa', B), R('Curl femoral'), R('Extensión de cuádriceps'), R('Abductores y aductores'), R('Gemelos'), R('Puente de glúteos'), { n: 'Bici suave 30 min' }]],
-  ['Sábado', 'Cardio', [{ n: 'Cardio largo suave 60-75 min (bici o caminata en cinta inclinada)' }]],
-  ['Domingo', 'Activo', [{ n: 'Caminata 60 min' }]],
+  ['Lunes', 'Boxeo', [{ n: 'Boxeo (sin pesas)' }, { n: 'Caminata 40 min a las 17 h, antes de comer' }]],
+  ['Martes', 'Torso 1', [R('Press de pecho', B), R('Jalón al pecho'), R('Press de hombros', B), R('Remo sentado'), R('Peck deck'), R('Curl de bíceps en polea'), R('Tríceps en polea'), { n: 'Plancha', t: '3 × 40 s' }, { n: 'Bici 40 min' }, { n: 'Caminata 40 min a las 17 h, antes de comer' }]],
+  ['Miércoles', 'Boxeo', [{ n: 'Boxeo (sin pesas)' }, { n: 'Caminata 40 min a las 17 h, antes de comer' }]],
+  ['Jueves', 'Torso 2', [R('Press inclinado en máquina'), R('Remo en polea baja'), R('Elevaciones laterales'), R('Peck deck invertido'), R('Fondos asistidos o máquina de tríceps'), R('Jalón con agarre cerrado'), R('Crunch en máquina'), R('Elevación de piernas'), { n: 'Bici 40 min' }, { n: 'Caminata 40 min a las 17 h, antes de comer' }]],
+  ['Viernes', 'Piernas', [R('Peso muerto convencional', B), R('Sentadilla', B), R('Prensa', B), R('Curl femoral'), R('Extensión de cuádriceps'), R('Abductores y aductores'), R('Gemelos'), R('Puente de glúteos'), { n: 'Bici 40 min' }, { n: 'Caminata 40 min a las 17 h, antes de comer' }]],
+  ['Sábado', 'Cardio', [{ n: 'Cardio 90 min (bici o cinta inclinada), obligatorio' }]],
+  ['Domingo', 'Cardio', [{ n: 'Caminata 90-100 min o bici 50 min, obligatorio' }]],
 ];
 /** Rutina del día: la del calendario o la que elegiste para hoy (input.rut). */
 const rutDia = d => RUTINA[S.days[d]?.input?.rut ?? wkdayOf(d)];
 const exTxt = x => x.r ? `${x.n} · ${x.r.join('-')}` : x.t ? `${x.n} · ${x.t}` : x.n;
-const COMIDAS = [['12:00', 'Milanesa al horno de 250 g de nalga o peceto (en crudo) con ensalada grande y 1 cda de aceite · ~550 kcal · 60 g de proteína'], ['17:00', 'Licuado: 1 banana, 300 ml de leche descremada y 2 scoops de proteína · ~450 kcal · 58 g'], ['23:00', '200 g de pechuga de pollo (en crudo), 2 huevos, 1/2 taza de arroz y verduras · ~570 kcal · 61 g']];
+// Provisorio hasta armar el plan con la lista de alimentos: ayuno hasta las 17, caminata, y se come entre las 17 y las 23.
+const COMIDAS = [['18:00', '300 g de nalga o peceto (en crudo) a la plancha, ensalada verde grande y 1 cda de aceite · ~560 kcal · 66 g de proteína'], ['20:30', 'Licuado: 2 scoops de proteína y 250 ml de leche descremada · ~330 kcal · 57 g'], ['23:00', '250 g de pechuga (en crudo), 2 huevos y verduras salteadas con 1 cdita de aceite · ~560 kcal · 70 g']];
 function rutinaCards(pre) {
   const hoy = rutDia(todayISO());
   const lista = r => `<ul class="plan">${r[2].map(x => `<li>${esc(exTxt(x))}</li>`).join('')}</ul>`;
   return `<div class="card slim"><div class="row"><h2>Hoy · ${hoy[0]}</h2><span class="pill gold">${hoy[1]}</span></div>${lista(hoy)}<details><summary>Toda la semana</summary>${RUTINA.map(r => `<div class="row" style="margin-top:10px"><b>${r[0]}</b><span class="pill">${r[1]}</span></div>${lista(r)}`).join('')}</details></div>`
-    + `<div class="card slim"><details><summary>Comidas del día · ~1.700 kcal</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: 180 g de proteína, nunca menos de 1.500 kcal y ~3 litros de agua por día. Pesá la comida y cargala con gramos.</p></details></div>`;
+    + `<div class="card slim"><details><summary>Comidas del día · ~1.500 kcal · de 17 a 23 h</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: 200 g de proteína, menos de 50 g de carbohidratos, sin azúcar, nunca menos de 1.500 kcal y ~3 litros de agua (con sal) por día. Ayuno hasta las 17 h. Pesá la comida y cargala con gramos.</p></details></div>`;
 }
 /** Fases del bloque de 4 semanas: base, progresiva, máxima y descarga. */
 const FASES = ['Carga base', 'Carga progresiva', 'Carga máxima', 'Descarga'];

@@ -309,7 +309,7 @@ test('comidas: la estimación se guarda una vez y el acumulado es una suma (el a
     const r: any = await post('50ml de agua', '22:38');
     const j = prompts.at(-1)!;
     assert.match(j, /22:36: Dos milanesas con tomates \[fijo: ~770 kcal · 54 g/); assert.match(j, /22:38: 50ml de agua \[fijo: ~0 kcal · 0 g/);
-    assert.match(j, /~770 kcal · 54 g de proteína\. Los números/, 'el acumulado ya viene sumado');
+    assert.match(j, /~770 kcal · 54 g de proteína · 0 g de carbohidratos\. Los números/, 'el acumulado ya viene sumado');
     assert.doesNotMatch(j, /Cena|Almuerzo|Merienda|Desayuno/, 'no se nombra la comida según la hora');
     assert.equal(r.meals.length, 2); assert.deepEqual(r.meals.map((m: any) => m.kcal), [770, 0]);
     // una comida vieja sin estimación se estima una vez y queda fija
@@ -337,14 +337,14 @@ test('exceso de calorías: arma el desafío de ejercicio y al compensarlo el pun
     await post('Banquete enorme');
     assert.match(prompts.at(-1)!, /PUNTAJE SIN EXCESO/, 'pasa del tope: le pide el puntaje sin exceso');
     let s: any = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); let d = s.days['2026-11-04'].input;
-    assert.equal(d.foodPct, 0.8); assert.equal(d.comp.burn, 750); assert.equal(d.comp.over, 750); assert.equal(d.comp.sin, 100);
+    assert.equal(d.foodPct, 0.8); assert.equal(d.comp.burn, 1000); assert.equal(d.comp.over, 1000); assert.equal(d.comp.sin, 100);
     assert.equal(d.comp.opts.find((o: any) => o.n === 'bici').kpm, 9.9, '(7,5 − 1) MET × 3,5 × 87 kg / 200');
     // el usuario registra lo quemado (el cliente lo guarda en comp.done)
-    d.comp.done = 750;
+    d.comp.done = 1000;
     await call(e, 'POST', '/api/sync', { changes: [{ date: '2026-11-04', input: d, updated_at: Date.now() + 5 }] }, T);
     await post('agua');
     s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); d = s.days['2026-11-04'].input;
-    assert.equal(d.foodPct, 1, 'compensado: vuelve al 100 %'); assert.equal(d.comp.done, 750, 'conserva lo registrado');
+    assert.equal(d.foodPct, 1, 'compensado: vuelve al 100 %'); assert.equal(d.comp.done, 1000, 'conserva lo registrado');
     assert.doesNotMatch(prompts.at(-1)!, /Cena|Almuerzo/);
   } finally { globalThis.fetch = real; Date.now = rn; }
 });

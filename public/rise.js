@@ -10,8 +10,8 @@ function dateOfDay(startDate, day) {
 // engine/src/engine/gasto.ts
 var GASTO = {
   desde: "2026-11-13",
-  meta: 700,
-  metaDom: 350,
+  meta: 900,
+  metaDom: 500,
   kgDef: 87,
   metPesas: 5,
   metBoxeo: 7.8,
@@ -22,13 +22,30 @@ var kpm = (met, kg) => Math.round((met - 1) * 3.5 * kg / 200 * 10) / 10;
 var esBoxeo = (inp, dowL) => GASTO.boxeo.includes(inp?.rut ?? dowL);
 var gastoCuenta = (fecha) => fecha >= GASTO.desde;
 var metaGasto = (dowL) => dowL === 6 ? GASTO.metaDom : GASTO.meta;
-function gastoDia(inp, dowL, kg) {
+var CONTROLES = [["2026-11-20", 85.5], ["2026-11-27", 84.3], ["2026-12-04", 83], ["2026-12-11", 81.8], ["2026-12-18", 80.6], ["2026-12-25", 79.9]];
+var EXTRA_KCAL = 150;
+function pesoControl(pesos, fecha) {
+  for (let q = 0;q < 3; q++) {
+    const d = new Date(Date.parse(fecha) - q * 86400000).toISOString().slice(0, 10);
+    if (pesos[d] > 0)
+      return pesos[d];
+  }
+  return null;
+}
+function controles(pesos, fecha) {
+  return CONTROLES.map(([d, max]) => {
+    const kg = d < fecha ? pesoControl(pesos, d) : null;
+    return { d, max, kg, pasado: d < fecha, ok: kg !== null && kg <= max };
+  });
+}
+var extraGasto = (pesos, fecha) => controles(pesos, fecha).filter((c) => c.pasado && !c.ok).length * EXTRA_KCAL;
+function gastoDia(inp, dowL, kg, extra = 0) {
   const min = inp?.gymMin ?? (inp?.gym ? 60 : 0), box = esBoxeo(inp, dowL), k = kpm(box ? GASTO.metBoxeo : GASTO.metPesas, kg || GASTO.kgDef);
   const gym = Math.round(min * k), aero = Math.round(Number(inp?.aeroKcal) || 0);
-  return { min, box, kpm: k, gym, aero, total: gym + aero, meta: metaGasto(dowL) };
+  return { min, box, kpm: k, gym, aero, total: gym + aero, meta: metaGasto(dowL) + extra, extra };
 }
-var gastoOk = (inp, dowL, kg) => {
-  const g = gastoDia(inp, dowL, kg);
+var gastoOk = (inp, dowL, kg, extra = 0) => {
+  const g = gastoDia(inp, dowL, kg, extra);
   return g.total >= g.meta;
 };
 
@@ -287,9 +304,10 @@ class Rise {
     if ((inp.weightKg ?? 0) > 0) {
       add("V", "D", "Peso", c.weighXp);
       S.kg = inp.weightKg;
+      (S.pesos ??= {})[date] = inp.weightKg;
     }
     if (gastoCuenta(date)) {
-      const g = gastoDia(inp, dd, S.kg ?? GASTO.kgDef);
+      const g = gastoDia(inp, dd, S.kg ?? GASTO.kgDef, extraGasto(S.pesos ?? {}, date));
       if (g.total >= g.meta)
         add("V", "D", "Gasto del día", c.gastoXp);
     }
@@ -373,12 +391,16 @@ function replayRise(inputs, cfg = {}) {
 export {
   AERO,
   CATS,
+  CONTROLES,
+  EXTRA_KCAL,
   GASTO,
   HERO_TITLES,
   PET_TITLES,
   RISE,
   ROOMS,
   Rise,
+  controles,
+  extraGasto,
   gastoCuenta,
   gastoDia,
   gastoOk,

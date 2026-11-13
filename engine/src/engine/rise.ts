@@ -5,8 +5,8 @@
  * Nada baja nunca. Es determinista: se rehace desde el día 0 con las entradas diarias guardadas.
  */
 import { dateOfDay } from './calendar.ts';
-import { gastoDia, gastoCuenta, GASTO } from './gasto.ts';
-export { GASTO, AERO, kpm, gastoDia, gastoOk, gastoCuenta, metaGasto } from './gasto.ts';
+import { gastoDia, gastoCuenta, GASTO, extraGasto } from './gasto.ts';
+export { GASTO, AERO, kpm, gastoDia, gastoOk, gastoCuenta, metaGasto, CONTROLES, controles, extraGasto, EXTRA_KCAL } from './gasto.ts';
 
 export type Cat = 'F' | 'I' | 'V' | 'D' | 'O';
 export const CATS: readonly Cat[] = ['F', 'I', 'V', 'D', 'O'];
@@ -98,6 +98,7 @@ export interface RiseState {
   cyc: string[];                   // ejercicios distintos con progreso en el ciclo de 4 semanas
   totals: { gym: number; books: number; repairs: number };
   kg?: number;                     // último peso registrado (para calcular el gasto del gimnasio)
+  pesos?: Record<string, number>;  // pesajes por fecha (controles del modo 25/12)
 }
 
 export type EvKind = 'D' | 'W' | 'M';
@@ -217,8 +218,8 @@ export class Rise {
       S.wk.food.push(pct); S.mo.food.push(pct);
     }
     if (inp.water) add('V', 'D', 'Agua', c.waterXp);
-    if ((inp.weightKg ?? 0) > 0) { add('V', 'D', 'Peso', c.weighXp); S.kg = inp.weightKg; }
-    if (gastoCuenta(date)) { const g = gastoDia(inp, dd, S.kg ?? GASTO.kgDef); if (g.total >= g.meta) add('V', 'D', 'Gasto del día', c.gastoXp); }
+    if ((inp.weightKg ?? 0) > 0) { add('V', 'D', 'Peso', c.weighXp); S.kg = inp.weightKg; (S.pesos ??= {})[date] = inp.weightKg!; }
+    if (gastoCuenta(date)) { const g = gastoDia(inp, dd, S.kg ?? GASTO.kgDef, extraGasto(S.pesos ?? {}, date)); if (g.total >= g.meta) add('V', 'D', 'Gasto del día', c.gastoXp); }
     // Disciplina
     if (inp.gameH) S.wk.gameH += inp.gameH;
 

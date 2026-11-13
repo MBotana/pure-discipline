@@ -1,5 +1,5 @@
 /** Histórico y sugerencias (puro, sin dependencias): lo usan la app (Registro) y el servidor (aviso del lunes). */
-import { gastoDia, gastoCuenta, GASTO } from './gasto.ts';
+import { gastoDia, gastoCuenta, GASTO, extraGasto } from './gasto.ts';
 export type Inputs = Record<string, any>;
 const DIA = 864e5;
 export const addD = (iso: string, n: number) => new Date(Date.parse(iso) + n * DIA).toISOString().slice(0, 10);
@@ -18,26 +18,28 @@ export function pesoHasta(inp: Inputs, fecha: string): number {
   for (const [d, i] of Object.entries(inp)) if (d <= fecha && d > best && (i as any)?.weightKg > 0) { best = d; kg = +(i as any).weightKg; }
   return kg;
 }
+/** Pesajes por fecha. */
+export const pesosDe = (inp: Inputs): Record<string, number> => Object.fromEntries(Object.entries(inp).filter(([, i]) => (i as any)?.weightKg > 0).map(([d, i]) => [d, +(i as any).weightKg]));
 /** Cumplimiento del día de 0 a 1: misiones hechas sobre las que corresponden (6 de lunes a viernes, 5 el fin de semana; +1 con el gasto desde el modo corte). */
-export function puntajeDia(i: any, fecha: string, kg: number = GASTO.kgDef): number {
+export function puntajeDia(i: any, fecha: string, kg: number = GASTO.kgDef, extra = 0): number {
   const wd = dowL(fecha) < 5, g = gastoCuenta(fecha);
   const lista = [gymMin(i) >= 40, !!i?.read, (i?.rooms ?? (i?.room ? [i.room] : [])).length > 0, agua(i), (i?.weightKg ?? 0) > 0, ...(wd ? [i?.foodPct !== undefined] : [])];
-  if (g) { const x = gastoDia(i, dowL(fecha), kg); lista.push(x.total >= x.meta); }
+  if (g) { const x = gastoDia(i, dowL(fecha), kg, extra); lista.push(x.total >= x.meta); }
   return Math.min(1, lista.filter(Boolean).length / lista.length);
 }
 
 export interface Sem { lunes: string; completa: boolean; dias: number; gastoDias: number; gastoN: number; score: number | null; gymMin: number; sess: number; comida: number | null; aguaDias: number; lecturaDias: number; ambientes: number; prog: number; juegosH: number; peso: number | null; pesoN: number }
 /** Resumen por semana (lunes a domingo) desde el inicio hasta hoy. El puntaje usa solo días ya terminados. */
 export function semanas(inp: Inputs, start: string, hoy: string): Sem[] {
-  const out: Sem[] = [];
+  const out: Sem[] = [], P = pesosDe(inp);
   for (let lun = start; lun <= hoy; lun = addD(lun, 7)) {
     const s: Sem = { lunes: lun, completa: addD(lun, 6) < hoy, dias: 0, gastoDias: 0, gastoN: 0, score: null, gymMin: 0, sess: 0, comida: null, aguaDias: 0, lecturaDias: 0, ambientes: 0, prog: 0, juegosH: 0, peso: null, pesoN: 0 };
     let sc = 0, n = 0; const comida: number[] = [], pesos: number[] = [], amb = new Set<string>();
     for (let q = 0; q < 7; q++) {
       const d = addD(lun, q); if (d > hoy) break;
-      const i = inp[d] ?? {}, kg = pesoHasta(inp, d); s.dias++;
-      if (d < hoy) { sc += puntajeDia(i, d, kg); n++; }
-      if (gastoCuenta(d)) { const g = gastoDia(i, q, kg); s.gastoN++; if (g.total >= g.meta) s.gastoDias++; }
+      const i = inp[d] ?? {}, kg = pesoHasta(inp, d), ex = extraGasto(P, d); s.dias++;
+      if (d < hoy) { sc += puntajeDia(i, d, kg, ex); n++; }
+      if (gastoCuenta(d)) { const g = gastoDia(i, q, kg, ex); s.gastoN++; if (g.total >= g.meta) s.gastoDias++; }
       const m = gymMin(i); s.gymMin += m; if (m >= 40) s.sess++;
       if (i.foodPct !== undefined) comida.push(Number(i.foodPct));
       if (agua(i)) s.aguaDias++; if (i.read) s.lecturaDias++;
@@ -55,8 +57,8 @@ export function semanas(inp: Inputs, start: string, hoy: string): Sem[] {
 
 export interface Mes { ym: string; dias: number; score: number; gymMin: number }
 export function meses(inp: Inputs, start: string, hoy: string): Mes[] {
-  const m: Record<string, { sc: number; n: number; g: number }> = {};
-  for (let d = start; d < hoy; d = addD(d, 1)) { const k = d.slice(0, 7), x = (m[k] ??= { sc: 0, n: 0, g: 0 }); x.sc += puntajeDia(inp[d] ?? {}, d, pesoHasta(inp, d)); x.n++; x.g += gymMin(inp[d]); }
+  const m: Record<string, { sc: number; n: number; g: number }> = {}, P = pesosDe(inp);
+  for (let d = start; d < hoy; d = addD(d, 1)) { const k = d.slice(0, 7), x = (m[k] ??= { sc: 0, n: 0, g: 0 }); x.sc += puntajeDia(inp[d] ?? {}, d, pesoHasta(inp, d), extraGasto(P, d)); x.n++; x.g += gymMin(inp[d]); }
   return Object.entries(m).map(([ym, x]) => ({ ym, dias: x.n, score: x.sc / x.n, gymMin: x.g }));
 }
 
@@ -65,10 +67,10 @@ export interface Destacados {
   rachaDias: number; gymRecord: Sem | null; pesoInicio: number | null; pesoActual: number | null;
 }
 export function destacados(inp: Inputs, start: string, hoy: string): Destacados {
-  const S = semanas(inp, start, hoy), comp = S.filter(s => s.completa && s.score !== null), M = meses(inp, start, hoy).filter(m => m.dias >= 7);
+  const S = semanas(inp, start, hoy), comp = S.filter(s => s.completa && s.score !== null), M = meses(inp, start, hoy).filter(m => m.dias >= 7), P = pesosDe(inp);
   const by = <T>(a: T[], f: (x: T) => number, mx: boolean) => a.length ? a.reduce((p, c) => (mx ? f(c) > f(p) : f(c) < f(p)) ? c : p) : null;
   let racha = 0, cur = 0;
-  for (let d = start; d < hoy; d = addD(d, 1)) { cur = puntajeDia(inp[d] ?? {}, d, pesoHasta(inp, d)) >= 0.8 ? cur + 1 : 0; racha = Math.max(racha, cur); }
+  for (let d = start; d < hoy; d = addD(d, 1)) { cur = puntajeDia(inp[d] ?? {}, d, pesoHasta(inp, d), extraGasto(P, d)) >= 0.8 ? cur + 1 : 0; racha = Math.max(racha, cur); }
   const conPeso = S.filter(s => s.peso !== null);
   return {
     mejorSemana: by(comp, s => s.score!, true), peorSemana: comp.length > 1 ? by(comp, s => s.score!, false) : null,
