@@ -173,3 +173,12 @@ test('progreso: carga/descarga alternan 3+1 y el ciclo paga con 4 ejercicios dis
   const r2 = run(28, (i) => (i % 7 === 2 ? { prog: ['ex1'] } : {}));
   assert.ok(!r2.log.flatMap(d => d.events).some(x => x.label === 'Ciclo completo'));
 });
+
+test('gasto del día: desde el modo corte suma Vitalidad si llega a la meta (con el último peso anotado)', () => {
+  const e = new Rise();
+  for (let i = 0; i < 4; i++) e.processDay(i === 0 ? { weightKg: 87 } : {});          // 9 al 12/11: antes del corte
+  const d = e.processDay({ gymMin: 72, aeroKcal: 300 });                             // viernes 13/11: 439 + 300 kcal
+  assert.ok(d.events.some(x => x.label === 'Gasto del día' && x.cat === 'V'));
+  const sat = e.processDay({ aeroKcal: 600 });                                       // sábado: le falta
+  assert.ok(!sat.events.some(x => x.label === 'Gasto del día'));
+});

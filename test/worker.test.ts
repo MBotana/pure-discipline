@@ -337,14 +337,14 @@ test('exceso de calorías: arma el desafío de ejercicio y al compensarlo el pun
     await post('Banquete enorme');
     assert.match(prompts.at(-1)!, /PUNTAJE SIN EXCESO/, 'pasa del tope: le pide el puntaje sin exceso');
     let s: any = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); let d = s.days['2026-11-04'].input;
-    assert.equal(d.foodPct, 0.8); assert.equal(d.comp.burn, 200); assert.equal(d.comp.over, 200); assert.equal(d.comp.sin, 100);
-    assert.equal(d.comp.opts.find((o: any) => o.n === 'bici').kpm, 11.4, '7,5 MET × 3,5 × 87 kg / 200');
+    assert.equal(d.foodPct, 0.8); assert.equal(d.comp.burn, 750); assert.equal(d.comp.over, 750); assert.equal(d.comp.sin, 100);
+    assert.equal(d.comp.opts.find((o: any) => o.n === 'bici').kpm, 9.9, '(7,5 − 1) MET × 3,5 × 87 kg / 200');
     // el usuario registra lo quemado (el cliente lo guarda en comp.done)
-    d.comp.done = 200;
+    d.comp.done = 750;
     await call(e, 'POST', '/api/sync', { changes: [{ date: '2026-11-04', input: d, updated_at: Date.now() + 5 }] }, T);
     await post('agua');
     s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json()); d = s.days['2026-11-04'].input;
-    assert.equal(d.foodPct, 1, 'compensado: vuelve al 100 %'); assert.equal(d.comp.done, 200, 'conserva lo registrado');
+    assert.equal(d.foodPct, 1, 'compensado: vuelve al 100 %'); assert.equal(d.comp.done, 750, 'conserva lo registrado');
     assert.doesNotMatch(prompts.at(-1)!, /Cena|Almuerzo/);
   } finally { globalThis.fetch = real; Date.now = rn; }
 });

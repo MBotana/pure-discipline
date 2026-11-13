@@ -7,6 +7,31 @@ function dateOfDay(startDate, day) {
   return addDays(startDate, day).toISOString().slice(0, 10);
 }
 
+// engine/src/engine/gasto.ts
+var GASTO = {
+  desde: "2026-11-13",
+  meta: 700,
+  metaDom: 350,
+  kgDef: 87,
+  metPesas: 5,
+  metBoxeo: 7.8,
+  boxeo: [0, 2]
+};
+var AERO = [["bici", "de bici", 7.5], ["trote", "de trote", 9.8], ["soga", "de soga", 11], ["caminata", "de caminata rápida", 4.3]];
+var kpm = (met, kg) => Math.round((met - 1) * 3.5 * kg / 200 * 10) / 10;
+var esBoxeo = (inp, dowL) => GASTO.boxeo.includes(inp?.rut ?? dowL);
+var gastoCuenta = (fecha) => fecha >= GASTO.desde;
+var metaGasto = (dowL) => dowL === 6 ? GASTO.metaDom : GASTO.meta;
+function gastoDia(inp, dowL, kg) {
+  const min = inp?.gymMin ?? (inp?.gym ? 60 : 0), box = esBoxeo(inp, dowL), k = kpm(box ? GASTO.metBoxeo : GASTO.metPesas, kg || GASTO.kgDef);
+  const gym = Math.round(min * k), aero = Math.round(Number(inp?.aeroKcal) || 0);
+  return { min, box, kpm: k, gym, aero, total: gym + aero, meta: metaGasto(dowL) };
+}
+var gastoOk = (inp, dowL, kg) => {
+  const g = gastoDia(inp, dowL, kg);
+  return g.total >= g.meta;
+};
+
 // engine/src/engine/rise.ts
 var CATS = ["F", "I", "V", "D", "O"];
 var ROOMS = ["cocina", "bano", "habitacion", "living", "oficina", "patio"];
@@ -30,6 +55,7 @@ var RISE = {
   foodDay: 105,
   waterXp: 15,
   weighXp: 15,
+  gastoXp: 60,
   foodThr: 0.8,
   vitW: 250,
   vitM: 650,
@@ -258,8 +284,15 @@ class Rise {
     }
     if (inp.water)
       add("V", "D", "Agua", c.waterXp);
-    if ((inp.weightKg ?? 0) > 0)
+    if ((inp.weightKg ?? 0) > 0) {
       add("V", "D", "Peso", c.weighXp);
+      S.kg = inp.weightKg;
+    }
+    if (gastoCuenta(date)) {
+      const g = gastoDia(inp, dd, S.kg ?? GASTO.kgDef);
+      if (g.total >= g.meta)
+        add("V", "D", "Gasto del día", c.gastoXp);
+    }
     if (inp.gameH)
       S.wk.gameH += inp.gameH;
     const nextYm = dateOfDay(c.startDate, i + 1).slice(0, 7);
@@ -338,14 +371,21 @@ function replayRise(inputs, cfg = {}) {
   return { engine, days };
 }
 export {
+  AERO,
   CATS,
+  GASTO,
   HERO_TITLES,
   PET_TITLES,
   RISE,
   ROOMS,
   Rise,
+  gastoCuenta,
+  gastoDia,
+  gastoOk,
   initialRise,
+  kpm,
   ladder,
+  metaGasto,
   needSessions,
   normalize,
   replayRise

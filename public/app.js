@@ -1,6 +1,6 @@
-import { Rise, ladder, needSessions, HERO_TITLES, PET_TITLES } from '/rise.js';
+import { Rise, ladder, needSessions, HERO_TITLES, PET_TITLES, AERO, kpm, gastoDia, gastoCuenta, GASTO } from '/rise.js';
 import { frase } from '/phrases.js';
-import { semanas, meses, destacados, sugerencias, nombreMes } from '/resumen.js';
+import { semanas, meses, destacados, sugerencias, nombreMes, ajustePeso } from '/resumen.js';
 import { ROOMS, roomTile, onAssets, has, url, iconTag } from '/assets.js';
 
 const NAMES = { F: 'Fuerza', I: 'Inteligencia', V: 'Vitalidad', D: 'Disciplina', O: 'Orden' };
@@ -176,8 +176,11 @@ function gameStatus(h, cap) {
 const wkdayOf = d => (new Date(toUTC(d)).getUTCDay() + 6) % 7;
 const isSess = inp => (inp.gymMin ?? (inp.gym ? 60 : 0)) >= 40;
 const waterOk = inp => (inp.waterMl ?? 0) >= 1000 || !!inp.water;
-const dayDoneN = (inp, d) => [isSess(inp), !!inp.read, roomsOf(inp).length > 0, waterOk(inp), (inp.weightKg ?? 0) > 0, ...(wkdayOf(d) < 5 ? [inp.foodPct !== undefined] : [])].filter(Boolean).length;
-const dayNeed = d => (wkdayOf(d) < 5 ? 6 : 5);
+/** Último peso anotado hasta ese día (para el gasto del gimnasio). */
+function kgAt(d) { let best = '', kg = GASTO.kgDef; for (const [k, v] of Object.entries(S.days)) if (k <= d && k > best && v.input?.weightKg > 0) { best = k; kg = +v.input.weightKg; } return kg; }
+const gastoOf = (inp, d) => gastoDia(inp, wkdayOf(d), kgAt(d));
+const dayDoneN = (inp, d) => [isSess(inp), !!inp.read, roomsOf(inp).length > 0, waterOk(inp), (inp.weightKg ?? 0) > 0, ...(wkdayOf(d) < 5 ? [inp.foodPct !== undefined] : []), ...(gastoCuenta(d) ? [(g => g.total >= g.meta)(gastoOf(inp, d))] : [])].filter(Boolean).length;
+const dayNeed = d => (wkdayOf(d) < 5 ? 6 : 5) + (gastoCuenta(d) ? 1 : 0);
 const pc = x => Math.round(x * 100) + ' %';
 const litros = ml => (ml / 1000).toFixed(2).replace(/0$/, '').replace('.', ',') + ' L';
 const pips = (n, max) => `<span class="pips">${Array.from({ length: max }, (_, q) => `<i class="${q < n ? 'f' : ''}"></i>`).join('')}</span>`;
@@ -191,7 +194,7 @@ function foodCard(date, inp, locked) {
   const sc = inp.foodPct, cls = sc >= 0.8 ? 'ok' : sc >= 0.5 ? 'gold' : sc !== undefined ? 'bad' : '';
   let h = `<div class="card slim"><div class="row"><h2>${pic('comida', '')} Comidas</h2><span class="pill ${cls}">${sc === undefined ? 'sin puntuar' : (inp.meals ? 'final ' : 'va ') + pc(sc)}</span></div>`;
   h += list.length ? list.map(x => entryHTML(x, date)).join('') : '<p class="mute">Todavía no cargaste ninguna comida.</p>';
-  h += txOpen && isToday ? `<div class="row" style="margin-top:10px"><button class="btn sm ghost" data-act="pickfoto" ${busy ? 'disabled' : ''}>📷 ${pendBlob ? 'Cambiar foto' : 'Agregar foto'}</button>${pendBlob ? `<img class="thumb" src="${pendURL}" alt="">` : '<span class="mute">sin foto</span>'}</div><textarea id="txin" rows="3" placeholder="${pendBlob ? 'Descripción breve (opcional, por las dudas)' : 'Qué comiste (ej.: 2 milanesas con ensalada y agua)'}">${esc(txDraft)}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="txcancel" ${busy ? 'disabled' : ''}>Cancelar</button><button class="btn sm" data-act="mealsend" ${busy ? 'disabled' : ''}>Enviar</button></div>`
+  h += txOpen && isToday ? `<div class="row" style="margin-top:10px"><button class="btn sm ghost" data-act="pickfoto" ${busy ? 'disabled' : ''}>📷 ${pendBlob ? 'Cambiar foto' : 'Agregar foto'}</button>${pendBlob ? `<img class="thumb" src="${pendURL}" alt="">` : '<span class="mute">sin foto</span>'}</div><textarea id="txin" rows="3" placeholder="${pendBlob ? 'Descripción breve (opcional, por las dudas)' : 'Qué comiste, con gramos (ej.: 250 g de nalga cruda en milanesa, ensalada con 1 cda de aceite)'}">${esc(txDraft)}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="txcancel" ${busy ? 'disabled' : ''}>Cancelar</button><button class="btn sm" data-act="mealsend" ${busy ? 'disabled' : ''}>Enviar</button></div>`
     : `<button class="btn" style="margin-top:10px;width:100%" ${off ? 'disabled' : 'data-act="txopen"'}>Cargar comida</button>`;
   if (waterQ && waterQ.date === date) h += `<div class="wq"><b>¿Bebiste 250 ml de agua con esta comida?</b><div class="row"><button class="btn sm" data-act="waterq" data-v="1">Sí</button><button class="btn sm ghost" data-act="waterq" data-v="0">No</button></div></div>`;
   h += `${busy ? `<p class="mute busy">⏳ ${busy}</p>` : ''}${errMeal ? `<p class="err">${esc(errMeal)}</p>` : ''}`;
@@ -200,6 +203,20 @@ function foodCard(date, inp, locked) {
   return h + `</div>`;
 }
 const ACT_NOM = { bici: 'de bici', soga: 'de saltos a la soga', trote: 'de trote' };
+const kc = n => Math.round(n).toLocaleString('es-AR');
+/** Gasto del día: gimnasio calculado por tiempo y peso + aeróbico cargado a mano (hasta conectar el reloj). */
+function gastoCard(date, inp, locked) {
+  const g = gastoOf(inp, date), ok = g.total >= g.meta, left = Math.max(0, g.meta - g.total), kg = kgAt(date);
+  const nf = x => String(x).replace('.', ',');
+  const log = (inp.aeroLog || []).map(x => x.min ? `${x.min} min ${(AERO.find(a => a[0] === x.n) || [, x.n])[1]} (${kc(x.k)})` : `${kc(x.k)} kcal`).join(' · ');
+  const eq = AERO.map(([n, t, met]) => `${Math.max(1, Math.ceil(left / kpm(met, kg)))} min ${t}`).join(' · ');
+  return `<div class="card slim"><div class="row"><h2>🔥 Gasto del día</h2><span class="pill ${ok ? 'ok' : ''}">${kc(g.total)} / ${kc(g.meta)} kcal</span></div>`
+    + `<div class="bar gold"><i style="width:${Math.min(100, g.total / g.meta * 100)}%"></i></div>`
+    + `<div class="mute">${g.box ? 'Boxeo' : 'Gimnasio'}: ${g.min} min × ${nf(g.kpm)} kcal/min = <b>${kc(g.gym)}</b> · Aeróbico: <b>${kc(g.aero)}</b>${log ? ` (${log})` : ''}</div>`
+    + (ok ? '<div class="mute">Meta cumplida ✓</div>' : `<div class="mute">Te faltan ${kc(left)} kcal: ${eq}.</div>`)
+    + (locked ? '' : `<div class="row" style="margin-top:6px;gap:6px"><select id="aa" style="background:transparent;color:inherit;border:1px solid var(--line,#444);border-radius:8px;padding:4px 6px"><option value="kcal">kcal</option>${AERO.map(([n]) => `<option value="${n}">${n} (min)</option>`).join('')}</select><input id="an" type="text" inputmode="numeric" placeholder="0" autocomplete="off" style="width:64px"><button class="btn sm" data-act="aeroadd">Sumar</button></div>${g.aero ? '<button class="undo" data-act="aerozero">Borrar el aeróbico de este día</button>' : ''}`)
+    + `<div class="mute" style="font-size:12px;margin-top:6px">kcal activas (sin lo que gastás en reposo), con tu último peso: ${nf(kg)} kg.</div></div>`;
+}
 /** Desafío para compensar un exceso de calorías: cuánto quemar, equivalencias y contador manual. */
 function compCard(date, inp, locked) {
   const c = inp.comp, left = Math.max(0, c.burn - (c.done || 0)), ok = left === 0;
@@ -233,6 +250,7 @@ function viewHoy() {
       + infoRow('F', 'Gimnasio / boxeo', `${sessMin} min · se detecta por ubicación`, '', isSess(inp))
       + `<div class="row"><b>${pic('juegos', iconTag('D', 1))} Juegos</b><span class="pill ${gs[0]}">${hrs(gH)} / ${hrs(cap)}</span></div><div class="bar gold"><i style="width:${Math.min(100, gH / cap * 100)}%"></i></div><div class="mute">${gs[1]} · hoy ${hrs(inp.gameH || 0)}</div>`
       + `<div class="row" style="margin-top:6px"><b>${pic('agua', '💧')} Agua</b><span class="row" style="gap:6px">${!locked && ml < 1000 ? '<button class="btn sm" data-act="water1">Confirmar 1 L</button>' : ''}<span class="pill ${waterOk(inp) ? 'ok' : ''}">${litros(ml)} / 1 L</span></span></div><div class="bar"><i style="width:${Math.min(100, ml / 10)}%"></i></div></div>`;
+    if (gastoCuenta(viewDate)) b += gastoCard(viewDate, inp, locked);
     b += foodCard(viewDate, inp, locked);
     const mine = roomsOf(inp), taken = wk.rooms.filter(x => !mine.includes(x));
     b += `<div class="card slim"><div class="row"><h2>Ambientes</h2><span class="pill ${wk.rooms.length >= cfg.cleanRoomsWeek ? 'ok' : ''}">${wk.rooms.length} / ${cfg.cleanRoomsWeek} esta semana</span></div><div class="rooms">${ROOMS.map(([id, nm]) => `<button class="room ${mine.includes(id) ? 'sel' : ''} ${taken.includes(id) ? 'taken' : ''}" ${locked ? 'disabled' : `data-act="roomtap" data-r="${id}"`}>${roomTile(id)}<b>${nm}</b>${mine.includes(id) || taken.includes(id) ? '<span class="ck">✓</span>' : ''}</button>`).join('')}</div></div>`;
@@ -288,12 +306,8 @@ function viewPeso() {
     const cur = A[A.length - 1], prev = A.length > 1 ? A[A.length - 2] : null;
     h += `<div class="mute">Promedio de la semana: <b>${fm(cur.a)} kg</b>${prev ? ` · ${cur.a - prev.a <= 0 ? 'bajó' : 'subió'} ${fm(Math.abs(cur.a - prev.a))} kg respecto de la anterior` : ''}</div>`;
     const full = A.filter(x => x.n >= 3), dl = full.slice(1).map((x, i) => x.a - full[i].a);
-    let msg = '';
-    if (dl.length >= 2) {
-      const [a, b] = dl.slice(-2);
-      msg = a < -1 && b < -1 ? 'Bajás más de 1 kg por semana, dos semanas seguidas: sumá unas 200 kcal por día.' : a > -0.1 && b > -0.1 ? 'Dos semanas sin bajar: recortá unas 100-150 kcal por día.' : 'Vas en un ritmo razonable.';
-    }
-    if (msg) h += `<div class="mute">${msg}</div>`;
+    const msg = ajustePeso(dl);
+    h += `<div class="mute">${msg ? msg + '.' : 'Meta del corte: bajar de 0,8 a 1,3 kg por semana (promedio de la semana, con 3 pesajes o más).'}</div>`;
   } else h += `<div class="mute">Anotá tu peso en ayunas todos los días en Objetivos. Mirá el promedio, no el número de un día.</div>`;
   return h + `</div>`;
 }
@@ -463,26 +477,27 @@ function campMascota(e, pre) {
 }
 
 /** Rutina fija. Series con repeticiones por serie (r) y peso que se anota en el modo gimnasio. */
-const R = (n, r = [15, 12, 12]) => ({ n, r });
-const B = [12, 10, 10];   // los cinco ejercicios de récord
+// Modo corte: dos series por ejercicio (un tercio menos de volumen), mismo peso y sin llegar al fallo.
+const R = (n, r = [15, 12]) => ({ n, r });
+const B = [12, 10];   // los cinco ejercicios de récord
 const RUTINA = [
   ['Lunes', 'Boxeo', [{ n: 'Boxeo (sin pesas)' }]],
   ['Martes', 'Torso 1', [R('Press de pecho', B), R('Jalón al pecho'), R('Press de hombros', B), R('Remo sentado'), R('Peck deck'), R('Curl de bíceps en polea'), R('Tríceps en polea'), { n: 'Plancha', t: '3 × 40 s' }, { n: 'Bici libre 30-45 min' }]],
   ['Miércoles', 'Boxeo', [{ n: 'Boxeo (sin pesas)' }]],
   ['Jueves', 'Torso 2', [R('Press inclinado en máquina'), R('Remo en polea baja'), R('Elevaciones laterales'), R('Peck deck invertido'), R('Fondos asistidos o máquina de tríceps'), R('Jalón con agarre cerrado'), R('Crunch en máquina'), R('Elevación de piernas'), { n: 'Bici libre 30-45 min' }]],
   ['Viernes', 'Piernas', [R('Peso muerto convencional', B), R('Sentadilla', B), R('Prensa', B), R('Curl femoral'), R('Extensión de cuádriceps'), R('Abductores y aductores'), R('Gemelos'), R('Puente de glúteos'), { n: 'Bici suave 30 min' }]],
-  ['Sábado', 'Libre', [{ n: 'Descanso o bici libre' }]],
-  ['Domingo', 'Libre', [{ n: 'Descanso o bici libre' }]],
+  ['Sábado', 'Cardio', [{ n: 'Cardio largo suave 60-75 min (bici o caminata en cinta inclinada)' }]],
+  ['Domingo', 'Activo', [{ n: 'Caminata 60 min' }]],
 ];
 /** Rutina del día: la del calendario o la que elegiste para hoy (input.rut). */
 const rutDia = d => RUTINA[S.days[d]?.input?.rut ?? wkdayOf(d)];
 const exTxt = x => x.r ? `${x.n} · ${x.r.join('-')}` : x.t ? `${x.n} · ${x.t}` : x.n;
-const COMIDAS = [['12:00', 'Milanesa grande al horno con pan integral y verduras'], ['17:00', 'Licuado: 2 bananas, 300 ml de leche proteica, 1 scoop de proteína y 1 de avena'], ['23:00', '1 taza de arroz, 3 huevos, queso rallado y zanahoria rallada']];
+const COMIDAS = [['12:00', 'Milanesa al horno de 250 g de nalga o peceto (en crudo) con ensalada grande y 1 cda de aceite · ~550 kcal · 60 g de proteína'], ['17:00', 'Licuado: 1 banana, 300 ml de leche descremada y 2 scoops de proteína · ~450 kcal · 58 g'], ['23:00', '200 g de pechuga de pollo (en crudo), 2 huevos, 1/2 taza de arroz y verduras · ~570 kcal · 61 g']];
 function rutinaCards(pre) {
   const hoy = rutDia(todayISO());
   const lista = r => `<ul class="plan">${r[2].map(x => `<li>${esc(exTxt(x))}</li>`).join('')}</ul>`;
   return `<div class="card slim"><div class="row"><h2>Hoy · ${hoy[0]}</h2><span class="pill gold">${hoy[1]}</span></div>${lista(hoy)}<details><summary>Toda la semana</summary>${RUTINA.map(r => `<div class="row" style="margin-top:10px"><b>${r[0]}</b><span class="pill">${r[1]}</span></div>${lista(r)}`).join('')}</details></div>`
-    + `<div class="card slim"><details><summary>Comidas del día · ~2.000 kcal</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: ~150 g de proteína y 2 litros de agua por día.</p></details></div>`;
+    + `<div class="card slim"><details><summary>Comidas del día · ~1.700 kcal</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: 180 g de proteína, nunca menos de 1.500 kcal y ~3 litros de agua por día. Pesá la comida y cargala con gramos.</p></details></div>`;
 }
 /** Fases del bloque de 4 semanas: base, progresiva, máxima y descarga. */
 const FASES = ['Carga base', 'Carga progresiva', 'Carga máxima', 'Descarga'];
@@ -791,8 +806,15 @@ document.addEventListener('click', async ev => {
   else if (a === 'water') actDay(viewDate, i => { const v = Math.max(0, (i.waterMl || 0) + (+el.dataset.v)); if (v) i.waterMl = v; else delete i.waterMl; });
   else if (a === 'compreg') {
     const n = parseInt(document.getElementById('cn')?.value, 10), act = document.getElementById('ca')?.value; if (!(n > 0)) return;
-    actDay(viewDate, i => { const c = i.comp; if (!c) return; const o = c.opts.find(x => x.n === act); c.done = (c.done || 0) + Math.round(o ? n * o.kpm : n); if (c.done >= c.burn) i.foodPct = Math.max(i.foodPct ?? 0, c.sin / 100); });
+    // Lo quemado para compensar también suma al gasto del día.
+    actDay(viewDate, i => { const c = i.comp; if (!c) return; const o = c.opts.find(x => x.n === act), k = Math.round(o ? n * o.kpm : n); i.comp = { ...c, done: (c.done || 0) + k }; if (i.comp.done >= c.burn) i.foodPct = Math.max(i.foodPct ?? 0, c.sin / 100); i.aeroKcal = (i.aeroKcal || 0) + k; i.aeroLog = [...(i.aeroLog || []), o ? { n: act, min: n, k } : { k }]; });
   }
+  else if (a === 'aeroadd') {
+    const n = parseInt(document.getElementById('an')?.value, 10), act = document.getElementById('aa')?.value; if (!(n > 0 && n <= 5000)) { hint('Escribí las kcal o los minutos'); return; }
+    const m = AERO.find(x => x[0] === act), k = Math.round(m ? n * kpm(m[2], kgAt(viewDate)) : n);
+    actDay(viewDate, i => { i.aeroKcal = (i.aeroKcal || 0) + k; i.aeroLog = [...(i.aeroLog || []), m ? { n: act, min: n, k } : { k }]; });
+  }
+  else if (a === 'aerozero') actDay(viewDate, i => { delete i.aeroKcal; delete i.aeroLog; });
   else if (a === 'water1') actDay(viewDate, i => { i.waterMl = Math.max(i.waterMl || 0, 1000); });
   else if (a === 'gymset') {
     const v = parseInt(document.getElementById('gm')?.value, 10);

@@ -1,3 +1,23 @@
+// engine/src/engine/gasto.ts
+var GASTO = {
+  desde: "2026-11-13",
+  meta: 700,
+  metaDom: 350,
+  kgDef: 87,
+  metPesas: 5,
+  metBoxeo: 7.8,
+  boxeo: [0, 2]
+};
+var kpm = (met, kg) => Math.round((met - 1) * 3.5 * kg / 200 * 10) / 10;
+var esBoxeo = (inp, dowL) => GASTO.boxeo.includes(inp?.rut ?? dowL);
+var gastoCuenta = (fecha) => fecha >= GASTO.desde;
+var metaGasto = (dowL) => dowL === 6 ? GASTO.metaDom : GASTO.meta;
+function gastoDia(inp, dowL, kg) {
+  const min = inp?.gymMin ?? (inp?.gym ? 60 : 0), box = esBoxeo(inp, dowL), k = kpm(box ? GASTO.metBoxeo : GASTO.metPesas, kg || GASTO.kgDef);
+  const gym = Math.round(min * k), aero = Math.round(Number(inp?.aeroKcal) || 0);
+  return { min, box, kpm: k, gym, aero, total: gym + aero, meta: metaGasto(dowL) };
+}
+
 // engine/src/engine/resumen.ts
 var DIA = 86400000;
 var addD = (iso, n) => new Date(Date.parse(iso) + n * DIA).toISOString().slice(0, 10);
@@ -9,26 +29,45 @@ var MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "ag
 var nombreMes = (ym) => MESES[+ym.slice(5, 7) - 1] + " " + ym.slice(0, 4);
 var gymMin = (i) => i?.gymMin ?? (i?.gym ? 60 : 0);
 var agua = (i) => (i?.waterMl ?? 0) >= 1000 || !!i?.water;
-function puntajeDia(i, fecha) {
-  const wd = dowL(fecha) < 5;
-  const hechas = [gymMin(i) >= 40, !!i?.read, (i?.rooms ?? (i?.room ? [i.room] : [])).length > 0, agua(i), (i?.weightKg ?? 0) > 0, ...wd ? [i?.foodPct !== undefined] : []].filter(Boolean).length;
-  return Math.min(1, hechas / (wd ? 6 : 5));
+function pesoHasta(inp, fecha) {
+  let best = "", kg = GASTO.kgDef;
+  for (const [d, i] of Object.entries(inp))
+    if (d <= fecha && d > best && i?.weightKg > 0) {
+      best = d;
+      kg = +i.weightKg;
+    }
+  return kg;
+}
+function puntajeDia(i, fecha, kg = GASTO.kgDef) {
+  const wd = dowL(fecha) < 5, g = gastoCuenta(fecha);
+  const lista = [gymMin(i) >= 40, !!i?.read, (i?.rooms ?? (i?.room ? [i.room] : [])).length > 0, agua(i), (i?.weightKg ?? 0) > 0, ...wd ? [i?.foodPct !== undefined] : []];
+  if (g) {
+    const x = gastoDia(i, dowL(fecha), kg);
+    lista.push(x.total >= x.meta);
+  }
+  return Math.min(1, lista.filter(Boolean).length / lista.length);
 }
 function semanas(inp, start, hoy) {
   const out = [];
   for (let lun = start;lun <= hoy; lun = addD(lun, 7)) {
-    const s = { lunes: lun, completa: addD(lun, 6) < hoy, dias: 0, score: null, gymMin: 0, sess: 0, comida: null, aguaDias: 0, lecturaDias: 0, ambientes: 0, prog: 0, juegosH: 0, peso: null, pesoN: 0 };
+    const s = { lunes: lun, completa: addD(lun, 6) < hoy, dias: 0, gastoDias: 0, gastoN: 0, score: null, gymMin: 0, sess: 0, comida: null, aguaDias: 0, lecturaDias: 0, ambientes: 0, prog: 0, juegosH: 0, peso: null, pesoN: 0 };
     let sc = 0, n = 0;
     const comida = [], pesos = [], amb = new Set;
     for (let q = 0;q < 7; q++) {
       const d = addD(lun, q);
       if (d > hoy)
         break;
-      const i = inp[d] ?? {};
+      const i = inp[d] ?? {}, kg = pesoHasta(inp, d);
       s.dias++;
       if (d < hoy) {
-        sc += puntajeDia(i, d);
+        sc += puntajeDia(i, d, kg);
         n++;
+      }
+      if (gastoCuenta(d)) {
+        const g = gastoDia(i, q, kg);
+        s.gastoN++;
+        if (g.total >= g.meta)
+          s.gastoDias++;
       }
       const m = gymMin(i);
       s.gymMin += m;
@@ -60,7 +99,7 @@ function meses(inp, start, hoy) {
   const m = {};
   for (let d = start;d < hoy; d = addD(d, 1)) {
     const k = d.slice(0, 7), x = m[k] ??= { sc: 0, n: 0, g: 0 };
-    x.sc += puntajeDia(inp[d] ?? {}, d);
+    x.sc += puntajeDia(inp[d] ?? {}, d, pesoHasta(inp, d));
     x.n++;
     x.g += gymMin(inp[d]);
   }
@@ -71,7 +110,7 @@ function destacados(inp, start, hoy) {
   const by = (a, f, mx) => a.length ? a.reduce((p, c) => (mx ? f(c) > f(p) : f(c) < f(p)) ? c : p) : null;
   let racha = 0, cur = 0;
   for (let d = start;d < hoy; d = addD(d, 1)) {
-    cur = puntajeDia(inp[d] ?? {}, d) >= 0.8 ? cur + 1 : 0;
+    cur = puntajeDia(inp[d] ?? {}, d, pesoHasta(inp, d)) >= 0.8 ? cur + 1 : 0;
     racha = Math.max(racha, cur);
   }
   const conPeso = S.filter((s) => s.peso !== null);
@@ -86,6 +125,18 @@ function destacados(inp, start, hoy) {
     pesoActual: conPeso.length ? conPeso[conPeso.length - 1].peso : null
   };
 }
+function ajustePeso(dl) {
+  if (!dl.length)
+    return "";
+  const b = dl[dl.length - 1], a = dl.length > 1 ? dl[dl.length - 2] : null;
+  if (a !== null && a > -0.7 && b > -0.7)
+    return "Dos semanas bajando menos de 0,7 kg: recortá 150 kcal por día o subí 150 kcal la meta de gasto";
+  if (dl.length >= 2 && b < -1.5)
+    return "Bajaste más de 1,5 kg en la semana: sumá 150 kcal por día";
+  if (b <= -0.8 && b >= -1.3)
+    return "Vas en el ritmo (0,8 a 1,3 kg por semana): no toques nada";
+  return "";
+}
 var fh = (m) => `${Math.floor(m / 60)} h ${Math.round(m % 60)} min`;
 var fm = (x) => String(+x.toFixed(1)).replace(".", ",");
 function sugerencias(inp, start, hoy) {
@@ -97,11 +148,9 @@ function sugerencias(inp, start, hoy) {
   if (ref.pesoN < 3)
     out.push({ tema: "Peso", texto: `Pesaste tu peso ${ref.pesoN} día${ref.pesoN === 1 ? "" : "s"} la semana pasada. Hacelo todos los días en ayunas para ver la tendencia real.` });
   else if (dl.length >= 2 && P[P.length - 1] === ref) {
-    const [a, b] = dl.slice(-2);
-    if (a < -1 && b < -1)
-      out.push({ tema: "Peso", texto: `Bajás más de 1 kg por semana, dos semanas seguidas. Sumá unas 200 kcal por día para no perder músculo.` });
-    else if (a > -0.1 && b > -0.1)
-      out.push({ tema: "Peso", texto: `Dos semanas sin bajar (promedio ${fm(ref.peso)} kg). Recortá unas 100-150 kcal por día.` });
+    const t = ajustePeso(dl);
+    if (t)
+      out.push({ tema: "Peso", texto: t + ` (promedio ${fm(ref.peso)} kg)` });
   }
   const idxRef = idxDe(ref.lunes, start) / 7, fase = idxRef % 4;
   if (fase === 1 || fase === 2) {
@@ -127,6 +176,8 @@ function sugerencias(inp, start, hoy) {
       out.push({ tema: "Gimnasio", texto: duro ? `Estancado en ${n} y se sintió duro. Bajá un 5-10% el peso unas semanas y volvé a subir; revisá sueño y comida.` : `No subiste el peso en ${n}. Sumá 1-2 repeticiones o una serie antes de subir la carga, y cuidá la técnica.` });
     }
   }
+  if (ref.gastoN >= 5 && ref.gastoDias < ref.gastoN - 1)
+    out.push({ tema: "Gasto", texto: `Llegaste al gasto del día ${ref.gastoDias} de ${ref.gastoN} días. Después del gimnasio sumá bici hasta cerrar las ${GASTO.meta} kcal.` });
   if (ref.gymMin < META.gymSemMin)
     out.push({ tema: "Gimnasio", texto: `Hiciste ${fh(ref.gymMin)} de ${fh(META.gymSemMin)}. Reservá desde el lunes los días y horarios fijos de la semana.` });
   if (ref.comida !== null && ref.comida < META.comida)
@@ -144,11 +195,13 @@ function sugerencias(inp, start, hoy) {
 export {
   META,
   addD,
+  ajustePeso,
   destacados,
   dowL,
   lunesDe,
   meses,
   nombreMes,
+  pesoHasta,
   puntajeDia,
   semanas,
   sugerencias
