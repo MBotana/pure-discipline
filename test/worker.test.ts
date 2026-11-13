@@ -348,3 +348,38 @@ test('exceso de calorías: arma el desafío de ejercicio y al compensarlo el pun
     assert.doesNotMatch(prompts.at(-1)!, /Cena|Almuerzo/);
   } finally { globalThis.fetch = real; Date.now = rn; }
 });
+
+test('comida abierta del sábado y día de descanso: sin desafío de compensación; otros días ignoran el modo', async () => {
+  const e: any = env(); const T = 'clave-larga-1'; e.GEMINI_KEY = 'k';
+  await call(e, 'POST', '/api/setup', { token: T, startDate: '2026-11-09' });
+  const real = globalThis.fetch, rn = Date.now; Date.now = () => Date.parse('2026-11-21T23:00:00Z');
+  const prompts: string[] = [];
+  globalThis.fetch = (async (_u: any, init: any) => {
+    const b = JSON.parse(init.body), user = b.contents[0].parts[0].text as string, sys = b.systemInstruction.parts[0].text as string;
+    prompts.push(user);
+    if (sys.includes('SOLO un JSON')) return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"kcal":2600,"prot":160,"carb":200}' }] } }] }));
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'Te pasaste.\nPUNTAJE: 70%\nPUNTAJE SIN EXCESO: 100%' }] } }] }));
+  }) as any;
+  try {
+    const post = (date: string) => call(e, 'POST', '/api/meal', { date, text: 'Banquete', t: '21:00' }, T).then(x => x.json());
+    const sync = (date: string, input: any) => call(e, 'POST', '/api/sync', { changes: [{ date, input, updated_at: Date.now() }] }, T).then(x => x.json());
+    // sábado 21/11 con comida abierta: no hay desafío
+    await sync('2026-11-21', { weightKg: 87, modo: 'libre' }); await post('2026-11-21');
+    assert.match(prompts.at(-1)!, /COMIDA ABIERTA SEMANAL/); assert.doesNotMatch(prompts.at(-1)!, /PUNTAJE SIN EXCESO/);
+    let s: any = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
+    assert.equal(s.days['2026-11-21'].input.comp, undefined);
+    // el mismo modo un martes se ignora: hay desafío
+    await sync('2026-11-17', { weightKg: 87, modo: 'libre' }); await post('2026-11-17');
+    assert.doesNotMatch(prompts.at(-1)!, /COMIDA ABIERTA/); assert.match(prompts.at(-1)!, /PUNTAJE SIN EXCESO/);
+    s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
+    assert.ok(s.days['2026-11-17'].input.comp, 'un martes no existe la comida abierta');
+    // día de descanso (cualquier día): sin desafío y con la meta de 2.000
+    await sync('2026-11-18', { weightKg: 87, modo: 'descanso' }); await post('2026-11-18');
+    assert.match(prompts.at(-1)!, /DÍA DE DESCANSO/);
+    s = await call(e, 'POST', '/api/sync', { changes: [] }, T).then(x => x.json());
+    assert.equal(s.days['2026-11-18'].input.comp, undefined);
+    // rejudge
+    const rj: any = await call(e, 'POST', '/api/meal/rejudge', { date: '2026-11-18' }, T).then(x => x.json());
+    assert.equal(rj.ok, true); assert.equal(rj.meals.length, 1);
+  } finally { globalThis.fetch = real; Date.now = rn; }
+});

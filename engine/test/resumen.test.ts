@@ -12,8 +12,9 @@ test('puntaje del día: 6 misiones entre semana, 5 el fin de semana', () => {
   assert.equal(puntajeDia({ read: true, waterMl: 1200, gymMin: 45 }, '2026-11-09'), 0.5);
   assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'] }, '2026-11-08'), 1, 'domingo antes del corte: 5 de 5');
   // desde el modo corte el gasto del día es una misión más (7 entre semana, 6 el fin de semana)
-  assert.equal(puntajeDia(dia(), '2026-11-13'), 6 / 7, 'viernes con 60 min de pesas: 365 kcal, no llega a 900');
-  assert.equal(puntajeDia(dia({ aeroKcal: 600 }), '2026-11-13', 87), 1);
+  assert.equal(puntajeDia(dia(), '2026-11-20'), 6 / 7, 'viernes con 60 min de pesas: 365 kcal, no llega a 900');
+  assert.equal(puntajeDia(dia(), '2026-11-13'), 1, 'el viernes 13 todavía no hay misión de gasto');
+  assert.equal(puntajeDia(dia({ aeroKcal: 600 }), '2026-11-20', 87), 1);
   assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], aeroKcal: 600, foodPct: 0.9 }, '2026-11-14', 87), 1, 'sábado del modo 25/12: 7 de 7 (la comida también cuenta)');
   assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], aeroKcal: 600 }, '2027-01-09', 87), 1, 'sábado fuera del modo: 6 de 6');
 });
@@ -24,6 +25,10 @@ test('gasto del día: gimnasio por tiempo y peso, boxeo con más MET, aeróbico 
   const b = gastoDia({ gymMin: 90 }, 0, 87);                        // lunes, boxeo
   assert.equal(b.box, true); assert.equal(b.gym, 936); assert.equal(gastoDia({ gymMin: 90, rut: 4 }, 0, 87).box, false, 'si el lunes elegiste piernas, son pesas');
   assert.equal(gastoDia({}, 6, 87).meta, 500, 'domingo: descanso activo');
+  assert.equal(gastoDia({}, 0, 87, 0, '2026-11-16').meta, 750, 'rampa: primera semana');
+  assert.equal(gastoDia({}, 6, 87, 0, '2026-11-15').meta, 400, 'rampa: domingo');
+  assert.equal(gastoDia({}, 4, 87, 0, '2026-11-20').meta, 900, 'desde el 20/11: completa');
+  const d = gastoDia({ modo: 'descanso' }, 2, 87, 150, '2026-11-25'); assert.equal(d.meta, 0); assert.equal(d.extra, 0); assert.ok(d.total >= d.meta, 'día de descanso: sin meta');
 });
 
 test('semanas y destacados: la mejor semana, el peor mes y la racha de días', () => {

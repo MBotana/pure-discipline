@@ -178,11 +178,13 @@ test('progreso: carga/descarga alternan 3+1 y el ciclo paga con 4 ejercicios dis
   assert.ok(!r2.log.flatMap(d => d.events).some(x => x.label === 'Ciclo completo'));
 });
 
-test('gasto del día: desde el modo corte suma Vitalidad si llega a la meta (con el último peso anotado)', () => {
+test('gasto del día: desde el modo corte suma Vitalidad si llega a la meta (con la rampa y el último peso anotado)', () => {
   const e = new Rise();
-  for (let i = 0; i < 4; i++) e.processDay(i === 0 ? { weightKg: 87 } : {});          // 9 al 12/11: antes del corte
-  const d = e.processDay({ gymMin: 72, aeroKcal: 500 });                             // viernes 13/11: 439 + 500 kcal
-  assert.ok(d.events.some(x => x.label === 'Gasto del día' && x.cat === 'V'));
-  const sat = e.processDay({ aeroKcal: 600 });                                       // sábado: le falta
-  assert.ok(!sat.events.some(x => x.label === 'Gasto del día'));
+  for (let i = 0; i < 5; i++) e.processDay(i === 0 ? { weightKg: 87 } : {});          // 9 al 13/11: antes del corte
+  const sab = e.processDay({ gymMin: 72, aeroKcal: 400 });                           // sábado 14/11: 439 + 400 kcal ≥ 750 (rampa)
+  assert.ok(sab.events.some(x => x.label === 'Gasto del día' && x.cat === 'V'));
+  const dom = e.processDay({ aeroKcal: 300 });                                       // domingo 15/11: meta 400, no llega
+  assert.ok(!dom.events.some(x => x.label === 'Gasto del día'));
+  const desc = e.processDay({ modo: 'descanso' } as any);                            // día de descanso: sin meta, suma
+  assert.ok(desc.events.some(x => x.label === 'Gasto del día'));
 });

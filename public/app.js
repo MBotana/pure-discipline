@@ -179,7 +179,10 @@ const waterOk = inp => (inp.waterMl ?? 0) >= 1000 || !!inp.water;
 /** Último peso anotado hasta ese día (para el gasto del gimnasio). */
 function kgAt(d) { let best = '', kg = GASTO.kgDef; for (const [k, v] of Object.entries(S.days)) if (k <= d && k > best && v.input?.weightKg > 0) { best = k; kg = +v.input.weightKg; } return kg; }
 const pesosApp = () => Object.fromEntries(Object.entries(S.days).filter(([, v]) => v.input?.weightKg > 0).map(([d, v]) => [d, +v.input.weightKg]));
-const gastoOf = (inp, d) => gastoDia(inp, wkdayOf(d), kgAt(d), extraGasto(pesosApp(), d));
+const gastoOf = (inp, d) => gastoDia(inp, wkdayOf(d), kgAt(d), extraGasto(pesosApp(), d), d);
+/** Modo del día: 'libre' (comida abierta, solo sábados) o 'descanso' (máximo uno cada 10 días). */
+const modoDe = (inp, d) => (inp.modo === 'libre' && wkdayOf(d) === 5) || inp.modo === 'descanso' ? inp.modo : '';
+const descansoOk = d => !Object.entries(S.days).some(([k, v]) => k !== d && v.input?.modo === 'descanso' && Math.abs(Math.round((toUTC(k) - toUTC(d)) / 864e5)) < 10);
 const dayDoneN = (inp, d) => [isSess(inp), !!inp.read, roomsOf(inp).length > 0, waterOk(inp), (inp.weightKg ?? 0) > 0, ...(comidaPuntua(d) ? [inp.foodPct !== undefined] : []), ...(gastoCuenta(d) ? [(g => g.total >= g.meta)(gastoOf(inp, d))] : [])].filter(Boolean).length;
 const dayNeed = d => 5 + (comidaPuntua(d) ? 1 : 0) + (gastoCuenta(d) ? 1 : 0);
 const pc = x => Math.round(x * 100) + ' %';
@@ -201,7 +204,12 @@ function foodCard(date, inp, locked) {
     : `<button class="btn" style="margin-top:10px;width:100%" ${off ? 'disabled' : 'data-act="txopen"'}>Cargar comida</button>`;
   if (waterQ && waterQ.date === date) h += `<div class="wq"><b>¿Bebiste 250 ml de agua con esta comida?</b><div class="row"><button class="btn sm" data-act="waterq" data-v="1">Sí</button><button class="btn sm ghost" data-act="waterq" data-v="0">No</button></div></div>`;
   h += `${busy ? `<p class="mute busy">⏳ ${busy}</p>` : ''}${errMeal ? `<p class="err">${esc(errMeal)}</p>` : ''}`;
-  if (inp.comp && comidaPuntua(date)) h += compCard(date, inp, locked);
+  if (isToday && gastoCuenta(date) && !locked) {
+    const m = modoDe(inp, date), sab = wkdayOf(date) === 5;
+    if (m) h += `<div class="wq"><div class="row"><b>${m === 'libre' ? '🍔 Comida abierta de hoy' : '😴 Día de descanso'}</b><button class="btn sm ghost" data-act="modo" data-v="">Cancelar</button></div><small class="mute">${m === 'libre' ? 'Una sola comida libre: no se penalizan sus carbohidratos ni calorías. La proteína del día sigue contando. Mañana, de vuelta al plan.' : 'Sin meta de gasto; comé ~2.000 kcal con 185 g de proteína. Hasta ~150 g de carbohidratos, sin azúcar.'}</small></div>`;
+    else h += `<div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">${sab ? '<button class="btn sm ghost" data-act="modo" data-v="libre">🍔 Hoy es mi comida abierta</button>' : ''}${descansoOk(date) ? '<button class="btn sm ghost" data-act="modo" data-v="descanso">😴 Día de descanso</button>' : '<span class="mute" style="font-size:12px">Día de descanso: ya usaste uno en los últimos 10 días.</span>'}</div>`;
+  }
+  if (inp.comp && comidaPuntua(date) && !modoDe(inp, date)) h += compCard(date, inp, locked);
   if (inp.verdictTx) h += `<p class="vnote">${esc(inp.verdictTx)}</p>`;
   return h + `</div>`;
 }
@@ -219,7 +227,7 @@ function metaCard(date) {
   return `<div class="card slim"><div class="row"><h2>🎯 Abajo de 80 kg el 25/12</h2><span class="pill gold">${dias > 0 ? `faltan ${dias} días` : dias === 0 ? 'hoy' : 'terminó'}</span></div>`
     + `<div class="mute">Último pesaje: <b>${ult ? fm(P[ult]) + ' kg' : '—'}</b>${avg ? ` · promedio 7 días ${fm(avg)} kg` : ''}. ${estado}</div>`
     + `<div class="row" style="flex-wrap:wrap;gap:4px;justify-content:flex-start;margin-top:6px">${cs.map(fila).join('')}</div>`
-    + `<div class="mute" style="font-size:12px;margin-top:6px">Control: pesaje del viernes en ayunas. Cada control no alcanzado (o sin pesarte) suma ${EXTRA_KCAL} kcal a la meta de gasto de todos los días siguientes${extra ? ` · hoy: +${extra}` : ''}. La comida no baja de 1.500 kcal.</div></div>`;
+    + `<div class="mute" style="font-size:12px;margin-top:6px">Control: pesaje del viernes en ayunas. Cada control no alcanzado (o sin pesarte) suma ${EXTRA_KCAL} kcal a la meta de gasto de todos los días siguientes${extra ? ` · hoy: +${extra}` : ''}. La comida no baja de 1.500 kcal.${date <= GASTO.rampa.hasta ? ` Primera semana (rampa): meta de ${GASTO.rampa.meta} kcal (domingo ${GASTO.rampa.metaDom}); desde el 20/11 sube a ${GASTO.meta} (domingo ${GASTO.metaDom}).` : ''}</div></div>`;
 }
 /** Gasto del día: gimnasio calculado por tiempo y peso + aeróbico cargado a mano (hasta conectar el reloj). */
 function gastoCard(date, inp, locked) {
@@ -227,11 +235,11 @@ function gastoCard(date, inp, locked) {
   const nf = x => String(x).replace('.', ',');
   const log = (inp.aeroLog || []).map(x => x.min ? `${x.min} min ${(AERO.find(a => a[0] === x.n) || [, x.n])[1]} (${kc(x.k)})` : `${kc(x.k)} kcal`).join(' · ');
   const eq = AERO.map(([n, t, met]) => `${Math.max(1, Math.ceil(left / kpm(met, kg)))} min ${t}`).join(' · ');
-  return `<div class="card slim"><div class="row"><h2>🔥 Gasto del día</h2><span class="pill ${ok ? 'ok' : ''}">${kc(g.total)} / ${kc(g.meta)} kcal</span></div>`
-    + `<div class="bar gold"><i style="width:${Math.min(100, g.total / g.meta * 100)}%"></i></div>`
+  return `<div class="card slim"><div class="row"><h2>🔥 Gasto del día</h2><span class="pill ${ok ? 'ok' : ''}">${g.desc ? 'día de descanso' : `${kc(g.total)} / ${kc(g.meta)} kcal`}</span></div>`
+    + `<div class="bar gold"><i style="width:${g.meta ? Math.min(100, g.total / g.meta * 100) : 100}%"></i></div>`
     + `<div class="mute">${g.box ? 'Boxeo' : 'Gimnasio'}: ${g.min} min × ${nf(g.kpm)} kcal/min = <b>${kc(g.gym)}</b> · Aeróbico: <b>${kc(g.aero)}</b>${log ? ` (${log})` : ''}</div>`
     + (g.extra ? `<div class="mute">Incluye +${kc(g.extra)} kcal por ${g.extra / EXTRA_KCAL} control${g.extra / EXTRA_KCAL === 1 ? '' : 'es'} de peso no alcanzado${g.extra / EXTRA_KCAL === 1 ? '' : 's'}.</div>` : '')
-    + (ok ? '<div class="mute">Meta cumplida ✓</div>' : `<div class="mute">Te faltan ${kc(left)} kcal: ${eq}.</div>`)
+    + (g.desc ? '<div class="mute">Hoy no hay meta de gasto. Comé ~2.000 kcal con 185 g de proteína y descansá.</div>' : ok ? '<div class="mute">Meta cumplida ✓</div>' : `<div class="mute">Te faltan ${kc(left)} kcal: ${eq}.</div>`)
     + (locked ? '' : `<div class="row" style="margin-top:6px;gap:6px"><select id="aa" style="background:transparent;color:inherit;border:1px solid var(--line,#444);border-radius:8px;padding:4px 6px"><option value="kcal">kcal</option>${AERO.map(([n]) => `<option value="${n}">${n} (min)</option>`).join('')}</select><input id="an" type="text" inputmode="numeric" placeholder="0" autocomplete="off" style="width:64px"><button class="btn sm" data-act="aeroadd">Sumar</button></div>${g.aero ? '<button class="undo" data-act="aerozero">Borrar el aeróbico de este día</button>' : ''}`)
     + `<div class="mute" style="font-size:12px;margin-top:6px">kcal activas (sin lo que gastás en reposo), con tu último peso: ${nf(kg)} kg.</div></div>`;
 }
@@ -511,12 +519,12 @@ const RUTINA = [
 const rutDia = d => RUTINA[S.days[d]?.input?.rut ?? wkdayOf(d)];
 const exTxt = x => x.r ? `${x.n} · ${x.r.join('-')}` : x.t ? `${x.n} · ${x.t}` : x.n;
 // Provisorio hasta armar el plan con la lista de alimentos: ayuno hasta las 17, caminata, y se come entre las 17 y las 23.
-const COMIDAS = [['17:45', 'Después de la caminata: omelette de 4 huevos con espinaca y cebolla · ~310 kcal · 26 g de proteína'], ['20:00', '280 g de nalga o peceto (en crudo) a la plancha, rúcula, 100 g de cherry y zanahoria rallada; de postre, yogur griego natural con 1 fruta · ~620 kcal · 70 g'], ['23:00', '280 g de carne magra (en crudo) al horno con brócoli al vapor, 250 ml de leche proteica y 10 g de nueces · ~560 kcal · 88 g']];
+const COMIDAS = [['17:45', 'Después de la caminata: omelette de 4 huevos con tomates cherry y cebolla · ~310 kcal · 26 g de proteína'], ['20:00', '280 g de nalga o peceto (en crudo) a la plancha, rúcula, 100 g de cherry y zanahoria rallada; de postre, yogur griego natural con 1 fruta · ~620 kcal · 70 g'], ['23:00', '280 g de carne magra (en crudo) al horno con brócoli al vapor, 250 ml de leche proteica y 10 g de nueces · ~560 kcal · 88 g']];
 function rutinaCards(pre) {
   const hoy = rutDia(todayISO());
   const lista = r => `<ul class="plan">${r[2].map(x => `<li>${esc(exTxt(x))}</li>`).join('')}</ul>`;
   return `<div class="card slim"><div class="row"><h2>Hoy · ${hoy[0]}</h2><span class="pill gold">${hoy[1]}</span></div>${lista(hoy)}<details><summary>Toda la semana</summary>${RUTINA.map(r => `<div class="row" style="margin-top:10px"><b>${r[0]}</b><span class="pill">${r[1]}</span></div>${lista(r)}`).join('')}</details></div>`
-    + `<div class="card slim"><details><summary>Comidas del día · ~1.500 kcal · de 17 a 23 h</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: ~185 g de proteína, menos de 50 g de carbohidratos, sin azúcar, nunca menos de 1.500 kcal y ~3 litros de agua (con sal) por día. Ayuno hasta las 17 h. Pesá la comida y cargala con gramos.</p><ul class="plan"><li>Es una sugerencia: podés cambiar comidas. Quedarte corto de calorías no baja el puntaje; quedarte corto de proteína sí.</li><li>Leche proteica sin azúcar agregada (≤ 5 g de carbohidratos cada 100 ml). Yogur griego natural, sin azúcar.</li><li>Fruta: una porción por día (150 g de frutillas, 1 manzana chica, 1 naranja o 1 kiwi; banana, solo media).</li><li>Milanesa: rebozada en huevo y almendras procesadas, al horno (ese día, sin nueces).</li><li>Queso untable light (30 g) puede reemplazar a las nueces. Cocinar sin aceite: plancha, horno o vapor.</li><li>Durante el ayuno: agua con una pizca de sal, café o mate sin azúcar. Si entrenás de noche, comé después de la caminata y entrená 1,5-2 h después.</li><li>Sin comidas libres hasta el 25/12: el fin de semana también puntúa.</li></ul></details></div>`;
+    + `<div class="card slim"><details><summary>Comidas del día · ~1.500 kcal · de 17 a 23 h</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: ~185 g de proteína, menos de 50 g de carbohidratos, sin azúcar, nunca menos de 1.500 kcal y ~3 litros de agua (con sal) por día. Ayuno hasta las 17 h. Pesá la comida y cargala con gramos.</p><ul class="plan"><li>Es una sugerencia: podés cambiar comidas. Quedarte corto de calorías no baja el puntaje; quedarte corto de proteína sí.</li><li>Leche proteica sin azúcar agregada (≤ 5 g de carbohidratos cada 100 ml). Yogur griego natural, sin azúcar.</li><li>Fruta: una porción por día (150 g de frutillas, 1 manzana chica, 1 naranja o 1 kiwi; banana, solo media).</li><li>Milanesa: rebozada en huevo y queso rallado, al horno (sin pan rallado).</li><li>Queso untable light (30 g) puede reemplazar a las nueces. Cocinar sin aceite: plancha, horno o vapor.</li><li>Por los cristales de oxalato de tu análisis: espinaca, acelga, remolacha y almendras, mejor evitarlas (rúcula, lechuga, brócoli y zucchini sí); yogur o queso en las comidas; nada de vitamina C en suplemento.</li><li>Agua: 2,5-3 L repartidos en el día, no más de 1 L por hora. Tu sodio estaba en 136 (piso del rango): sal en las comidas, sin restringirla. Orina clara.</li><li>Comida abierta: una por semana, el sábado después del pesaje. Día de descanso (~2.000 kcal): máximo uno cada 10 días o si tenés mareos, pulso alto o mal sueño.</li><li>Durante el ayuno: agua con una pizca de sal, café o mate sin azúcar. Si entrenás de noche, comé después de la caminata y entrená 1,5-2 h después.</li><li>Sin comidas libres hasta el 25/12: el fin de semana también puntúa.</li></ul></details></div>`;
 }
 /** Fases del bloque de 4 semanas: base, progresiva, máxima y descarga. */
 const FASES = ['Carga base', 'Carga progresiva', 'Carga máxima', 'Descarga'];
@@ -833,6 +841,7 @@ document.addEventListener('click', async ev => {
     const m = AERO.find(x => x[0] === act), k = Math.round(m ? n * kpm(m[2], kgAt(viewDate)) : n);
     actDay(viewDate, i => { i.aeroKcal = (i.aeroKcal || 0) + k; i.aeroLog = [...(i.aeroLog || []), m ? { n: act, min: n, k } : { k }]; });
   }
+  else if (a === 'modo') { const v = el.dataset.v; actDay(viewDate, i => { if (v) i.modo = v; else delete i.modo; delete i.comp; }); if (mealsOf(viewDate).length && S.token) { const d = viewDate; aiRun('Recalculando el puntaje del día…', async () => { const r = await api('/api/meal/rejudge', 'POST', { date: d }); S.mc[d] = { meals: r.meals }; }); } }
   else if (a === 'aerozero') actDay(viewDate, i => { delete i.aeroKcal; delete i.aeroLog; });
   else if (a === 'water1') actDay(viewDate, i => { i.waterMl = Math.max(i.waterMl || 0, 1000); });
   else if (a === 'gymset') {

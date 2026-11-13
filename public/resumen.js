@@ -1,8 +1,9 @@
 // engine/src/engine/gasto.ts
 var GASTO = {
-  desde: "2026-11-13",
+  desde: "2026-11-14",
   meta: 900,
   metaDom: 500,
+  rampa: { hasta: "2026-11-19", meta: 750, metaDom: 400 },
   kgDef: 87,
   metPesas: 5,
   metBoxeo: 7.8,
@@ -10,13 +11,16 @@ var GASTO = {
 };
 var kpm = (met, kg) => Math.round((met - 1) * 3.5 * kg / 200 * 10) / 10;
 var esBoxeo = (inp, dowL) => GASTO.boxeo.includes(inp?.rut ?? dowL);
-var gastoCuenta = (fecha) => fecha >= GASTO.desde;
 var CORTE = { desde: "2026-11-14", hasta: "2026-12-25" };
+var gastoCuenta = (fecha) => fecha >= GASTO.desde && fecha <= CORTE.hasta;
 var comidaPuntua = (fecha) => {
   const d = (new Date(fecha + "T00:00:00Z").getUTCDay() + 6) % 7;
   return d < 5 || fecha >= CORTE.desde && fecha <= CORTE.hasta;
 };
-var metaGasto = (dowL) => dowL === 6 ? GASTO.metaDom : GASTO.meta;
+var metaGasto = (dowL, fecha) => {
+  const r = fecha !== undefined && fecha <= GASTO.rampa.hasta;
+  return dowL === 6 ? r ? GASTO.rampa.metaDom : GASTO.metaDom : r ? GASTO.rampa.meta : GASTO.meta;
+};
 var CONTROLES = [["2026-11-20", 85.5], ["2026-11-27", 84.3], ["2026-12-04", 83], ["2026-12-11", 81.8], ["2026-12-18", 80.6], ["2026-12-25", 79.9]];
 var EXTRA_KCAL = 150;
 function pesoControl(pesos, fecha) {
@@ -34,10 +38,10 @@ function controles(pesos, fecha) {
   });
 }
 var extraGasto = (pesos, fecha) => controles(pesos, fecha).filter((c) => c.pasado && !c.ok).length * EXTRA_KCAL;
-function gastoDia(inp, dowL, kg, extra = 0) {
+function gastoDia(inp, dowL, kg, extra = 0, fecha) {
   const min = inp?.gymMin ?? (inp?.gym ? 60 : 0), box = esBoxeo(inp, dowL), k = kpm(box ? GASTO.metBoxeo : GASTO.metPesas, kg || GASTO.kgDef);
-  const gym = Math.round(min * k), aero = Math.round(Number(inp?.aeroKcal) || 0);
-  return { min, box, kpm: k, gym, aero, total: gym + aero, meta: metaGasto(dowL) + extra, extra };
+  const desc = inp?.modo === "descanso", gym = Math.round(min * k), aero = Math.round(Number(inp?.aeroKcal) || 0);
+  return { min, box, kpm: k, gym, aero, total: gym + aero, meta: desc ? 0 : metaGasto(dowL, fecha) + extra, extra: desc ? 0 : extra, desc };
 }
 
 // engine/src/engine/resumen.ts
@@ -65,7 +69,7 @@ function puntajeDia(i, fecha, kg = GASTO.kgDef, extra = 0) {
   const wd = comidaPuntua(fecha), g = gastoCuenta(fecha);
   const lista = [gymMin(i) >= 40, !!i?.read, (i?.rooms ?? (i?.room ? [i.room] : [])).length > 0, agua(i), (i?.weightKg ?? 0) > 0, ...wd ? [i?.foodPct !== undefined] : []];
   if (g) {
-    const x = gastoDia(i, dowL(fecha), kg, extra);
+    const x = gastoDia(i, dowL(fecha), kg, extra, fecha);
     lista.push(x.total >= x.meta);
   }
   return Math.min(1, lista.filter(Boolean).length / lista.length);
@@ -87,7 +91,7 @@ function semanas(inp, start, hoy) {
         n++;
       }
       if (gastoCuenta(d)) {
-        const g = gastoDia(i, q, kg, ex);
+        const g = gastoDia(i, q, kg, ex, d);
         s.gastoN++;
         if (g.total >= g.meta)
           s.gastoDias++;
