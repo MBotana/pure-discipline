@@ -1,4 +1,4 @@
-import { Rise, ladder, needSessions, HERO_TITLES, PET_TITLES, AERO, kpm, gastoDia, gastoCuenta, GASTO, controles, extraGasto, EXTRA_KCAL } from '/rise.js';
+import { Rise, ladder, needSessions, HERO_TITLES, PET_TITLES, AERO, kpm, gastoDia, gastoCuenta, GASTO, controles, extraGasto, EXTRA_KCAL, comidaPuntua } from '/rise.js';
 import { frase } from '/phrases.js';
 import { semanas, meses, destacados, sugerencias, nombreMes, ajustePeso } from '/resumen.js';
 import { ROOMS, roomTile, onAssets, has, url, iconTag } from '/assets.js';
@@ -105,7 +105,7 @@ function autoClose() {
   for (const [d, v] of Object.entries(S.days)) {
     if (d >= today || v.input?.closed || !Object.keys(v.input || {}).length) continue;
     setInput(d, i => { i.closed = true; });
-    if (wkdayOf(d) < 5 && !S.days[d].input.meals && !closing.has(d)) { closing.add(d); loadMeals(d, true).then(() => { if (mealsOf(d).length) mealClose(d); }); }
+    if (comidaPuntua(d) && !S.days[d].input.meals && !closing.has(d)) { closing.add(d); loadMeals(d, true).then(() => { if (mealsOf(d).length) mealClose(d); }); }
   }
 }
 const pending = () => Object.values(S.days).filter(v => v.dirty).length;
@@ -180,8 +180,8 @@ const waterOk = inp => (inp.waterMl ?? 0) >= 1000 || !!inp.water;
 function kgAt(d) { let best = '', kg = GASTO.kgDef; for (const [k, v] of Object.entries(S.days)) if (k <= d && k > best && v.input?.weightKg > 0) { best = k; kg = +v.input.weightKg; } return kg; }
 const pesosApp = () => Object.fromEntries(Object.entries(S.days).filter(([, v]) => v.input?.weightKg > 0).map(([d, v]) => [d, +v.input.weightKg]));
 const gastoOf = (inp, d) => gastoDia(inp, wkdayOf(d), kgAt(d), extraGasto(pesosApp(), d));
-const dayDoneN = (inp, d) => [isSess(inp), !!inp.read, roomsOf(inp).length > 0, waterOk(inp), (inp.weightKg ?? 0) > 0, ...(wkdayOf(d) < 5 ? [inp.foodPct !== undefined] : []), ...(gastoCuenta(d) ? [(g => g.total >= g.meta)(gastoOf(inp, d))] : [])].filter(Boolean).length;
-const dayNeed = d => (wkdayOf(d) < 5 ? 6 : 5) + (gastoCuenta(d) ? 1 : 0);
+const dayDoneN = (inp, d) => [isSess(inp), !!inp.read, roomsOf(inp).length > 0, waterOk(inp), (inp.weightKg ?? 0) > 0, ...(comidaPuntua(d) ? [inp.foodPct !== undefined] : []), ...(gastoCuenta(d) ? [(g => g.total >= g.meta)(gastoOf(inp, d))] : [])].filter(Boolean).length;
+const dayNeed = d => 5 + (comidaPuntua(d) ? 1 : 0) + (gastoCuenta(d) ? 1 : 0);
 const pc = x => Math.round(x * 100) + ' %';
 const litros = ml => (ml / 1000).toFixed(2).replace(/0$/, '').replace('.', ',') + ' L';
 const pips = (n, max) => `<span class="pips">${Array.from({ length: max }, (_, q) => `<i class="${q < n ? 'f' : ''}"></i>`).join('')}</span>`;
@@ -190,16 +190,18 @@ const infoRow = (cat, label, meta, right, done) => `<div class="mrow static ${do
 
 /** Tarjeta de comidas del día: lista, carga (foto o texto) y el puntaje que va dando la IA. */
 function foodCard(date, inp, locked) {
-  if (wkdayOf(date) >= 5) return `<div class="card slim"><h2>${pic('comida', '')} Comidas</h2><p class="mute">Fin de semana: tus permitidos. La comida no puntúa.</p>${date === todayISO() ? `<div class="row" style="margin-top:8px"><span class="mute">Agua: ${litros(inp.waterMl ?? 0)} / 1 L</span><button class="btn sm" data-act="waterq" data-v="1">Bebí 250 ml</button>${(inp.waterMl ?? 0) < 1000 ? '<button class="btn sm" data-act="water1">Confirmar 1 L</button>' : ''}</div>` : ''}</div>`;
+  if (!comidaPuntua(date)) return `<div class="card slim"><h2>${pic('comida', '')} Comidas</h2><p class="mute">Fin de semana: tus permitidos. La comida no puntúa.</p>${date === todayISO() ? `<div class="row" style="margin-top:8px"><span class="mute">Agua: ${litros(inp.waterMl ?? 0)} / 1 L</span><button class="btn sm" data-act="waterq" data-v="1">Bebí 250 ml</button>${(inp.waterMl ?? 0) < 1000 ? '<button class="btn sm" data-act="water1">Confirmar 1 L</button>' : ''}</div>` : ''}</div>`;
   const list = mealsOf(date), isToday = date === todayISO(), pre = dayIdx(date) < 0, off = pre || !!busy || locked || !isToday;
   const sc = inp.foodPct, cls = sc >= 0.8 ? 'ok' : sc >= 0.5 ? 'gold' : sc !== undefined ? 'bad' : '';
   let h = `<div class="card slim"><div class="row"><h2>${pic('comida', '')} Comidas</h2><span class="pill ${cls}">${sc === undefined ? 'sin puntuar' : (inp.meals ? 'final ' : 'va ') + pc(sc)}</span></div>`;
   h += list.length ? list.map(x => entryHTML(x, date)).join('') : '<p class="mute">Todavía no cargaste ninguna comida.</p>';
+  const sug = isToday && gastoCuenta(date) ? COMIDAS[list.filter(x => x.kcal !== 0).length] : null;
+  if (sug) h += `<p class="mute" style="margin-top:8px">💡 Sugerencia para la próxima comida (${sug[0]}): ${esc(sug[1])}</p>`;
   h += txOpen && isToday ? `<div class="row" style="margin-top:10px"><button class="btn sm ghost" data-act="pickfoto" ${busy ? 'disabled' : ''}>📷 ${pendBlob ? 'Cambiar foto' : 'Agregar foto'}</button>${pendBlob ? `<img class="thumb" src="${pendURL}" alt="">` : '<span class="mute">sin foto</span>'}</div><textarea id="txin" rows="3" placeholder="${pendBlob ? 'Descripción breve (opcional, por las dudas)' : 'Qué comiste, con gramos (ej.: 250 g de nalga cruda en milanesa, ensalada con 1 cda de aceite)'}">${esc(txDraft)}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="txcancel" ${busy ? 'disabled' : ''}>Cancelar</button><button class="btn sm" data-act="mealsend" ${busy ? 'disabled' : ''}>Enviar</button></div>`
     : `<button class="btn" style="margin-top:10px;width:100%" ${off ? 'disabled' : 'data-act="txopen"'}>Cargar comida</button>`;
   if (waterQ && waterQ.date === date) h += `<div class="wq"><b>¿Bebiste 250 ml de agua con esta comida?</b><div class="row"><button class="btn sm" data-act="waterq" data-v="1">Sí</button><button class="btn sm ghost" data-act="waterq" data-v="0">No</button></div></div>`;
   h += `${busy ? `<p class="mute busy">⏳ ${busy}</p>` : ''}${errMeal ? `<p class="err">${esc(errMeal)}</p>` : ''}`;
-  if (inp.comp && wkdayOf(date) < 5) h += compCard(date, inp, locked);
+  if (inp.comp && comidaPuntua(date)) h += compCard(date, inp, locked);
   if (inp.verdictTx) h += `<p class="vnote">${esc(inp.verdictTx)}</p>`;
   return h + `</div>`;
 }
@@ -279,7 +281,7 @@ function viewHoy() {
     const need = needSessions(st.k), avg = wk.food.length ? wk.food.reduce((a, x) => a + x, 0) / wk.food.length : 0;
     h += `<div class="card slim"><div class="row"><h2>Esta semana</h2><span class="pill ${e.weekType(pre ? 0 : idx) === 'descarga' ? 'gold' : ''}">semana de ${e.weekType(pre ? 0 : idx)}</span></div>`;
     h += infoRow('F', 'Fuerza', `${wk.min} de ${cfg.fuerzaWeekMin} min (6 h)`, miniBar(wk.min, cfg.fuerzaWeekMin), wk.min >= cfg.fuerzaWeekMin);
-    h += infoRow('V', 'Vitalidad', `comida L–V: promedio ${wk.food.length ? pc(avg) : '—'} (hace falta ${pc(cfg.foodThr)})`, miniBar(avg, cfg.foodThr), wk.food.length > 0 && avg >= cfg.foodThr - 1e-9);
+    h += infoRow('V', 'Vitalidad', `comida: promedio ${wk.food.length ? pc(avg) : '—'} (hace falta ${pc(cfg.foodThr)})`, miniBar(avg, cfg.foodThr), wk.food.length > 0 && avg >= cfg.foodThr - 1e-9);
     h += infoRow('O', 'Orden', `${wk.rooms.length} de ${cfg.cleanRoomsWeek} ambientes distintos de ${ROOMS.length}`, pips(wk.rooms.length, cfg.cleanRoomsWeek), wk.rooms.length >= cfg.cleanRoomsWeek);
     h += infoRow('D', 'Disciplina', `juegos ${hrs(gH)} de ${hrs(cap)}`, '', gH <= cap);
     h += infoRow('P', 'La bestia · constancia', `${wk.sess} sesiones · mínimo ${need} para mantener la racha`, pips(Math.min(wk.sess, 5), 5), wk.sess >= need);
@@ -514,7 +516,7 @@ function rutinaCards(pre) {
   const hoy = rutDia(todayISO());
   const lista = r => `<ul class="plan">${r[2].map(x => `<li>${esc(exTxt(x))}</li>`).join('')}</ul>`;
   return `<div class="card slim"><div class="row"><h2>Hoy · ${hoy[0]}</h2><span class="pill gold">${hoy[1]}</span></div>${lista(hoy)}<details><summary>Toda la semana</summary>${RUTINA.map(r => `<div class="row" style="margin-top:10px"><b>${r[0]}</b><span class="pill">${r[1]}</span></div>${lista(r)}`).join('')}</details></div>`
-    + `<div class="card slim"><details><summary>Comidas del día · ~1.500 kcal · de 17 a 23 h</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: ~185 g de proteína, menos de 50 g de carbohidratos, sin azúcar, nunca menos de 1.500 kcal y ~3 litros de agua (con sal) por día. Ayuno hasta las 17 h. Pesá la comida y cargala con gramos.</p></details></div>`;
+    + `<div class="card slim"><details><summary>Comidas del día · ~1.500 kcal · de 17 a 23 h</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: ~185 g de proteína, menos de 50 g de carbohidratos, sin azúcar, nunca menos de 1.500 kcal y ~3 litros de agua (con sal) por día. Ayuno hasta las 17 h. Pesá la comida y cargala con gramos.</p><ul class="plan"><li>Es una sugerencia: podés cambiar comidas. Quedarte corto de calorías no baja el puntaje; quedarte corto de proteína sí.</li><li>Leche proteica sin azúcar agregada (≤ 5 g de carbohidratos cada 100 ml). Yogur griego natural, sin azúcar.</li><li>Fruta: una porción por día (150 g de frutillas, 1 manzana chica, 1 naranja o 1 kiwi; banana, solo media).</li><li>Milanesa: rebozada en huevo y almendras procesadas, al horno (ese día, sin nueces).</li><li>Queso untable light (30 g) puede reemplazar a las nueces. Cocinar sin aceite: plancha, horno o vapor.</li><li>Durante el ayuno: agua con una pizca de sal, café o mate sin azúcar. Si entrenás de noche, comé después de la caminata y entrená 1,5-2 h después.</li><li>Sin comidas libres hasta el 25/12: el fin de semana también puntúa.</li></ul></details></div>`;
 }
 /** Fases del bloque de 4 semanas: base, progresiva, máxima y descarga. */
 const FASES = ['Carga base', 'Carga progresiva', 'Carga máxima', 'Descarga'];
@@ -848,7 +850,7 @@ document.addEventListener('click', async ev => {
   else if (a === 'confirm') {
     const d = viewDate; setInput(d, i => { i.closed = true; });
     const inp = S.days[d]?.input ?? {};
-    if (wkdayOf(d) < 5 && mealsOf(d).length && !inp.meals) mealClose(d);
+    if (comidaPuntua(d) && mealsOf(d).length && !inp.meals) mealClose(d);
   }
   else if (a === 'reopen') setInput(viewDate, i => { i.closed = false; i.meals = false; });
     else if (a === 'alloc') {

@@ -21,6 +21,11 @@ var AERO = [["bici", "de bici", 7.5], ["trote", "de trote", 9.8], ["soga", "de s
 var kpm = (met, kg) => Math.round((met - 1) * 3.5 * kg / 200 * 10) / 10;
 var esBoxeo = (inp, dowL) => GASTO.boxeo.includes(inp?.rut ?? dowL);
 var gastoCuenta = (fecha) => fecha >= GASTO.desde;
+var CORTE = { desde: "2026-11-14", hasta: "2026-12-25" };
+var comidaPuntua = (fecha) => {
+  const d = (new Date(fecha + "T00:00:00Z").getUTCDay() + 6) % 7;
+  return d < 5 || fecha >= CORTE.desde && fecha <= CORTE.hasta;
+};
 var metaGasto = (dowL) => dowL === 6 ? GASTO.metaDom : GASTO.meta;
 var CONTROLES = [["2026-11-20", 85.5], ["2026-11-27", 84.3], ["2026-12-04", 83], ["2026-12-11", 81.8], ["2026-12-18", 80.6], ["2026-12-25", 79.9]];
 var EXTRA_KCAL = 150;
@@ -293,7 +298,7 @@ class Rise {
       S.mo.repairs++;
       S.totals.repairs++;
     }
-    if (dd < 5) {
+    if (comidaPuntua(date)) {
       const pct = Math.max(0, Math.min(1, inp.foodPct ?? 0));
       add("V", "D", "Comida", c.foodDay * pct);
       S.wk.food.push(pct);
@@ -399,6 +404,7 @@ export {
   RISE,
   ROOMS,
   Rise,
+  comidaPuntua,
   controles,
   extraGasto,
   gastoCuenta,

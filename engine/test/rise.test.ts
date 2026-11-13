@@ -5,6 +5,8 @@ import type { RiseInput, Cat } from '../src/engine/rise.ts';
 import { dateOfDay } from '../src/engine/calendar.ts';
 
 const START = RISE.startDate;
+// Calendario fuera del modo 25/12 (temporal: ahí el fin de semana también puntúa la comida).
+const GEN = '2027-01-04';
 
 /** Día de jugador perfecto: gimnasio 75 min de lunes a viernes, lectura, un ambiente, comida al 100 %, agua; libro y arreglo el día 25. */
 function perfect(i: number, e: Rise, opts: { train?: boolean } = {}): RiseInput {
@@ -24,8 +26,8 @@ function autoAlloc(e: Rise): Cat[] {
   }
   return out;
 }
-function run(days: number, f: (i: number, e: Rise) => RiseInput) {
-  const e = new Rise(); const log = [];
+function run(days: number, f: (i: number, e: Rise) => RiseInput, start = START) {
+  const e = new Rise({ startDate: start }); const log = [];
   for (let i = 0; i < days; i++) log.push(e.processDay(f(i, e)));
   return { e, log };
 }
@@ -62,7 +64,7 @@ test('jugando perfecto: Maestro al año, Inmortal a los 2-3 años, y las cinco e
 });
 
 test('semana típica perfecta: ~1.000 XP por estadística', () => {
-  const { e } = run(7 * 8, (i, r) => perfect(i, r));
+  const { e } = run(7 * 8, (i, r) => perfect(i, r), GEN);
   for (const c of CATS) { const perWeek = e.state.xp[c] / 8; assert.ok(perWeek > 850 && perWeek < 1250, c + ': ' + perWeek); }
 });
 
@@ -92,12 +94,14 @@ test('boxeo y gimnasio cuentan igual; solo pagan 5 sesiones por semana; menos de
 });
 
 test('comida: fin de semana libre, agua todos los días', () => {
-  const r = run(7, (i) => ({ foodPct: 1, water: true }));
+  const r = run(7, (i) => ({ foodPct: 1, water: true }), GEN);
   const food = r.log.flatMap(d => d.events).filter(x => x.label === 'Comida');
   assert.equal(food.length, 5);
   assert.equal(r.log.flatMap(d => d.events).filter(x => x.label === 'Agua').length, 7);
   assert.equal(Math.round(r.e.state.xp.V), 5 * 105 + 7 * 15 + 250);
-  const bad = run(7, (i) => ({ foodPct: 0.7 }));
+  const bad = run(7, (i) => ({ foodPct: 0.7 }), GEN);
+  const corte = run(7, (i) => ({ foodPct: 1 }));                    // semana del 9/11: el sábado 14 y el domingo 15 ya puntúan
+  assert.equal(corte.log.flatMap(d => d.events).filter(x => x.label === 'Comida').length, 7);
   assert.equal(bad.log.flatMap(d => d.events).filter(x => x.kind === 'W' && x.cat === 'V').length, 0);
 });
 

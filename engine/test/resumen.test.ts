@@ -14,7 +14,8 @@ test('puntaje del día: 6 misiones entre semana, 5 el fin de semana', () => {
   // desde el modo corte el gasto del día es una misión más (7 entre semana, 6 el fin de semana)
   assert.equal(puntajeDia(dia(), '2026-11-13'), 6 / 7, 'viernes con 60 min de pesas: 365 kcal, no llega a 900');
   assert.equal(puntajeDia(dia({ aeroKcal: 600 }), '2026-11-13', 87), 1);
-  assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], aeroKcal: 600 }, '2026-11-14', 87), 1, 'sábado: 6 de 6');
+  assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], aeroKcal: 600, foodPct: 0.9 }, '2026-11-14', 87), 1, 'sábado del modo 25/12: 7 de 7 (la comida también cuenta)');
+  assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], aeroKcal: 600 }, '2027-01-09', 87), 1, 'sábado fuera del modo: 6 de 6');
 });
 
 test('gasto del día: gimnasio por tiempo y peso, boxeo con más MET, aeróbico a mano', () => {

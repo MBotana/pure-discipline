@@ -12,6 +12,9 @@ export const AERO: readonly [string, string, number][] = [['bici', 'de bici', 7.
 export const kpm = (met: number, kg: number) => Math.round((met - 1) * 3.5 * kg / 200 * 10) / 10;
 export const esBoxeo = (inp: any, dowL: number) => GASTO.boxeo.includes(inp?.rut ?? dowL);
 export const gastoCuenta = (fecha: string) => fecha >= GASTO.desde;
+/** La comida puntúa de lunes a viernes; durante el modo 25/12 (desde el sábado 14/11), también el fin de semana: no hay permitidos. */
+export const CORTE = { desde: '2026-11-14', hasta: '2026-12-25' };
+export const comidaPuntua = (fecha: string) => { const d = (new Date(fecha + 'T00:00:00Z').getUTCDay() + 6) % 7; return d < 5 || (fecha >= CORTE.desde && fecha <= CORTE.hasta); };
 export const metaGasto = (dowL: number) => (dowL === 6 ? GASTO.metaDom : GASTO.meta);
 /** Controles del modo 25/12 (pesaje del viernes en ayunas): [fecha, peso máximo]. */
 export const CONTROLES: readonly [string, number][] = [['2026-11-20', 85.5], ['2026-11-27', 84.3], ['2026-12-04', 83], ['2026-12-11', 81.8], ['2026-12-18', 80.6], ['2026-12-25', 79.9]];

@@ -5,8 +5,8 @@
  * Nada baja nunca. Es determinista: se rehace desde el día 0 con las entradas diarias guardadas.
  */
 import { dateOfDay } from './calendar.ts';
-import { gastoDia, gastoCuenta, GASTO, extraGasto } from './gasto.ts';
-export { GASTO, AERO, kpm, gastoDia, gastoOk, gastoCuenta, metaGasto, CONTROLES, controles, extraGasto, EXTRA_KCAL } from './gasto.ts';
+import { gastoDia, gastoCuenta, GASTO, extraGasto, comidaPuntua } from './gasto.ts';
+export { GASTO, AERO, kpm, gastoDia, gastoOk, gastoCuenta, metaGasto, CONTROLES, controles, extraGasto, EXTRA_KCAL, comidaPuntua } from './gasto.ts';
 
 export type Cat = 'F' | 'I' | 'V' | 'D' | 'O';
 export const CATS: readonly Cat[] = ['F', 'I', 'V', 'D', 'O'];
@@ -211,8 +211,8 @@ export class Rise {
       for (const r of rooms) if (!S.wk.rooms.includes(r)) S.wk.rooms.push(r);
     }
     for (const r of inp.repairs ?? []) { add('O', 'D', 'Arreglo: ' + r.t, S.mo.repairs === 0 ? c.repairFirst : c.repairNext); S.mo.repairs++; S.totals.repairs++; }
-    // Vitalidad: comida de lunes a viernes, agua todos los días
-    if (dd < 5) {
+    // Vitalidad: comida de lunes a viernes (en el modo 25/12, todos los días), agua todos los días
+    if (comidaPuntua(date)) {
       const pct = Math.max(0, Math.min(1, inp.foodPct ?? 0));
       add('V', 'D', 'Comida', c.foodDay * pct);
       S.wk.food.push(pct); S.mo.food.push(pct);

@@ -1,5 +1,5 @@
 /** Histórico y sugerencias (puro, sin dependencias): lo usan la app (Registro) y el servidor (aviso del lunes). */
-import { gastoDia, gastoCuenta, GASTO, extraGasto } from './gasto.ts';
+import { gastoDia, gastoCuenta, GASTO, extraGasto, comidaPuntua } from './gasto.ts';
 export type Inputs = Record<string, any>;
 const DIA = 864e5;
 export const addD = (iso: string, n: number) => new Date(Date.parse(iso) + n * DIA).toISOString().slice(0, 10);
@@ -22,7 +22,7 @@ export function pesoHasta(inp: Inputs, fecha: string): number {
 export const pesosDe = (inp: Inputs): Record<string, number> => Object.fromEntries(Object.entries(inp).filter(([, i]) => (i as any)?.weightKg > 0).map(([d, i]) => [d, +(i as any).weightKg]));
 /** Cumplimiento del día de 0 a 1: misiones hechas sobre las que corresponden (6 de lunes a viernes, 5 el fin de semana; +1 con el gasto desde el modo corte). */
 export function puntajeDia(i: any, fecha: string, kg: number = GASTO.kgDef, extra = 0): number {
-  const wd = dowL(fecha) < 5, g = gastoCuenta(fecha);
+  const wd = comidaPuntua(fecha), g = gastoCuenta(fecha);
   const lista = [gymMin(i) >= 40, !!i?.read, (i?.rooms ?? (i?.room ? [i.room] : [])).length > 0, agua(i), (i?.weightKg ?? 0) > 0, ...(wd ? [i?.foodPct !== undefined] : [])];
   if (g) { const x = gastoDia(i, dowL(fecha), kg, extra); lista.push(x.total >= x.meta); }
   return Math.min(1, lista.filter(Boolean).length / lista.length);

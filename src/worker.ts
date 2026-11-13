@@ -95,7 +95,7 @@ async function gemini(env: Env, system: string, parts: unknown[], temperature = 
   throw Object.assign(new Error('La IA no respondió (' + last + ')'), { status: 502 });
 }
 import { sugerencias, dowL } from '../engine/src/engine/resumen.ts';
-import { AERO, kpm } from '../engine/src/engine/gasto.ts';
+import { AERO, kpm, comidaPuntua } from '../engine/src/engine/gasto.ts';
 
 // ---------- Mascotas que hablan (Gemini redacta, Telegram entrega) ----------
 // El servidor decide SI hay algo que decir y qué hechos pasaron; Gemini solo decide CÓMO decirlo, con la voz de la mascota.
@@ -127,10 +127,10 @@ No evalúes el día ni des consejos. Si la imagen no es comida, respondé solo "
 const RUBRIC = `Rúbrica fija para puntuar la alimentación del día (aplicala siempre igual). El puntaje es un porcentaje de 0 a 100:
 - 100: proteína abundante a lo largo del día (idealmente en almuerzo y cena), verduras o frutas presentes, grasas razonables, porciones adecuadas, sin comida basura ni bebidas azucaradas.
 - 80: bastante bien, con una falla menor (por ejemplo, poca verdura o una comida algo desbalanceada).
-- 50: malo: falta de proteína clara, desbalance fuerte, comida basura o ultraprocesados repetidos, o comer muy poco.
+- 50: malo: falta de proteína clara, desbalance fuerte, comida basura o ultraprocesados repetidos.
 - Menos de 50: peor todavía (varias fallas juntas). 0 si no se comió nada.
-Lo que baja el puntaje, sobre todo: falta de proteína, desbalance entre proteínas, verduras, frutas y grasas, comida basura y comer muy poco. Mirá el día completo: lo que faltó en una comida cuenta como cumplido si se compensó en otra. Si falta información para juzgar algo, no lo penalices. Usá solo las comidas listadas; no inventes otras.
-Referencia de esta persona: está bajando de peso y entrena casi todos los días. Está en un corte agresivo hasta el 25/12, bajo en carbohidratos y sin azúcar: hace ayuno hasta las 17 hs y come entre las 17 y las 23 hs. Meta diaria: ~1.500 kcal, ~185 g de proteína y menos de 50 g de carbohidratos (solo de verduras y lácteos). Fallas claras: menos de ~1.350 kcal, menos de ~160 g de proteína, más de ~70 g de carbohidratos, o cualquier azúcar, dulce, harina, pan, arroz, pasta, cereal, legumbre o fruta dulce. Pasarse de ~1.600 kcal es una falla. No le sugieras ninguno de esos alimentos para compensar. Si una comida trae gramos, calculá con esos gramos (la carne en crudo salvo que diga cocida). No come papa ni batata: no las recomiendes.`;
+Lo que baja el puntaje, sobre todo: falta de proteína, desbalance entre proteínas, verduras, frutas y grasas, y comida basura. Comer pocas calorías NO baja el puntaje. Mirá el día completo: lo que faltó en una comida cuenta como cumplido si se compensó en otra. Si falta información para juzgar algo, no lo penalices. Usá solo las comidas listadas; no inventes otras.
+Referencia de esta persona: está bajando de peso y entrena casi todos los días. Está en un corte agresivo hasta el 25/12, bajo en carbohidratos y sin azúcar: hace ayuno hasta las 17 hs y come entre las 17 y las 23 hs. Meta diaria: ~1.500 kcal, ~185 g de proteína y menos de 50 g de carbohidratos (solo de verduras y lácteos). Quedarse corto de calorías NO es una falla y no baja el puntaje (solo si el día cerró con menos de ~1.200 kcal, agregá una línea de aviso de que es poco para cómo entrena, sin bajar el puntaje). Fallas: proteína por debajo de ~165 g (falla leve) y por debajo de ~140 g (falla clara); más de ~70 g de carbohidratos; cualquier azúcar, dulce, harina, pan, arroz, pasta, cereal, legumbre, jugo o más de una porción de fruta; pasarse de ~1.600 kcal. La fruta (una porción) está permitida. Un plan sugerido de referencia: omelette de 4 huevos con espinaca y cebolla; 280 g de nalga o peceto con rúcula, cherry y zanahoria más yogur griego con una fruta; 280 g de carne magra con brócoli, 250 ml de leche proteica y 10 g de nueces. Es una sugerencia, no una obligación. No le sugieras ninguno de esos alimentos para compensar. Si una comida trae gramos, calculá con esos gramos (la carne en crudo salvo que diga cocida). No come papa ni batata: no las recomiendes.`;
 const normFirst = (text: string) => text.split('\n').find(l => l.trim())?.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') ?? '';
 const parseScore = (text: string): number | null => { const m = /PUNTAJE(?! SIN)[^0-9\n]{0,20}(\d{1,3})/i.exec(text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')); return m ? Math.min(100, Number(m[1])) : null; };
 const validDate = (d: unknown): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
@@ -171,7 +171,7 @@ async function lastWeight(env: Env, date: string): Promise<number> {
 async function saveVerdict(env: Env, date: string, text: string, fin: boolean) {
   await ensureMeals(env);
   const row = await env.DB.prepare('SELECT input FROM day_inputs WHERE date = ?').bind(date).first();
-  const input = row ? JSON.parse(row.input as string) : {}, score = parseScore(text), weekday = dowOf(date) >= 1 && dowOf(date) <= 5;
+  const input = row ? JSON.parse(row.input as string) : {}, score = parseScore(text), weekday = comidaPuntua(date);
   let eff = score;
   const kcal = (await listMeals(env, date)).reduce((a, m) => a + (m.kcal ?? 0), 0);
   const sinM = /PUNTAJE SIN EXCESO[^0-9\n]{0,20}(\d{1,3})/i.exec(text.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
@@ -205,7 +205,7 @@ async function judgeDay(env: Env, date: string, final: boolean) {
   const tot = `Acumulado del día (ya sumado, NO lo recalcules): ~${kcal} kcal · ${prot} g de proteína · ${carb} g de carbohidratos. Los números "fijo" de cada comida tampoco se recalculan: usalos tal cual.`;
   const how = final
     ? `El día terminó. Primera línea: solo "PUNTAJE: NN%" (un número entero de 0 a 100), según TODO el día junto. Después: "Macros del día: ~${kcal} kcal · ${prot} g de proteína · ${carb} g de carbohidratos" (usá exactamente esos números) y una línea "Meta: ${META_TX}: llegó / quedó corto en X". Después, una sección "Qué bajó el puntaje:" con cada falla y qué habría que haber comido para evitarla (o una línea de por qué fue 100 si no hubo fallas). Sin markdown.`
-    : `El día sigue. Respondé con estas líneas, sin encabezado de veredicto y sin markdown, cortas y concretas: "Esta comida: qué comí (SOLO la última comida cargada, la de la hora más tardía; no la mezcles con otras)", "Esta comida: ~X kcal · X g de proteína · X g de carbohidratos" (los números "fijo" de esa comida), "Acumulado hoy: ~X kcal · X g de proteína · X g de carbohidratos (meta: ${META_TX})" (usá el acumulado ya sumado), "Te falta: X kcal y X g de proteína, y si falta algo más (verduras, grasas buenas) o si hay algo para evitar", "Para compensar: una sugerencia concreta con alimentos y cantidades para la próxima comida (o para lo que queda del día, según la hora de las comidas listadas)", "Puntaje estimado hasta ahora: PUNTAJE: NN%" (suponiendo que no comes nada más). Si ya llegó a la meta o se pasó, decilo y no sugieras comer más. Una comida sin calorías (agua) no cambia nada del acumulado ni del puntaje.`;
+    : `El día sigue. Respondé con estas líneas, sin encabezado de veredicto y sin markdown, cortas y concretas: "Esta comida: qué comí (SOLO la última comida cargada, la de la hora más tardía; no la mezcles con otras)", "Esta comida: ~X kcal · X g de proteína · X g de carbohidratos" (los números "fijo" de esa comida), "Acumulado hoy: ~X kcal · X g de proteína · X g de carbohidratos (meta: ${META_TX})" (usá el acumulado ya sumado), "Te falta: X kcal y X g de proteína, y si falta algo más (verduras, grasas buenas) o si hay algo para evitar", "Para compensar: una sugerencia concreta con alimentos y cantidades para la próxima comida (o para lo que queda del día, según la hora de las comidas listadas)", "Puntaje estimado hasta ahora: PUNTAJE: NN%" (suponiendo que no comes nada más). Si ya llegó a la meta o se pasó, decilo y no sugieras comer más. Si le faltan calorías pero no proteína, decilo como dato, no como falla. Una comida sin calorías (agua) no cambia nada del acumulado ni del puntaje.`;
   return gemini(env, 'Sos un evaluador consistente de la alimentación diaria de un adulto que entrena. Respondés en español rioplatense, breve y concreto.\n' + RUBRIC, [{ text: `${how}${over}\n\nComidas del día (ordenadas por hora):\n${list}\n\n${tot}` }]);
 }
 
@@ -229,7 +229,7 @@ export async function runReminders(env: Env, origin: string, now = Date.now()) {
     await env.DB.prepare('INSERT OR IGNORE INTO notification_log (kind, date, sent_at) VALUES (?, ?, ?)').bind(kind, date, now).run();
     await pushAll(env, origin, title, body); sent.push(kind);
   };
-  if (dow >= 1 && dow <= 5 && hour >= Number(st.feed_hour) && !(input && (input.meals || input.feed)))
+  if (comidaPuntua(date) && hour >= Number(st.feed_hour) && !(input && (input.meals || input.feed)))
     await once('feed', 'Set ∞', 'Cargá el veredicto de alimentación de hoy y revisá tus horas de videojuegos.');
   if (hour >= Number(st.reminder_hour) && isEmptyInput(row ? (row.input as string) : null))
     await once('daily', 'Set ∞', 'Todavía no registraste nada hoy. ¿Cómo te fue?');
