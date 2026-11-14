@@ -101,7 +101,7 @@ test('comida: fin de semana libre, agua todos los días', () => {
   assert.equal(Math.round(r.e.state.xp.V), 5 * 105 + 7 * 15 + 250);
   const bad = run(7, (i) => ({ foodPct: 0.7 }), GEN);
   const corte = run(14, (i) => ({ foodPct: 1 }));                   // semana del 9/11 (5 días) y del 16/11 (modo 25/12: sábado y domingo también puntúan)
-  assert.equal(corte.log.flatMap(d => d.events).filter(x => x.label === 'Comida').length, 5 + 7);
+  assert.equal(corte.log.flatMap(d => d.events).filter(x => x.label === 'Comida').length, 5 + 9);
   assert.equal(bad.log.flatMap(d => d.events).filter(x => x.kind === 'W' && x.cat === 'V').length, 0);
 });
 

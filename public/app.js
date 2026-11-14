@@ -142,7 +142,7 @@ async function hydratePhotos() {
   }
 }
 /** Alimentación con IA: el servidor describe cada comida, guarda la lista del día y rehace el análisis completo. */
-let waterQ = null, busy = '', errMeal = '', pendBlob = null, pendURL = '';
+let busy = '', errMeal = '', pendBlob = null, pendURL = '';
 S.mc = S.mc || {};
 const mealsOf = date => S.mc[date]?.meals ?? [];
 const blobB64 = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = () => rej(r.error); r.readAsDataURL(b); });
@@ -152,7 +152,7 @@ async function aiRun(label, fn) {
   catch (e) { errMeal = e.message || 'No se pudo completar'; }
   busy = ''; render();
 }
-const mealSend = (blob, text) => { waterQ = { date: todayISO() }; return aiRun('Analizando la comida…', async () => {
+const mealSend = (blob, text) => { return aiRun('Analizando la comida…', async () => {
   const date = todayISO(), r = await api('/api/meal', 'POST', { date, t: hhmm(), image: blob ? await blobB64(blob) : undefined, mime: 'image/jpeg', text: text || undefined });
   if (blob) await fotoPut(r.id, blob).catch(() => {});
   S.mc[date] = { meals: r.meals }; txOpen = false; txDraft = ''; pendBlob = null; if (pendURL) URL.revokeObjectURL(pendURL); pendURL = '';
@@ -192,7 +192,7 @@ const infoRow = (cat, label, meta, right, done) => `<div class="mrow static ${do
 
 /** Tarjeta de comidas del día: lista, carga (foto o texto) y el puntaje que va dando la IA. */
 function foodCard(date, inp, locked) {
-  if (!comidaPuntua(date)) return `<div class="card slim"><h2>${pic('comida', '')} Comidas</h2><p class="mute">Fin de semana: tus permitidos. La comida no puntúa.</p>${date === todayISO() ? `<div class="row" style="margin-top:8px"><span class="mute">Agua: ${litros(inp.waterMl ?? 0)} / 1 L</span><button class="btn sm" data-act="waterq" data-v="1">Bebí 250 ml</button>${(inp.waterMl ?? 0) < 1000 ? '<button class="btn sm" data-act="water1">Confirmar 1 L</button>' : ''}</div>` : ''}</div>`;
+  if (!comidaPuntua(date)) return `<div class="card slim"><h2>${pic('comida', '')} Comidas</h2><p class="mute">Fin de semana: tus permitidos. La comida no puntúa.</p>${date === todayISO() ? `<div class="row" style="margin-top:8px"><span class="mute">Agua: ${litros(inp.waterMl ?? 0)} / 1 L</span></div>` : ''}</div>`;
   const list = mealsOf(date), isToday = date === todayISO(), pre = dayIdx(date) < 0, off = pre || !!busy || locked || !isToday;
   const sc = inp.foodPct, cls = sc >= 0.8 ? 'ok' : sc >= 0.5 ? 'gold' : sc !== undefined ? 'bad' : '';
   let h = `<div class="card slim"><div class="row"><h2>${pic('comida', '')} Comidas</h2><span class="pill ${cls}">${sc === undefined ? 'sin puntuar' : (inp.meals ? 'final ' : 'va ') + pc(sc)}</span></div>`;
@@ -201,7 +201,6 @@ function foodCard(date, inp, locked) {
   if (sug) h += `<p class="mute" style="margin-top:8px">💡 Sugerencia para la próxima comida (${sug[0]}): ${esc(sug[1])}</p>`;
   h += txOpen && isToday ? `<div class="row" style="margin-top:10px"><button class="btn sm ghost" data-act="pickfoto" ${busy ? 'disabled' : ''}>📷 ${pendBlob ? 'Cambiar foto' : 'Agregar foto'}</button>${pendBlob ? `<img class="thumb" src="${pendURL}" alt="">` : '<span class="mute">sin foto</span>'}</div><textarea id="txin" rows="3" placeholder="${pendBlob ? 'Descripción breve (opcional, por las dudas)' : 'Qué comiste, con gramos (ej.: 250 g de nalga cruda en milanesa, ensalada con 1 cda de aceite)'}">${esc(txDraft)}</textarea><div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="txcancel" ${busy ? 'disabled' : ''}>Cancelar</button><button class="btn sm" data-act="mealsend" ${busy ? 'disabled' : ''}>Enviar</button></div>`
     : `<button class="btn" style="margin-top:10px;width:100%" ${off ? 'disabled' : 'data-act="txopen"'}>Cargar comida</button>`;
-  if (waterQ && waterQ.date === date) h += `<div class="wq"><b>¿Bebiste 250 ml de agua con esta comida?</b><div class="row"><button class="btn sm" data-act="waterq" data-v="1">Sí</button><button class="btn sm ghost" data-act="waterq" data-v="0">No</button></div></div>`;
   h += `${busy ? `<p class="mute busy">⏳ ${busy}</p>` : ''}${errMeal ? `<p class="err">${esc(errMeal)}</p>` : ''}`;
   if (gastoCuenta(date) && !enPausa(inp)) { const e = gastoOf(inp, date); if (e.exc > 0) h += `<div class="wq"><b>Te pasaste ${kc(e.exc)} kcal de las 1.500</b><small class="mute">${e.comp > 0 ? `Suman +${kc(e.comp)} kcal a la meta de gasto de hoy${e.exc > e.comp ? ` (tope diario ${kc(GASTO.compMax)}; el resto lo absorbe el control de peso del viernes)` : ''}. Elegí cómo quemarlas en la tarjeta de Gasto.` : 'Es un margen de error de la estimación: no suma gasto.'}</small></div>`; }
   if (isToday && gastoCuenta(date) && !locked) {
@@ -260,7 +259,7 @@ function viewHoy() {
     let b = `<div class="card slim"><div class="row"><h2>Automático</h2><span class="pill ${isSess(inp) ? 'ok' : ''}">${isSess(inp) ? 'sesión ✓' : 'sin sesión'}</span></div>`
       + infoRow('F', 'Gimnasio / boxeo', `${sessMin} min · se detecta por ubicación`, '', isSess(inp))
       + `<div class="row"><b>${pic('juegos', iconTag('D', 1))} Juegos</b><span class="pill ${gs[0]}">${hrs(gH)} / ${hrs(cap)}</span></div><div class="bar gold"><i style="width:${Math.min(100, gH / cap * 100)}%"></i></div><div class="mute">${gs[1]} · hoy ${hrs(inp.gameH || 0)}</div>`
-      + `<div class="row" style="margin-top:6px"><b>${pic('agua', '💧')} Agua</b><span class="row" style="gap:6px">${!locked && ml < 1000 ? '<button class="btn sm" data-act="water1">Confirmar 1 L</button>' : ''}<span class="pill ${waterOk(inp) ? 'ok' : ''}">${litros(ml)} / 1 L</span></span></div><div class="bar"><i style="width:${Math.min(100, ml / 10)}%"></i></div></div>`;
+      + `<div class="row" style="margin-top:6px"><b>${pic('agua', '💧')} Agua</b><span class="pill ${waterOk(inp) ? 'ok' : ''}">${waterOk(inp) ? '✓ ' : ''}${litros(ml)} / 1 L</span></div><div class="bar" ${locked ? '' : 'data-act="waterbar"'} style="${locked ? '' : 'cursor:pointer;'}"><i style="width:${waterOk(inp) ? 100 : Math.min(100, ml / 10)}%"></i></div>${!locked && !waterOk(inp) ? '<div class="mute" style="font-size:11px">Doble toque en la barra para confirmar el agua del día</div>' : ''}</div>`;
     if (gastoCuenta(viewDate)) b += metaCard(viewDate) + gastoCard(viewDate, inp, locked);
     b += foodCard(viewDate, inp, locked);
     const mine = roomsOf(inp), taken = wk.rooms.filter(x => !mine.includes(x));
@@ -509,7 +508,7 @@ function rutinaCards(pre) {
   const hoy = rutDia(todayISO());
   const lista = r => `<ul class="plan">${r[2].map(x => `<li>${esc(exTxt(x))}</li>`).join('')}</ul>`;
   return `<div class="card slim"><div class="row"><h2>Hoy · ${hoy[0]}</h2><span class="pill gold">${hoy[1]}</span></div>${lista(hoy)}<details><summary>Toda la semana</summary>${RUTINA.map(r => `<div class="row" style="margin-top:10px"><b>${r[0]}</b><span class="pill">${r[1]}</span></div>${lista(r)}`).join('')}</details></div>`
-    + `<div class="card slim"><details><summary>Comidas del día · ~1.500 kcal · de 17 a 23 h</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: ~185 g de proteína, menos de 50 g de carbohidratos, sin azúcar, nunca menos de 1.500 kcal y ~3 litros de agua (con sal) por día. Ayuno hasta las 17 h. Pesá la comida y cargala con gramos.</p><ul class="plan"><li>Es una sugerencia: podés cambiar comidas. Quedarte corto de calorías no baja el puntaje; quedarte corto de proteína sí.</li><li>Leche proteica sin azúcar agregada (≤ 5 g de carbohidratos cada 100 ml). Yogur griego natural, sin azúcar.</li><li>Fruta: una porción por día (150 g de frutillas, 1 manzana chica, 1 naranja o 1 kiwi; banana, solo media).</li><li>Milanesa: rebozada en huevo y queso rallado, al horno (sin pan rallado).</li><li>Queso untable light (30 g) puede reemplazar a las nueces. Cocinar sin aceite: plancha, horno o vapor.</li><li>Por los cristales de oxalato de tu análisis: espinaca, acelga, remolacha y almendras, mejor evitarlas (rúcula, lechuga, brócoli y zucchini sí); yogur o queso en las comidas; nada de vitamina C en suplemento.</li><li>Agua: 2,5-3 L repartidos en el día, no más de 1 L por hora. Tu sodio estaba en 136 (piso del rango): sal en las comidas, sin restringirla. Orina clara.</li><li>Sin comidas libres ni días de descanso programados: lo que comas fuera del plan se carga igual, y cada kcal por encima de 1.500 se suma a la meta de gasto del día (tope +400). Pausa por salud solo con mareos, fiebre, dolor o pulso alto.</li><li>Durante el ayuno: agua con una pizca de sal, café o mate sin azúcar. Si entrenás de noche, comé después de la caminata y entrená 1,5-2 h después.</li><li>Desde el lunes 16/11 hasta el 25/12 el fin de semana también puntúa.</li></ul></details></div>`;
+    + `<div class="card slim"><details><summary>Comidas del día · ~1.500 kcal · de 17 a 23 h</summary><ul class="plan">${COMIDAS.map(c => `<li><b>${c[0]}</b> · ${esc(c[1])}</li>`).join('')}</ul><p class="mute">Meta: ~185 g de proteína, menos de 50 g de carbohidratos, sin azúcar, nunca menos de 1.500 kcal y ~3 litros de agua (con sal) por día. Ayuno hasta las 17 h. Pesá la comida y cargala con gramos.</p><ul class="plan"><li>Es una sugerencia: podés cambiar comidas. Quedarte corto de calorías no baja el puntaje; quedarte corto de proteína sí.</li><li>Leche proteica sin azúcar agregada (≤ 5 g de carbohidratos cada 100 ml). Yogur griego natural, sin azúcar.</li><li>Fruta: una porción por día (150 g de frutillas, 1 manzana chica, 1 naranja o 1 kiwi; banana, solo media).</li><li>Milanesa: rebozada en huevo y queso rallado, al horno (sin pan rallado).</li><li>Queso untable light (30 g) puede reemplazar a las nueces. Cocinar sin aceite: plancha, horno o vapor.</li><li>Por los cristales de oxalato de tu análisis: espinaca, acelga, remolacha y almendras, mejor evitarlas (rúcula, lechuga, brócoli y zucchini sí); yogur o queso en las comidas; nada de vitamina C en suplemento.</li><li>Agua: 2,5-3 L repartidos en el día, no más de 1 L por hora. Tu sodio estaba en 136 (piso del rango): sal en las comidas, sin restringirla. Orina clara.</li><li>Sin comidas libres ni días de descanso programados: lo que comas fuera del plan se carga igual, y cada kcal por encima de 1.500 se suma a la meta de gasto del día (tope +400). Pausa por salud solo con mareos, fiebre, dolor o pulso alto.</li><li>Durante el ayuno: agua con una pizca de sal, café o mate sin azúcar. Si entrenás de noche, comé después de la caminata y entrená 1,5-2 h después.</li><li>Desde el sábado 14/11 hasta el 25/12 el fin de semana también puntúa.</li></ul></details></div>`;
 }
 /** Fases del bloque de 4 semanas: base, progresiva, máxima y descarga. */
 const FASES = ['Carga base', 'Carga progresiva', 'Carga máxima', 'Descarga'];
@@ -814,8 +813,6 @@ document.addEventListener('click', async ev => {
   else if (a === 'roomtap') actDay(viewDate, i => { const r = el.dataset.r, s = new Set(roomsOf(i)); if (s.has(r)) s.delete(r); else s.add(r); delete i.room; i.rooms = [...s]; if (!i.rooms.length) delete i.rooms; });
   else if (a === 'wsave') { const w = parseFloat((document.getElementById('wgt')?.value || '').replace(',', '.')); if (w >= 30 && w <= 300) { actDay(viewDate, i => { i.weightKg = Math.round(w * 10) / 10; }); } else hint('Escribí tu peso en kg'); }
   else if (a === 'readtog') actDay(viewDate, i => { i.read = !i.read; });
-  else if (a === 'waterq') { const d = waterQ?.date || todayISO(); waterQ = null; if (el.dataset.v === '1') actDay(d, i => { i.waterMl = (i.waterMl || 0) + 250; }); else render(); }
-  else if (a === 'water') actDay(viewDate, i => { const v = Math.max(0, (i.waterMl || 0) + (+el.dataset.v)); if (v) i.waterMl = v; else delete i.waterMl; });
   else if (a === 'aeroadd') {
     const n = parseInt(document.getElementById('an')?.value, 10), act = document.getElementById('aa')?.value; if (!(n > 0 && n <= 5000)) { hint('Escribí las kcal o los minutos'); return; }
     const m = AERO.find(x => x[0] === act), k = Math.round(m ? n * kpm(m[2], kgAt(viewDate)) : n);
@@ -823,7 +820,7 @@ document.addEventListener('click', async ev => {
   }
   else if (a === 'modo') { const v = el.dataset.v; actDay(viewDate, i => { if (v === 'pausa') i.modo = 'pausa'; else delete i.modo; }); if (mealsOf(viewDate).length && S.token) { const d = viewDate; aiRun('Recalculando el puntaje del día…', async () => { const r = await api('/api/meal/rejudge', 'POST', { date: d }); S.mc[d] = { meals: r.meals }; }); } }
   else if (a === 'aerozero') actDay(viewDate, i => { delete i.aeroKcal; delete i.aeroLog; });
-  else if (a === 'water1') actDay(viewDate, i => { i.waterMl = Math.max(i.waterMl || 0, 1000); });
+  else if (a === 'waterbar') { const now = Date.now(); if (now - (window._wb || 0) < 450) { window._wb = 0; actDay(viewDate, i => { if (waterOk(i)) { delete i.waterMl; delete i.water; } else i.waterMl = 1000; }); } else window._wb = now; }
   else if (a === 'gymset') {
     const v = parseInt(document.getElementById('gm')?.value, 10);
     if (!(v >= 0 && v <= 600)) { hint('Escribí los minutos'); return; }

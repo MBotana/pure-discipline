@@ -16,7 +16,7 @@ test('puntaje del día: 6 misiones entre semana, 5 el fin de semana', () => {
   assert.equal(puntajeDia(dia(), '2026-11-13'), 1, 'el viernes 13 todavía no hay misión de gasto');
   assert.equal(puntajeDia(dia({ aeroKcal: 600 }), '2026-11-20', 87), 1);
   assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], aeroKcal: 600, foodPct: 0.9 }, '2026-11-21', 87), 1, 'sábado del modo 25/12: 7 de 7 (la comida también cuenta)');
-  assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'] }, '2026-11-14', 87), 1, 'sábado 14/11, antes del modo: 5 de 5');
+  assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'] }, '2026-11-14', 87), 5 / 7, 'sábado 14/11 ya es modo 25/12: faltan gasto y comida');
   assert.equal(puntajeDia({ read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], aeroKcal: 600 }, '2027-01-09', 87), 1, 'sábado fuera del modo: 6 de 6');
 });
 
@@ -70,10 +70,16 @@ test('ajuste de peso del corte: 0,8 a 1,3 kg por semana', () => {
   assert.equal(ajustePeso([-2]), '', 'la primera semana baja agua: no se corrige');
 });
 
+test('castigo: pasarse de 1.500 kcal anula la Comida hasta cerrar la meta de gasto', () => {
+  const base = { read: true, weightKg: 80, gymMin: 60, waterMl: 1000, rooms: ['bano'], foodPct: 1 };
+  assert.equal(puntajeDia({ ...base, kcalDia: 1800, aeroKcal: 0 }, '2026-11-20', 87), 5 / 7, 'sin comida ni gasto');
+  assert.equal(puntajeDia({ ...base, kcalDia: 1800, aeroKcal: 900 }, '2026-11-20', 87), 1, 'compensó: vuelve la comida y el gasto');
+  assert.equal(puntajeDia({ ...base, kcalDia: 1540, aeroKcal: 600 }, '2026-11-20', 87), 1, 'hasta 50 kcal de margen');
+});
 test('controles del 25/12: cada viernes no alcanzado (o sin pesaje) suma 150 kcal a la meta de gasto', async () => {
   const { extraGasto, controles } = await import('../src/engine/gasto.ts');
-  assert.equal(extraGasto({ '2026-11-20': 85.9 }, '2026-11-21'), 0, 'llegó');
-  assert.equal(extraGasto({ '2026-11-19': 85.9 }, '2026-11-21'), 0, 'se pesó el jueves: vale');
+  assert.equal(extraGasto({ '2026-11-20': 85.4 }, '2026-11-21'), 0, 'llegó');
+  assert.equal(extraGasto({ '2026-11-19': 85.4 }, '2026-11-21'), 0, 'se pesó el jueves: vale');
   assert.equal(extraGasto({ '2026-11-20': 86.5 }, '2026-11-20'), 0, 'el mismo día del control todavía no suma');
   assert.equal(extraGasto({ '2026-11-20': 86.5 }, '2026-11-21'), 150);
   assert.equal(extraGasto({ '2026-11-20': 85 }, '2026-11-28'), 150, 'el 27 no se pesó: cuenta como no alcanzado');

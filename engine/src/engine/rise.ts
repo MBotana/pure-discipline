@@ -5,8 +5,8 @@
  * Nada baja nunca. Es determinista: se rehace desde el día 0 con las entradas diarias guardadas.
  */
 import { dateOfDay } from './calendar.ts';
-import { gastoDia, gastoCuenta, GASTO, extraGasto, comidaPuntua } from './gasto.ts';
-export { GASTO, AERO, kpm, gastoDia, gastoOk, gastoCuenta, metaGasto, CONTROLES, controles, extraGasto, EXTRA_KCAL, comidaPuntua } from './gasto.ts';
+import { gastoDia, gastoCuenta, GASTO, extraGasto, comidaPuntua, castigada } from './gasto.ts';
+export { GASTO, AERO, kpm, gastoDia, gastoOk, gastoCuenta, metaGasto, CONTROLES, controles, extraGasto, EXTRA_KCAL, comidaPuntua, castigada, exceso, compensa } from './gasto.ts';
 
 export type Cat = 'F' | 'I' | 'V' | 'D' | 'O';
 export const CATS: readonly Cat[] = ['F', 'I', 'V', 'D', 'O'];
@@ -213,7 +213,9 @@ export class Rise {
     for (const r of inp.repairs ?? []) { add('O', 'D', 'Arreglo: ' + r.t, S.mo.repairs === 0 ? c.repairFirst : c.repairNext); S.mo.repairs++; S.totals.repairs++; }
     // Vitalidad: comida de lunes a viernes (en el modo 25/12, todos los días), agua todos los días
     if (comidaPuntua(date)) {
-      const pct = Math.max(0, Math.min(1, inp.foodPct ?? 0));
+      // Castigo: pasarse de 1.500 kcal anula la Comida del día hasta cerrar la meta de gasto (con la compensación).
+      const cast = gastoCuenta(date) && castigada(inp, dd, inp.weightKg ?? S.kg ?? GASTO.kgDef, extraGasto(S.pesos ?? {}, date));
+      const pct = cast ? 0 : Math.max(0, Math.min(1, inp.foodPct ?? 0));
       add('V', 'D', 'Comida', c.foodDay * pct);
       S.wk.food.push(pct); S.mo.food.push(pct);
     }

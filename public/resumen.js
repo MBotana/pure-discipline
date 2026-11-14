@@ -1,6 +1,6 @@
 // engine/src/engine/gasto.ts
 var GASTO = {
-  desde: "2026-11-16",
+  desde: "2026-11-14",
   meta: 900,
   metaDom: 500,
   kcalMeta: 1500,
@@ -13,7 +13,7 @@ var GASTO = {
 };
 var kpm = (met, kg) => Math.round((met - 1) * 3.5 * kg / 200 * 10) / 10;
 var esBoxeo = (inp, dowL) => GASTO.boxeo.includes(inp?.rut ?? dowL);
-var CORTE = { desde: "2026-11-16", hasta: "2026-12-25" };
+var CORTE = { desde: "2026-11-14", hasta: "2026-12-25" };
 var gastoCuenta = (fecha) => fecha >= GASTO.desde && fecha <= CORTE.hasta;
 var comidaPuntua = (fecha) => {
   const d = (new Date(fecha + "T00:00:00Z").getUTCDay() + 6) % 7;
@@ -25,7 +25,7 @@ var compensa = (inp) => {
   const e = exceso(inp);
   return e <= GASTO.kcalIgn ? 0 : Math.min(GASTO.compMax, Math.round(e / 10) * 10);
 };
-var CONTROLES = [["2026-11-20", 86], ["2026-11-27", 84.8], ["2026-12-04", 83.6], ["2026-12-11", 82.3], ["2026-12-18", 81.1], ["2026-12-25", 79.9]];
+var CONTROLES = [["2026-11-20", 85.5], ["2026-11-27", 84.3], ["2026-12-04", 83], ["2026-12-11", 81.8], ["2026-12-18", 80.6], ["2026-12-25", 79.9]];
 var EXTRA_KCAL = 150;
 function pesoControl(pesos, fecha) {
   for (let q = 0;q < 3; q++) {
@@ -48,6 +48,10 @@ function gastoDia(inp, dowL, kg, extra = 0) {
   const exc = pausa ? 0 : exceso(inp), comp = pausa ? 0 : compensa(inp), base = metaGasto(dowL);
   return { min, box, kpm: k, gym, aero, total: gym + aero, base, exc, comp, extra: pausa ? 0 : extra, meta: pausa ? 0 : base + extra + comp, pausa };
 }
+var castigada = (inp, dowL, kg, extra = 0) => {
+  const g = gastoDia(inp, dowL, kg, extra);
+  return g.comp > 0 && g.total < g.meta;
+};
 
 // engine/src/engine/resumen.ts
 var DIA = 86400000;
@@ -72,7 +76,8 @@ function pesoHasta(inp, fecha) {
 var pesosDe = (inp) => Object.fromEntries(Object.entries(inp).filter(([, i]) => i?.weightKg > 0).map(([d, i]) => [d, +i.weightKg]));
 function puntajeDia(i, fecha, kg = GASTO.kgDef, extra = 0) {
   const wd = comidaPuntua(fecha), g = gastoCuenta(fecha);
-  const lista = [gymMin(i) >= 40, !!i?.read, (i?.rooms ?? (i?.room ? [i.room] : [])).length > 0, agua(i), (i?.weightKg ?? 0) > 0, ...wd ? [i?.foodPct !== undefined] : []];
+  const cast = g && castigada(i, dowL(fecha), kg, extra);
+  const lista = [gymMin(i) >= 40, !!i?.read, (i?.rooms ?? (i?.room ? [i.room] : [])).length > 0, agua(i), (i?.weightKg ?? 0) > 0, ...wd ? [i?.foodPct !== undefined && !cast] : []];
   if (g) {
     const x = gastoDia(i, dowL(fecha), kg, extra);
     lista.push(x.total >= x.meta);
@@ -106,7 +111,7 @@ function semanas(inp, start, hoy) {
       if (m >= 40)
         s.sess++;
       if (i.foodPct !== undefined)
-        comida.push(Number(i.foodPct));
+        comida.push(gastoCuenta(d) && castigada(i, q, kg, ex) ? 0 : Number(i.foodPct));
       if (agua(i))
         s.aguaDias++;
       if (i.read)

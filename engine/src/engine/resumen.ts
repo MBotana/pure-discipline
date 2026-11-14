@@ -1,5 +1,5 @@
 /** Histórico y sugerencias (puro, sin dependencias): lo usan la app (Registro) y el servidor (aviso del lunes). */
-import { gastoDia, gastoCuenta, GASTO, extraGasto, comidaPuntua } from './gasto.ts';
+import { gastoDia, gastoCuenta, GASTO, extraGasto, comidaPuntua, castigada } from './gasto.ts';
 export type Inputs = Record<string, any>;
 const DIA = 864e5;
 export const addD = (iso: string, n: number) => new Date(Date.parse(iso) + n * DIA).toISOString().slice(0, 10);
@@ -23,7 +23,8 @@ export const pesosDe = (inp: Inputs): Record<string, number> => Object.fromEntri
 /** Cumplimiento del día de 0 a 1: misiones hechas sobre las que corresponden (6 de lunes a viernes, 5 el fin de semana; +1 con el gasto desde el modo corte). */
 export function puntajeDia(i: any, fecha: string, kg: number = GASTO.kgDef, extra = 0): number {
   const wd = comidaPuntua(fecha), g = gastoCuenta(fecha);
-  const lista = [gymMin(i) >= 40, !!i?.read, (i?.rooms ?? (i?.room ? [i.room] : [])).length > 0, agua(i), (i?.weightKg ?? 0) > 0, ...(wd ? [i?.foodPct !== undefined] : [])];
+  const cast = g && castigada(i, dowL(fecha), kg, extra);
+  const lista = [gymMin(i) >= 40, !!i?.read, (i?.rooms ?? (i?.room ? [i.room] : [])).length > 0, agua(i), (i?.weightKg ?? 0) > 0, ...(wd ? [i?.foodPct !== undefined && !cast] : [])];
   if (g) { const x = gastoDia(i, dowL(fecha), kg, extra); lista.push(x.total >= x.meta); }
   return Math.min(1, lista.filter(Boolean).length / lista.length);
 }
@@ -41,7 +42,7 @@ export function semanas(inp: Inputs, start: string, hoy: string): Sem[] {
       if (d < hoy) { sc += puntajeDia(i, d, kg, ex); n++; }
       if (gastoCuenta(d)) { const g = gastoDia(i, q, kg, ex); s.gastoN++; if (g.total >= g.meta) s.gastoDias++; }
       const m = gymMin(i); s.gymMin += m; if (m >= 40) s.sess++;
-      if (i.foodPct !== undefined) comida.push(Number(i.foodPct));
+      if (i.foodPct !== undefined) comida.push(gastoCuenta(d) && castigada(i, q, kg, ex) ? 0 : Number(i.foodPct));
       if (agua(i)) s.aguaDias++; if (i.read) s.lecturaDias++;
       for (const r of i.rooms ?? []) amb.add(r);
       s.prog += (i.prog ?? []).length; s.juegosH += Number(i.gameH) || 0;
