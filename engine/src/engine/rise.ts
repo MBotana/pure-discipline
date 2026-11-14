@@ -21,7 +21,7 @@ export interface RiseInput {
   foodPct?: number;                // 0..1, lo que Gemini puntúa del día (L–V)
   food?: boolean;                  // v1.x: aprobado = 100 %, cerrado sin aprobar = 50 %
   water?: boolean;                 // meta de agua cumplida
-  waterMl?: number;                // agua tomada (la meta es 1 litro)
+  waterMl?: number;                // agua tomada (la meta es 3 litros)
   weightKg?: number;               // peso en ayunas (misión diaria de Vitalidad)
   aeroKcal?: number;               // kcal de aeróbico cargadas a mano (se suman al gimnasio para el gasto del día)
   rut?: number;                    // rutina elegida para el día (0 = lunes)

@@ -192,7 +192,7 @@ const infoRow = (cat, label, meta, right, done) => `<div class="mrow static ${do
 
 /** Tarjeta de comidas del día: lista, carga (foto o texto) y el puntaje que va dando la IA. */
 function foodCard(date, inp, locked) {
-  if (!comidaPuntua(date)) return `<div class="card slim"><h2>${pic('comida', '')} Comidas</h2><p class="mute">Fin de semana: tus permitidos. La comida no puntúa.</p>${date === todayISO() ? `<div class="row" style="margin-top:8px"><span class="mute">Agua: ${litros(inp.waterMl ?? 0)} / 1 L</span></div>` : ''}</div>`;
+  if (!comidaPuntua(date)) return `<div class="card slim"><h2>${pic('comida', '')} Comidas</h2><p class="mute">Fin de semana: tus permitidos. La comida no puntúa.</p>${date === todayISO() ? `<div class="row" style="margin-top:8px"><span class="mute">Agua: ${litros(inp.waterMl ?? 0)} / 3 L</span></div>` : ''}</div>`;
   const list = mealsOf(date), isToday = date === todayISO(), pre = dayIdx(date) < 0, off = pre || !!busy || locked || !isToday;
   const sc = inp.foodPct, cls = sc >= 0.8 ? 'ok' : sc >= 0.5 ? 'gold' : sc !== undefined ? 'bad' : '';
   let h = `<div class="card slim"><div class="row"><h2>${pic('comida', '')} Comidas</h2><span class="pill ${cls}">${sc === undefined ? 'sin puntuar' : (inp.meals ? 'final ' : 'va ') + pc(sc)}</span></div>`;
@@ -259,7 +259,7 @@ function viewHoy() {
     let b = `<div class="card slim"><div class="row"><h2>Automático</h2><span class="pill ${isSess(inp) ? 'ok' : ''}">${isSess(inp) ? 'sesión ✓' : 'sin sesión'}</span></div>`
       + infoRow('F', 'Gimnasio / boxeo', `${sessMin} min · se detecta por ubicación`, '', isSess(inp))
       + `<div class="row"><b>${pic('juegos', iconTag('D', 1))} Juegos</b><span class="pill ${gs[0]}">${hrs(gH)} / ${hrs(cap)}</span></div><div class="bar gold"><i style="width:${Math.min(100, gH / cap * 100)}%"></i></div><div class="mute">${gs[1]} · hoy ${hrs(inp.gameH || 0)}</div>`
-      + `<div class="row" style="margin-top:6px"><b>${pic('agua', '💧')} Agua</b><span class="pill ${waterOk(inp) ? 'ok' : ''}">${waterOk(inp) ? '✓ ' : ''}${litros(ml)} / 1 L</span></div><div class="bar" ${locked ? '' : 'data-act="waterbar"'} style="${locked ? '' : 'cursor:pointer;'}"><i style="width:${waterOk(inp) ? 100 : Math.min(100, ml / 10)}%"></i></div>${!locked && !waterOk(inp) ? '<div class="mute" style="font-size:11px">Doble toque en la barra para confirmar el agua del día</div>' : ''}</div>`;
+      + `<div class="row" style="margin-top:6px"><b>${pic('agua', '💧')} Agua</b><span class="pill ${waterOk(inp) ? 'ok' : ''}">${waterOk(inp) ? '✓ ' : ''}${litros(ml)} / 3 L</span></div><div class="bar" ${locked ? '' : 'data-act="waterbar"'} style="${locked ? '' : 'cursor:pointer;'}"><i style="width:${waterOk(inp) ? 100 : Math.min(100, ml / 30)}%"></i></div>${!locked && !waterOk(inp) ? '<div class="mute" style="font-size:11px">Doble toque en la barra para confirmar el agua del día</div>' : ''}</div>`;
     if (gastoCuenta(viewDate)) b += metaCard(viewDate) + gastoCard(viewDate, inp, locked);
     b += foodCard(viewDate, inp, locked);
     const mine = roomsOf(inp), taken = wk.rooms.filter(x => !mine.includes(x));
@@ -820,7 +820,7 @@ document.addEventListener('click', async ev => {
   }
   else if (a === 'modo') { const v = el.dataset.v; actDay(viewDate, i => { if (v === 'pausa') i.modo = 'pausa'; else delete i.modo; }); if (mealsOf(viewDate).length && S.token) { const d = viewDate; aiRun('Recalculando el puntaje del día…', async () => { const r = await api('/api/meal/rejudge', 'POST', { date: d }); S.mc[d] = { meals: r.meals }; }); } }
   else if (a === 'aerozero') actDay(viewDate, i => { delete i.aeroKcal; delete i.aeroLog; });
-  else if (a === 'waterbar') { const now = Date.now(); if (now - (window._wb || 0) < 450) { window._wb = 0; actDay(viewDate, i => { if (waterOk(i)) { delete i.waterMl; delete i.water; } else i.waterMl = 1000; }); } else window._wb = now; }
+  else if (a === 'waterbar') { const now = Date.now(); if (now - (window._wb || 0) < 450) { window._wb = 0; actDay(viewDate, i => { if (waterOk(i)) { delete i.waterMl; delete i.water; } else i.waterMl = 3000; }); } else window._wb = now; }
   else if (a === 'gymset') {
     const v = parseInt(document.getElementById('gm')?.value, 10);
     if (!(v >= 0 && v <= 600)) { hint('Escribí los minutos'); return; }
