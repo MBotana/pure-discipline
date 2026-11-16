@@ -95,6 +95,7 @@ async function gemini(env: Env, system: string, parts: unknown[], temperature = 
   throw Object.assign(new Error('La IA no respondió (' + last + ')'), { status: 502 });
 }
 import { sugerencias, dowL } from '../engine/src/engine/resumen.ts';
+import { RECETAS, recomendar, fmtReceta } from '../engine/src/engine/recetas.ts';
 import { comidaPuntua, GASTO } from '../engine/src/engine/gasto.ts';
 
 // ---------- Mascotas que hablan (Gemini redacta, Telegram entrega) ----------
@@ -201,10 +202,12 @@ async function judgeDay(env: Env, date: string, final: boolean) {
     ? ` Las calorías pasan de ${CAL_META}: mencioná cuántas kcal se pasó (${kcal - CAL_META}) en una línea, sin bajar el puntaje por eso y SIN sugerir ejercicio (la app suma esas kcal a la meta de gasto del día).`
     : '';
   const tot = `Acumulado del día (ya sumado, NO lo recalcules): ~${kcal} kcal · ${prot} g de proteína · ${carb} g de carbohidratos. Los números "fijo" de cada comida tampoco se recalculan: usalos tal cual.`;
+  const rr = recomendar({ k: kcal, p: prot, c: carb });
+  const rec = final ? '' : `\n\nReceta recomendada para la próxima comida (ya calculada por la app, usala tal cual): ${rr.r ? fmtReceta(rr.r) : 'ninguna, no hace falta comer más'}. Motivo: ${rr.why}\nCatálogo de recetas del plan (no recomiendes nada fuera de esto): ${RECETAS.map(r => r.n).join('; ')}.`;
   const how = final
     ? `El día terminó. Primera línea: solo "PUNTAJE: NN%" (un número entero de 0 a 100), según TODO el día junto. Después: "Macros del día: ~${kcal} kcal · ${prot} g de proteína · ${carb} g de carbohidratos" (usá exactamente esos números) y una línea "Meta: ${META_TX}: llegó / quedó corto en X". Después, una sección "Qué bajó el puntaje:" con cada falla y qué habría que haber comido para evitarla (o una línea de por qué fue 100 si no hubo fallas). Sin markdown.`
-    : `El día sigue. Respondé con estas líneas, sin encabezado de veredicto y sin markdown, cortas y concretas: "Esta comida: qué comí (SOLO la última comida cargada, la de la hora más tardía; no la mezcles con otras)", "Esta comida: ~X kcal · X g de proteína · X g de carbohidratos" (los números "fijo" de esa comida), "Acumulado hoy: ~X kcal · X g de proteína · X g de carbohidratos (meta: ${META_TX})" (usá el acumulado ya sumado), "Te falta: X kcal y X g de proteína, y si falta algo más (verduras, grasas buenas) o si hay algo para evitar", "Para compensar: una sugerencia concreta con alimentos y cantidades para la próxima comida (o para lo que queda del día, según la hora de las comidas listadas)", "Puntaje estimado hasta ahora: PUNTAJE: NN%" (suponiendo que no comes nada más). Si ya llegó a la meta o se pasó, decilo y no sugieras comer más. Si le faltan calorías pero no proteína, decilo como dato, no como falla. Una comida sin calorías (agua) no cambia nada del acumulado ni del puntaje.`;
-  return gemini(env, 'Sos un evaluador consistente de la alimentación diaria de un adulto que entrena. Respondés en español rioplatense, breve y concreto.\n' + RUBRIC, [{ text: `${how}${over}${modoTx}\n\nComidas del día (ordenadas por hora):\n${list}\n\n${tot}` }]);
+    : `El día sigue. Respondé con estas líneas, sin encabezado de veredicto y sin markdown, cortas y concretas: "Esta comida: qué comí (SOLO la última comida cargada, la de la hora más tardía; no la mezcles con otras)", "Esta comida: ~X kcal · X g de proteína · X g de carbohidratos" (los números "fijo" de esa comida), "Acumulado hoy: ~X kcal · X g de proteína · X g de carbohidratos (meta: ${META_TX})" (usá el acumulado ya sumado), "Te falta: X kcal y X g de proteína, y si falta algo más (verduras, grasas buenas) o si hay algo para evitar", "Para compensar: copiá EXACTAMENTE la receta recomendada que figura abajo (nombre y cantidades tal cual, sin inventar otra comida ni cambiar gramos) y su motivo", "Puntaje estimado hasta ahora: PUNTAJE: NN%" (suponiendo que no comes nada más). Si ya llegó a la meta o se pasó, decilo y no sugieras comer más. Si le faltan calorías pero no proteína, decilo como dato, no como falla. Una comida sin calorías (agua) no cambia nada del acumulado ni del puntaje.`;
+  return gemini(env, 'Sos un evaluador consistente de la alimentación diaria de un adulto que entrena. Respondés en español rioplatense, breve y concreto.\n' + RUBRIC, [{ text: `${how}${over}${modoTx}\n\nComidas del día (ordenadas por hora):\n${list}\n\n${tot}${rec}` }]);
 }
 
 const isEmptyInput = (raw: string | null) => {

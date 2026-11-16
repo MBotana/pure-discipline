@@ -6,6 +6,7 @@
  */
 import { dateOfDay } from './calendar.ts';
 import { gastoDia, gastoCuenta, GASTO, extraGasto, comidaPuntua, castigada } from './gasto.ts';
+export { RECETAS, recomendar, fmtReceta } from './recetas.ts';
 export { GASTO, AERO, kpm, gastoDia, gastoOk, gastoCuenta, metaGasto, CONTROLES, controles, extraGasto, EXTRA_KCAL, comidaPuntua, castigada, exceso, compensa } from './gasto.ts';
 
 export type Cat = 'F' | 'I' | 'V' | 'D' | 'O';
